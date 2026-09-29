@@ -140,23 +140,44 @@ impl DaemonService {
                 }))
             }
             Method::ScanStart => {
-                let mode = params
+                let mode_str = params
                     .get("mode")
                     .and_then(|v| v.as_str())
-                    .unwrap_or("quick");
-                let mode = if mode == "full" {
+                    .unwrap_or("quick")
+                    .to_string();
+                let mode = if mode_str == "full" {
                     toolhub_scanner::ScanMode::Full
                 } else {
                     toolhub_scanner::ScanMode::Quick
                 };
+                let sid = self.registry.begin_scan(&mode_str).map_err(db_err)?;
                 let report = toolhub_scanner::run_scan(mode, None);
                 self.ingest_scan(&report);
+                let cov = json!({
+                    "roots_ok": report.coverage.roots_ok.len(),
+                    "roots_failed": report.coverage.roots_failed.len(),
+                    "candidates": report.candidates.len(),
+                });
+                let errs = json!(report.coverage.roots_failed);
+                let _ = self.registry.finish_scan(
+                    &sid,
+                    if report.coverage.roots_failed.is_empty() {
+                        "completed"
+                    } else {
+                        "partial"
+                    },
+                    &cov.to_string(),
+                    &errs.to_string(),
+                );
                 Ok(json!({
+                    "scan_session_id": sid,
+                    "mode": mode_str,
                     "candidates": report.candidates.len(),
                     "roots_ok": report.coverage.roots_ok.len(),
                     "roots_failed": report.coverage.roots_failed,
                     "recognized": self.registry.count_instances().map_err(db_err)?,
                     "unknown_candidates": self.registry.count_candidates().map_err(db_err)?,
+                    "evidence": self.registry.count_evidence().map_err(db_err)?,
                 }))
             }
             Method::ScanStatus => Ok(json!({
@@ -516,14 +537,92 @@ impl DaemonService {
                 Ok(json!({"revoked": true}))
             }
             Method::SkillList => {
-                // Skills are optional; empty list is valid.
-                Ok(json!([]))
+                // F15: optional declarative registration via params
+                if let Some(manifest) = params.get("register") {
+                    let id = manifest.get("id").and_then(|v| v.as_str()).ok_or_else(|| {
+                        ProtocolError::new(ErrorCode::InvalidParams, "id required")
+                    })?;
+                    let name = manifest.get("name").and_then(|v| v.as_str()).unwrap_or(id);
+                    let schema = manifest
+                        .get("schema")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("toolhub.skill/v1");
+                    if schema != "toolhub.skill/v1" {
+                        return Err(ProtocolError::new(
+                            ErrorCode::InvalidParams,
+                            "unsupported skill schema",
+                        ));
+                    }
+                    // reject hook/installer payloads
+                    if manifest.get("hooks").is_some() || manifest.get("install").is_some() {
+                        return Err(ProtocolError::new(
+                            ErrorCode::Denied,
+                            "skill hooks/installers are not permitted",
+                        ));
+                    }
+                    let kind = manifest
+                        .get("kind")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("instruction");
+                    let json_s = serde_json::to_string(manifest).unwrap_or_else(|_| "{}".into());
+                    self.registry
+                        .upsert_skill(id, name, schema, kind, &json_s, None)
+                        .map_err(db_err)?;
+                }
+                let rows = self.registry.list_skills().map_err(db_err)?;
+                let skills: Vec<Value> = rows
+                    .into_iter()
+                    .map(|(id, name, schema, manifest)| {
+                        let m: Value = serde_json::from_str(&manifest).unwrap_or(json!({}));
+                        json!({"id": id, "name": name, "schema": schema, "manifest": m})
+                    })
+                    .collect();
+                Ok(json!(skills))
             }
             Method::SkillInspect | Method::SkillResolve => {
                 let id = params.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                Ok(
-                    json!({"id": id, "status": "not_installed", "note": "no skill packages registered"}),
-                )
+                let rows = self.registry.list_skills().map_err(db_err)?;
+                if let Some((_, name, schema, manifest)) =
+                    rows.into_iter().find(|(sid, _, _, _)| sid == id)
+                {
+                    let m: Value = serde_json::from_str(&manifest).unwrap_or(json!({}));
+                    // F15: resolve requirements against registry capability providers
+                    let mut requires = vec![];
+                    if let Some(reqs) = m.get("requires").and_then(|v| v.as_array()) {
+                        for r in reqs {
+                            let cap = r.get("capability").and_then(|v| v.as_str()).unwrap_or("");
+                            let canon = toolhub_core::CapabilityRegistry::with_core_taxonomy()
+                                .canonical_of(cap)
+                                .unwrap_or(cap)
+                                .to_string();
+                            let providers = self
+                                .registry
+                                .instances_for_capability(&canon)
+                                .map_err(db_err)?;
+                            requires.push(json!({
+                                "capability": cap,
+                                "canonical": canon,
+                                "satisfied": !providers.is_empty(),
+                                "providers": providers.len(),
+                            }));
+                        }
+                    }
+                    let status = if requires.iter().all(|r| r["satisfied"] == json!(true)) {
+                        "available"
+                    } else {
+                        "missing_capabilities"
+                    };
+                    Ok(json!({
+                        "id": id,
+                        "name": name,
+                        "schema": schema,
+                        "status": status,
+                        "requires": requires,
+                        "manifest": m
+                    }))
+                } else {
+                    Ok(json!({"id": id, "status": "malformed", "note": "skill not registered"}))
+                }
             }
             Method::DiscoveryStart => {
                 let agent_id = params
@@ -618,11 +717,35 @@ impl DaemonService {
                 if !s.allows("classification.submit") {
                     return Err(ProtocolError::denied("classification.submit not allowed"));
                 }
-                // Classification is untrusted data; store provenance without granting trust.
+                // F14: require candidate + non-empty label; durable untrusted enrichment
+                let cand = params
+                    .get("candidate_id")
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
+                    .ok_or_else(|| {
+                        ProtocolError::new(ErrorCode::InvalidParams, "candidate_id required")
+                    })?;
+                let label = params
+                    .get("label")
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.trim().is_empty())
+                    .ok_or_else(|| {
+                        ProtocolError::new(ErrorCode::InvalidParams, "label required")
+                    })?;
+                let conf = params
+                    .get("confidence")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.5)
+                    .clamp(0.0, 1.0);
+                self.registry
+                    .store_classification(id, cand, label, conf)
+                    .map_err(db_err)?;
                 Ok(json!({
                     "accepted": true,
+                    "stored": true,
                     "provenance": "ai",
-                    "note": "classification stored as untrusted enrichment only"
+                    "evidence_count": self.registry.count_evidence().map_err(db_err)?,
+                    "note": "classification stored as untrusted enrichment only; no execution trust"
                 }))
             }
             Method::DiscoveryRevoke => {
@@ -639,8 +762,34 @@ impl DaemonService {
                 Ok(json!({"revoked": true}))
             }
             Method::AgentList => {
+                // F16: detect + health + typed MCP config
                 let agents = toolhub_agent_bridge::detect_all();
-                Ok(json!(agents))
+                let endpoint = "toolhub";
+                let view: Vec<Value> = agents
+                    .into_iter()
+                    .map(|a| {
+                        let cfg = serde_json::json!({
+                            "mcpServers": {
+                                "toolhub": {
+                                    "command": "toolhub",
+                                    "args": ["mcp", "serve"],
+                                    "env": {"TOOLHUB_ENDPOINT": endpoint}
+                                }
+                            }
+                        });
+                        json!({
+                            "id": a.id,
+                            "name": a.name,
+                            "kind": a.kind,
+                            "executable": a.executable,
+                            "version": a.version,
+                            "health": "detected",
+                            "mcp_config": cfg,
+                            "launch": toolhub_agent_bridge::discovery_task_prompt(&a.id, "<session>")
+                        })
+                    })
+                    .collect();
+                Ok(json!(view))
             }
             Method::PolicyGet => {
                 let rules = self.registry.list_policy().map_err(db_err)?;
@@ -685,7 +834,14 @@ impl DaemonService {
                 let _ = self.registry.set_policy(scope, subject, action);
                 Ok(json!({"ok": true}))
             }
-            Method::ActivityList => Ok(json!([])),
+            Method::ActivityList => {
+                let rows = self.registry.list_activity(100).map_err(db_err)?;
+                let items: Vec<Value> = rows
+                    .into_iter()
+                    .map(|(ts, kind, summary)| json!({"ts": ts, "kind": kind, "summary": summary}))
+                    .collect();
+                Ok(json!(items))
+            }
             Method::ExportReport => {
                 let instances = self.registry.list_instances().map_err(db_err)?;
                 let tools: Vec<_> = instances
@@ -709,8 +865,7 @@ impl DaemonService {
     }
 
     fn ingest_scan(&mut self, report: &toolhub_scanner::ScanReport) {
-        let caps = toolhub_core::CapabilityRegistry::with_core_taxonomy();
-        let _ = caps;
+        let mut seen = Vec::new();
         for cand in &report.candidates {
             let rec = toolhub_recognizer::recognize(cand);
             if rec.recognized {
@@ -740,13 +895,20 @@ impl DaemonService {
                             .map(|c| c.as_str().to_string())
                             .collect(),
                     };
-                    let _ = self.registry.upsert_instance(&input);
-                    // Insert only if missing; do not clobber builtin kinds.
+                    if self.registry.upsert_instance(&input).is_ok() {
+                        seen.push(inst.id.as_str().to_string());
+                    }
                     let _ = self.registry.db.conn.execute(
                         "INSERT INTO environments(id, name, kind, root_path, parent_id, origin_json, owner_json, labels_json)
                          VALUES (?1, ?2, ?3, NULL, NULL, '{}', '{}', '[]')
                          ON CONFLICT(id) DO NOTHING",
                         rusqlite::params![env_id.as_str(), env_id.as_str(), "detected"],
+                    );
+                    let _ = self.registry.upsert_interface(
+                        &format!("if-{}", inst.id.as_str()),
+                        inst.id.as_str(),
+                        "cli",
+                        Some(inst.path.as_str()),
                     );
                 }
             } else {
@@ -759,6 +921,9 @@ impl DaemonService {
                         file_name: cand.file_name.clone(),
                     });
             }
+        }
+        if report.coverage.roots_failed.is_empty() {
+            let _ = self.registry.mark_missing_except(&seen);
         }
         self.last_scan = Some(chrono::Utc::now());
         let _ = self

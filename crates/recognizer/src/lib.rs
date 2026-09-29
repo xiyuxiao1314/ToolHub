@@ -258,7 +258,7 @@ pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
     };
 
     let instance = ToolInstance {
-        id: InstanceId::new(uuid_v4()).expect("uuid"),
+        id: InstanceId::new(stable_instance_id(&candidate.path)).expect("stable id"),
         definition_id: definition.id.clone(),
         version: candidate.version_hint.clone(),
         platform,
@@ -286,14 +286,11 @@ pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
     }
 }
 
-fn uuid_v4() -> String {
-    // Avoid extra dep in this crate: use a simple unique string.
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    format!("inst-{nanos:x}-{}", std::process::id())
+/// F06: stable instance identity from normalized path (not per-discovery UUID).
+pub fn stable_instance_id(path: &str) -> String {
+    let norm = toolhub_core::normalize_path(path);
+    let fp = toolhub_core::path_fingerprint(&norm);
+    format!("inst-{}", &fp[..16])
 }
 
 fn infer_origin(path: &str) -> Origin {

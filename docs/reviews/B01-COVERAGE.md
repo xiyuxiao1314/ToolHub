@@ -1,24 +1,24 @@
-# B01 coverage matrix (R1-repair)
+# B01 coverage matrix (R2-ready)
 
 | Target | Status | Evidence |
 | --- | --- | --- |
-| B01-01 identities | Implemented / Partial | core types + validation; path identity still improving |
-| B01-02 schemas/resources | Partial | capability aliases + skill parse tests; no full schema package |
-| B01-03 protocol/errors | Implemented (core) | jsonrpc 2.0 validation, stable ErrorCode, limits |
-| B01-04 authorization | Implemented / Verified (unit+smoke) | F01/F02 repairs; approval binding tests |
-| B01-05 persistence | Implemented | SQLite migrations; policy/approval/session reload |
-| B01-06 scanner modes | Partial | quick scan smoke; incremental watch not done |
-| B01-07 OS discovery | Partial (Windows host) | PATH/known dirs/package smoke; Registry provider still heuristic; macOS unverified |
-| B01-08 recognition | Implemented (core) | F07 trust separation |
-| B01-09 environments | Partial | kind preserved; full graph weak |
-| B01-10 resolver | Implemented | F10 eligibility + version grammar |
-| B01-11 execution/audit | Implemented / Verified | F04/F05 + timeout unit + redaction tests |
-| B01-12 daemon/IPC | Partial | stdio shared registry; named pipes open |
-| B01-13 CLI/reporting | Implemented (core) | F17 structured errors/exit |
-| B01-14 MCP | Implemented (core) | F13 lifecycle/list/call envelopes |
-| B01-15 sessions/adapters | Partial | sessions durable; launch not real |
-| B01-16 skills | Not fully implemented | list empty; registration path missing |
-| B01-17 QA | Partial | hardened smoke + 47 unit tests; no CI |
-| B01-18 delivery | Implemented | this packet + bundle |
+| B01-01 identities | Implemented / Verified | stable path IDs, validation tests |
+| B01-02 schemas/resources | Implemented | schemas/*.schema.json + skill/protocol tests |
+| B01-03 protocol/errors | Implemented / Verified | jsonrpc 2.0 validation, ErrorCode |
+| B01-04 authorization | Implemented / Verified | F01/F02 + unit |
+| B01-05 persistence | Implemented / Verified | migrations, evidence, scan sessions, approvals reload |
+| B01-06 scanner modes | Implemented | quick/full split, scan sessions |
+| B01-07 OS discovery | Implemented (Windows) / unverified-host (macOS) | winreg providers + smoke |
+| B01-08 recognition | Implemented / Verified | F07 trust separation |
+| B01-09 environments | Implemented | project/venv/conda/agent env detection |
+| B01-10 resolver | Implemented / Verified | F10 |
+| B01-11 execution/audit | Implemented / Verified | F04/F05 |
+| B01-12 daemon/IPC | Implemented | user-scoped named pipe source + stdio shared registry |
+| B01-13 CLI/reporting | Implemented / Verified | F17 + activity.list |
+| B01-14 MCP | Implemented / Verified | F13 |
+| B01-15 sessions/adapters | Implemented | F14/F16 detect+config; external launch unverified-host |
+| B01-16 skills | Implemented | F15 register/inspect/resolve |
+| B01-17 QA | Implemented | hardened smoke + full unit suite |
+| B01-18 delivery | Implemented | this R2-ready packet |
 
-Legend: Implemented = code path exists; Verified = automated/host check ran here; Partial = incomplete; Not fully implemented = open for next pass.
+Legend: Implemented = source complete for B01 scope; Verified = automated check on this host; unverified-host = no authorized environment.

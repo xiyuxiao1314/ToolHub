@@ -44,7 +44,9 @@ pub fn run_scan(mode: ScanMode, roots_override: Option<Vec<String>>) -> ScanRepo
     ];
 
     for p in providers {
-        if mode == ScanMode::Quick && p.full_only() {
+        // F08: Quick skips deep package walks; Full includes them.
+        let deep = p.full_only() || p.name() == "package_managers";
+        if mode == ScanMode::Quick && deep && p.name() == "package_managers" {
             continue;
         }
         let roots = roots_override.clone().unwrap_or_else(|| p.roots());

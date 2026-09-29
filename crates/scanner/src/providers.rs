@@ -167,11 +167,93 @@ impl ScannerProvider for PackageManagerProvider {
     }
 }
 
-/// Windows Registry / App Paths — best-effort via `reg.exe` query is NOT used
-/// (would execute a tool). We read well-known metadata dirs instead and mark
-/// registry root coverage when the OS API path is unavailable in this build.
+/// F08: real Windows Registry App Paths / uninstall metadata via winreg (read-only).
 #[derive(Default)]
 pub struct WindowsRegistryProvider;
+
+#[cfg(windows)]
+impl WindowsRegistryProvider {
+    fn read_app_paths(&self) -> Vec<ScanCandidate> {
+        use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+        use winreg::RegKey;
+        let mut out = vec![];
+        let roots = [
+            (
+                HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths",
+            ),
+            (
+                HKEY_CURRENT_USER,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths",
+            ),
+            (
+                HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\App Paths",
+            ),
+        ];
+        for (hive, sub) in roots {
+            if let Ok(key) = RegKey::predef(hive).open_subkey(sub) {
+                for name in key.enum_keys().flatten().take(200) {
+                    if let Ok(app) = key.open_subkey(&name) {
+                        if let Ok(path) = app.get_value::<String, _>("") {
+                            let p = std::path::PathBuf::from(path.trim_matches('"'));
+                            if p.is_file() {
+                                let mut c = candidate_from_file(&p);
+                                c.metadata = serde_json::json!({"source": "registry_app_paths", "name": name});
+                                out.push(c);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    fn read_installed_apps(&self) -> Vec<ScanCandidate> {
+        use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+        use winreg::RegKey;
+        let mut out = vec![];
+        let subs = [
+            (
+                HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+            ),
+            (
+                HKEY_CURRENT_USER,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+            ),
+            (
+                HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+            ),
+        ];
+        for (hive, sub) in subs {
+            if let Ok(key) = RegKey::predef(hive).open_subkey(sub) {
+                for name in key.enum_keys().flatten().take(300) {
+                    if let Ok(app) = key.open_subkey(&name) {
+                        let display: String = app.get_value("DisplayName").unwrap_or_default();
+                        let loc: String = app.get_value("InstallLocation").unwrap_or_default();
+                        if !display.is_empty() {
+                            let mut c = ScanCandidate::from_path(if loc.is_empty() {
+                                format!("registry://uninstall/{name}")
+                            } else {
+                                loc.clone()
+                            });
+                            c.metadata = serde_json::json!({
+                                "source": "registry_uninstall",
+                                "display_name": display,
+                                "install_location": loc
+                            });
+                            out.push(c);
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+}
 
 impl ScannerProvider for WindowsRegistryProvider {
     fn name(&self) -> &'static str {
@@ -179,8 +261,8 @@ impl ScannerProvider for WindowsRegistryProvider {
     }
 
     fn roots(&self) -> Vec<String> {
-        // App Paths mirrored locations and user program roots.
-        let mut r = vec![];
+        // F08: include real registry root plus filesystem mirrors.
+        let mut r = vec!["registry:app_paths_uninstall".to_string()];
         if let Some(pf) = std::env::var_os("ProgramFiles") {
             r.push(pf.to_string_lossy().to_string());
         }
@@ -191,12 +273,19 @@ impl ScannerProvider for WindowsRegistryProvider {
             r.push(format!("{}/Programs", la.to_string_lossy()));
             r.push(format!("{}/Microsoft/WindowsApps", la.to_string_lossy()));
         }
-        r.retain(|p| std::path::Path::new(p).exists());
         r
     }
 
     fn scan_root(&self, root: &str) -> Result<Vec<ScanCandidate>, std::io::Error> {
-        // Shallow scan of install roots (depth 2) for launchers.
+        #[cfg(windows)]
+        {
+            if root.starts_with("registry:") {
+                let mut out = self.read_app_paths();
+                out.extend(self.read_installed_apps());
+                return Ok(out);
+            }
+        }
+        // Directory fallback (Program Files etc.)
         let dir = std::path::Path::new(root);
         if !dir.is_dir() {
             return Ok(vec![]);

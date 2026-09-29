@@ -13,7 +13,7 @@ which = { workspace = true }
 dirs = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
-# registry reads via winapi-lite pattern using std + documented APIs in windows scanner
+winreg = "0.52"
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -49,39 +49,35 @@ impl EnvironmentGraph {
             .collect()
     }
 
+    /// F09: detect distinct project/venv/conda/package/agent environments from path markers.
     pub fn environment_for_path(&self, path: &str) -> EnvironmentId {
-        let p = path.to_ascii_lowercase();
+        let p = path.replace('\\', "/").to_ascii_lowercase();
+        // Project venv: .../project/.venv or .../project/venv
+        if let Some(env_id) = detect_project_env(&p) {
+            return env_id;
+        }
         if p.contains("homebrew") || p.contains("cellar") {
-            return self
-                .find_kind(EnvironmentKind::Homebrew)
-                .unwrap_or_else(|| EnvironmentId::new("env.system").unwrap());
+            return EnvironmentId::new("env.homebrew").unwrap();
         }
         if p.contains("scoop") {
-            return self
-                .find_kind(EnvironmentKind::Scoop)
-                .unwrap_or_else(|| EnvironmentId::new("env.user").unwrap());
+            return EnvironmentId::new("env.scoop").unwrap();
+        }
+        if p.contains("chocolatey") {
+            return EnvironmentId::new("env.chocolatey").unwrap();
         }
         if p.contains("conda") {
-            return self
-                .find_kind(EnvironmentKind::Conda)
-                .unwrap_or_else(|| EnvironmentId::new("env.user").unwrap());
-        }
-        if p.contains("venv") {
-            return self
-                .find_kind(EnvironmentKind::Venv)
-                .unwrap_or_else(|| EnvironmentId::new("env.user").unwrap());
+            return EnvironmentId::new("env.conda").unwrap();
         }
         if p.contains("cursor") || p.contains("opencode") || p.contains("codex") {
-            return self
-                .find_kind(EnvironmentKind::AgentSandbox)
-                .unwrap_or_else(|| EnvironmentId::new("env.user").unwrap());
+            return EnvironmentId::new("env.agent").unwrap();
         }
-        if p.contains("program files") || p.contains("/usr/bin") {
+        if p.contains("program files") || p.contains("/usr/bin") || p.contains("/usr/local/bin") {
             return EnvironmentId::new("env.system").unwrap();
         }
         EnvironmentId::new("env.user").unwrap()
     }
 
+    #[allow(dead_code)]
     fn find_kind(&self, kind: EnvironmentKind) -> Option<EnvironmentId> {
         self.environments
             .iter()
@@ -95,13 +91,20 @@ impl EnvironmentGraph {
             let kind = match id.as_str() {
                 "env.system" => EnvironmentKind::System,
                 "env.user" => EnvironmentKind::User,
+                "env.homebrew" => EnvironmentKind::Homebrew,
+                "env.scoop" => EnvironmentKind::Scoop,
+                "env.chocolatey" => EnvironmentKind::Chocolatey,
+                "env.conda" => EnvironmentKind::Conda,
+                "env.agent" => EnvironmentKind::AgentSandbox,
+                s if s.starts_with("env.project.") => EnvironmentKind::Venv,
                 _ => EnvironmentKind::Unknown,
             };
+            let name = id.as_str().trim_start_matches("env.").replace('.', " ");
             self.insert(Environment {
                 id: id.clone(),
-                name: id.as_str().to_string(),
+                name,
                 kind,
-                root_path: None,
+                root_path: Some(path.to_string()),
                 parent_id: None,
                 origin: Origin::Unknown,
                 owner: Owner::unknown(),
@@ -110,6 +113,19 @@ impl EnvironmentGraph {
         }
         id
     }
+}
+
+/// F09: project-local venvs become distinct environments keyed by project root.
+fn detect_project_env(p: &str) -> Option<EnvironmentId> {
+    let parts: Vec<&str> = p.split('/').collect();
+    for (i, seg) in parts.iter().enumerate() {
+        if (*seg == ".venv" || *seg == "venv" || *seg == "env") && i > 0 {
+            let project = parts[i - 1];
+            let id = format!("env.project.{}", project.replace(' ', "_"));
+            return EnvironmentId::new(id).ok();
+        }
+    }
+    None
 }
 
 /// Ownership attribution with explicit evidence; directory names never prove Known.

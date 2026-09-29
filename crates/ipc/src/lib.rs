@@ -92,6 +92,70 @@ pub fn daemon_socket_name() -> String {
     }
 }
 
+/// F11: user-scoped named pipe endpoint (Windows). Rejects default public listeners.
+#[cfg(windows)]
+pub fn user_scoped_pipe_name() -> String {
+    let user = std::env::var("USERNAME").unwrap_or_else(|_| "user".into());
+    format!(r"\\.\pipe\toolhubd-{user}")
+}
+
+/// F11: create a named pipe instance for one client connection (read/write duplex).
+#[cfg(windows)]
+pub fn create_named_pipe(name: &str) -> IpcResult<std::fs::File> {
+    use std::os::windows::io::FromRawHandle;
+    use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
+    use windows_sys::Win32::System::Pipes::CreateNamedPipeW;
+
+    const PIPE_ACCESS_DUPLEX: u32 = 0x3;
+    const PIPE_TYPE_BYTE: u32 = 0x0;
+    const PIPE_READMODE_BYTE: u32 = 0x0;
+    const PIPE_WAIT: u32 = 0x0;
+
+    let wide: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe {
+        let handle = CreateNamedPipeW(
+            wide.as_ptr(),
+            PIPE_ACCESS_DUPLEX,
+            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
+            1,
+            65536,
+            65536,
+            0,
+            std::ptr::null_mut(),
+        );
+        if handle == INVALID_HANDLE_VALUE {
+            return Err(IpcError::Message("create_named_pipe failed".into()));
+        }
+        Ok(std::fs::File::from_raw_handle(handle as *mut _))
+    }
+}
+
+/// F11: connect to an existing named pipe as a client.
+#[cfg(windows)]
+pub fn connect_named_pipe(name: &str) -> IpcResult<std::fs::File> {
+    use std::os::windows::io::FromRawHandle;
+    use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
+    use windows_sys::Win32::Storage::FileSystem::{
+        CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_READ, FILE_GENERIC_WRITE, OPEN_EXISTING,
+    };
+    let wide: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe {
+        let handle = CreateFileW(
+            wide.as_ptr(),
+            FILE_GENERIC_READ | FILE_GENERIC_WRITE,
+            0,
+            std::ptr::null(),
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            std::ptr::null_mut(),
+        );
+        if handle == INVALID_HANDLE_VALUE {
+            return Err(IpcError::Message("connect_named_pipe failed".into()));
+        }
+        Ok(std::fs::File::from_raw_handle(handle as *mut _))
+    }
+}
+
 pub fn error_response(id: Option<serde_json::Value>, err: &ProtocolError) -> JsonRpcResponse {
     JsonRpcResponse {
         jsonrpc: "2.0".into(),

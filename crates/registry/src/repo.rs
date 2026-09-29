@@ -37,7 +37,7 @@ impl Registry {
         Ok(())
     }
 
-    /// Idempotent upsert of a recognized instance. Duplicate discoveries update last_seen.
+    /// F06: idempotent upsert keyed by (definition_id, path); preserves identity across rescans.
     pub fn upsert_instance(&mut self, input: &UpsertInstanceInput) -> RegistryResult<()> {
         let now = chrono::Utc::now().to_rfc3339();
         let tx = self.db.conn.transaction()?;
@@ -47,6 +47,15 @@ impl Registry {
              ON CONFLICT(id) DO UPDATE SET name=excluded.name, updated_at=excluded.updated_at",
             params![input.definition_id, input.definition_name, now],
         )?;
+        // Resolve existing row by stable path identity
+        let existing: Option<String> = tx
+            .query_row(
+                "SELECT id FROM tool_instances WHERE definition_id = ?1 AND path = ?2 LIMIT 1",
+                params![input.definition_id, input.path],
+                |r| r.get(0),
+            )
+            .optional()?;
+        let id = existing.unwrap_or_else(|| input.id.clone());
         tx.execute(
             "INSERT INTO tool_instances(
                 id, definition_id, version, platform, arch, path, canonical_path,
@@ -62,7 +71,7 @@ impl Registry {
                 status=excluded.status,
                 last_seen=excluded.last_seen",
             params![
-                input.id,
+                id,
                 input.definition_id,
                 input.version,
                 input.platform,
@@ -77,8 +86,6 @@ impl Registry {
                 now
             ],
         )?;
-        // If another row already owns this (definition, path) under a different id, keep both
-        // but also upsert by path-match for stable identity of rediscovered copies.
         for cap in &input.capabilities {
             tx.execute(
                 "INSERT INTO tool_capabilities(definition_id, capability_id) VALUES (?1, ?2)
@@ -86,6 +93,12 @@ impl Registry {
                 params![input.definition_id, cap],
             )?;
         }
+        // F06: persist evidence rows
+        tx.execute(
+            "INSERT INTO evidence(entity_kind, entity_id, source, provenance, confidence, summary, observed_at)
+             VALUES ('instance', ?1, 'path_pattern', 'native', 0.8, 'recognized during scan', ?2)",
+            params![id, now],
+        )?;
         tx.commit()?;
         Ok(())
     }
@@ -209,13 +222,24 @@ impl Registry {
         Ok(rows)
     }
 
+    /// F06: candidate identity is the normalized path; repeated scans do not grow rows.
     pub fn upsert_candidate(&mut self, c: &CandidateRow) -> RegistryResult<()> {
+        let existing: Option<String> = self
+            .db
+            .conn
+            .query_row(
+                "SELECT id FROM scan_candidates WHERE path = ?1 LIMIT 1",
+                params![c.path],
+                |r| r.get(0),
+            )
+            .optional()?;
+        let id = existing.unwrap_or_else(|| c.id.clone());
         self.db.conn.execute(
             "INSERT INTO scan_candidates(id, path, canonical_path, file_name, recognized, metadata_json, discovered_at)
              VALUES (?1, ?2, NULL, ?3, ?4, '{}', ?5)
              ON CONFLICT(id) DO UPDATE SET recognized=excluded.recognized, file_name=excluded.file_name",
             params![
-                c.id,
+                id,
                 c.path,
                 c.file_name,
                 c.recognized as i32,
@@ -419,6 +443,130 @@ impl Registry {
             params![id, name, kind, health],
         )?;
         Ok(())
+    }
+
+    /// F06: start a scan session; returns session id.
+    pub fn begin_scan(&mut self, mode: &str) -> RegistryResult<String> {
+        let id = uuid::Uuid::new_v4().to_string();
+        self.db.conn.execute(
+            "INSERT INTO scan_sessions(id, mode, started_at, status, coverage_json, errors_json)
+             VALUES (?1, ?2, ?3, 'running', '{}', '[]')",
+            params![id, mode, chrono::Utc::now().to_rfc3339()],
+        )?;
+        Ok(id)
+    }
+
+    pub fn finish_scan(
+        &mut self,
+        id: &str,
+        status: &str,
+        coverage_json: &str,
+        errors_json: &str,
+    ) -> RegistryResult<()> {
+        self.db.conn.execute(
+            "UPDATE scan_sessions SET finished_at=?2, status=?3, coverage_json=?4, errors_json=?5 WHERE id=?1",
+            params![
+                id,
+                chrono::Utc::now().to_rfc3339(),
+                status,
+                coverage_json,
+                errors_json
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// F06: mark instances not seen in this scan (only when scan fully covered roots).
+    pub fn mark_missing_except(&mut self, seen_ids: &[String]) -> RegistryResult<usize> {
+        let mut n = 0;
+        let mut stmt = self
+            .db
+            .conn
+            .prepare("SELECT id FROM tool_instances WHERE status = 'available'")?;
+        let all: Vec<String> = stmt
+            .query_map([], |r| r.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(stmt);
+        for id in all {
+            if !seen_ids.contains(&id) {
+                self.db.conn.execute(
+                    "UPDATE tool_instances SET status = 'missing' WHERE id = ?1",
+                    params![id],
+                )?;
+                n += 1;
+            }
+        }
+        Ok(n)
+    }
+
+    /// F06: upsert interfaces for an instance.
+    pub fn upsert_interface(
+        &mut self,
+        id: &str,
+        instance_id: &str,
+        kind: &str,
+        executable: Option<&str>,
+    ) -> RegistryResult<()> {
+        self.db.conn.execute(
+            "INSERT INTO interfaces(id, instance_id, kind, executable, supports_stdin, supports_stdout, supports_batch)
+             VALUES (?1, ?2, ?3, ?4, 0, 0, 0)
+             ON CONFLICT(id) DO UPDATE SET kind=excluded.kind, executable=excluded.executable",
+            params![id, instance_id, kind, executable],
+        )?;
+        Ok(())
+    }
+
+    /// F14/F15: durable skill registration
+    pub fn list_skills(&mut self) -> RegistryResult<Vec<(String, String, String, String)>> {
+        let mut stmt = self
+            .db
+            .conn
+            .prepare("SELECT id, name, schema, manifest_json FROM skills ORDER BY name")?;
+        let rows = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// F14: store untrusted classification evidence (does not elevate trust).
+    pub fn store_classification(
+        &mut self,
+        session_id: &str,
+        candidate_id: &str,
+        label: &str,
+        confidence: f64,
+    ) -> RegistryResult<()> {
+        self.db.conn.execute(
+            "INSERT INTO evidence(entity_kind, entity_id, source, provenance, confidence, summary, detail, observed_at)
+             VALUES ('candidate', ?1, 'ai_classification', 'ai', ?2, ?3, ?4, ?5)",
+            params![
+                candidate_id,
+                confidence,
+                format!("classification from session {session_id}"),
+                label,
+                chrono::Utc::now().to_rfc3339()
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn count_evidence(&mut self) -> RegistryResult<u64> {
+        let n: i64 = self
+            .db
+            .conn
+            .query_row("SELECT COUNT(*) FROM evidence", [], |r| r.get(0))?;
+        Ok(n as u64)
+    }
+
+    pub fn list_activity(&mut self, limit: u32) -> RegistryResult<Vec<(String, String, String)>> {
+        let mut stmt = self
+            .db
+            .conn
+            .prepare("SELECT ts, kind, summary FROM activity ORDER BY id DESC LIMIT ?1")?;
+        let rows = stmt
+            .query_map(params![limit], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
     }
 
     pub fn count_instances(&mut self) -> RegistryResult<u64> {

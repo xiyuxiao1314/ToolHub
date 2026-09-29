@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://toolhub.local/schemas/skill.schema.json",
+  "title": "ToolHub Skill Manifest",
+  "type": "object",
+  "required": ["schema", "id", "name"],
+  "properties": {
+    "schema": { "const": "toolhub.skill/v1" },
+    "id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "kind": { "enum": ["instruction", "mcp", "package"] },
+    "requires": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["capability"],
+        "properties": {
+          "capability": { "type": "string" },
+          "version": { "type": "string" },
+          "optional": { "type": "boolean" }
+        }
+      }
+    },
+    "optional": { "type": "array" },
+    "instruction_file": { "type": "string" },
+    "mcp_config": { "type": "string" },
+    "package_path": { "type": "string" }
+  },
+  "additionalProperties": true
+}

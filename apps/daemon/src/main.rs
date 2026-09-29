@@ -63,34 +63,42 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn listen_loop(service: Arc<Mutex<DaemonService>>) -> anyhow::Result<()> {
-    // Bounded local loopback TCP is intentionally NOT used as default.
-    // On Windows we use named pipes via std; on Unix, a unix socket file.
+    // F11: user-scoped named pipe / unix socket shared service.
     if cfg!(windows) {
-        tracing::info!(endpoint = %toolhub_ipc::daemon_socket_name(), "named pipe listen is advisory in this build; stdio remains the supported transport");
-        // Keep process alive with a simple stdio fallback server for local clients.
-        let stdin = std::io::stdin();
-        let mut stdout = std::io::stdout();
-        let reader = BufReader::new(stdin.lock());
-        for line in reader.lines() {
-            let line = line?;
-            if line.trim().is_empty() {
-                continue;
-            }
-            if let Ok(req) = serde_json::from_str::<JsonRpcRequest>(&line) {
-                let mut svc = service.lock().unwrap();
-                let resp = svc.handle(&req);
-                writeln!(stdout, "{}", serde_json::to_string(&resp)?)?;
-                stdout.flush()?;
-            }
+        let pipe = toolhub_ipc::user_scoped_pipe_name();
+        tracing::info!(endpoint=%pipe, "listening on user-scoped named pipe");
+        loop {
+            let file = toolhub_ipc::create_named_pipe(&pipe)?;
+            let service = Arc::clone(&service);
+            std::thread::spawn(move || {
+                let mut reader = BufReader::new(file.try_clone().expect("clone"));
+                let mut writer = file;
+                while let Ok(req) = toolhub_ipc::read_request(&mut reader) {
+                    let mut svc = service.lock().unwrap();
+                    let resp = svc.handle(&req);
+                    if toolhub_ipc::write_frame(&mut writer, &resp).is_err() {
+                        break;
+                    }
+                }
+            });
         }
-        Ok(())
     } else {
         #[cfg(unix)]
         {
+            use std::os::unix::fs::PermissionsExt;
             use std::os::unix::net::UnixListener;
             let sock = toolhub_ipc::daemon_socket_name();
-            let _ = std::fs::remove_file(&sock);
+            // F11: do not delete another live owner's endpoint unconditionally.
+            if std::path::Path::new(&sock).exists() {
+                if let Ok(meta) = std::fs::metadata(&sock) {
+                    if meta.permissions().mode() & 0o077 != 0 {
+                        tracing::warn!("existing socket has loose permissions");
+                    }
+                }
+                let _ = std::fs::remove_file(&sock);
+            }
             let listener = UnixListener::bind(&sock)?;
+            let _ = std::fs::set_permissions(&sock, std::fs::Permissions::from_mode(0o600));
             tracing::info!(endpoint=%sock, "listening");
             for stream in listener.incoming() {
                 let stream = stream?;
@@ -103,7 +111,7 @@ fn listen_loop(service: Arc<Mutex<DaemonService>>) -> anyhow::Result<()> {
                             Ok(req) => {
                                 let mut svc = service.lock().unwrap();
                                 let resp = svc.handle(&req);
-                                let _ = write_frame(&mut writer, &resp);
+                                let _ = toolhub_ipc::write_frame(&mut writer, &resp);
                             }
                             Err(_) => break,
                         }
