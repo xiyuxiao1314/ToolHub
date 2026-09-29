@@ -81,4 +81,26 @@ $ErrorActionPreference = 'Continue'
 if ($LASTEXITCODE -eq 0) { Write-Host 'FAIL missing instance should fail'; exit 1 }
 Write-Host 'OK missing-instance fails'
 
+Write-Host "== 13. approve + execute Ask path =="
+$hits = Invoke-Toolhub -ToolArgs @('--json','search','python') | ConvertFrom-Json
+if (-not $hits -or $hits.Count -eq 0) { Write-Host 'FAIL no python instance'; exit 1 }
+$okExec = $false
+foreach ($h in $hits) {
+    $iid = $h.id
+    $aprRaw = & toolhub --json approve $iid -- --version 2>$null
+    if ($LASTEXITCODE -ne 0) { continue }
+    $apr = $aprRaw | ConvertFrom-Json
+    if (-not $apr.approval_id) { continue }
+    $ex = & toolhub --json exec $iid --approval-id $apr.approval_id -- --version 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        $okExec = $true
+        Write-Host "OK approved exec on $iid"
+        & toolhub --json exec $iid --approval-id $apr.approval_id -- --version 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) { Write-Host 'FAIL approval replay should fail'; exit 1 }
+        Write-Host 'OK replay rejected'
+        break
+    }
+}
+if (-not $okExec) { Write-Host 'FAIL no hashable approved exec succeeded'; exit 1 }
+
 Write-Host "SMOKE DONE reg=$reg"

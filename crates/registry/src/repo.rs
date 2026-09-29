@@ -50,8 +50,12 @@ impl Registry {
         // Resolve existing row by stable path identity
         let existing: Option<String> = tx
             .query_row(
-                "SELECT id FROM tool_instances WHERE definition_id = ?1 AND path = ?2 LIMIT 1",
-                params![input.definition_id, input.path],
+                "SELECT id FROM tool_instances WHERE definition_id = ?1 AND (path = ?2 OR lower(replace(path,'\\','/')) = ?3) LIMIT 1",
+                params![
+                    input.definition_id,
+                    input.path,
+                    toolhub_core::normalize_path(&input.path).replace('\\', "/")
+                ],
                 |r| r.get(0),
             )
             .optional()?;

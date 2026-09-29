@@ -161,6 +161,7 @@ pub fn execute(
     policy: &PolicyEngine,
     allow_extra_env: &[String],
     ctx_extra: &PolicyContext,
+    approval_validated: bool,
 ) -> ExecutionResult {
     let cmd_name = std::path::Path::new(&request.executable)
         .file_stem()
@@ -196,8 +197,8 @@ pub fn execute(
         };
     }
 
-    // Ask is not auto-approved by the executor; caller must supply a validated approval.
-    if decision.action == PolicyAction::Ask {
+    // Ask requires a validated+consumed approval (F01). Allow needs none. Deny already returned.
+    if decision.action == PolicyAction::Ask && !approval_validated {
         return ExecutionResult {
             status: ExecutionStatus::Denied,
             exit_code: None,
@@ -519,7 +520,6 @@ pub fn redact_args(args: &[String]) -> Vec<String> {
             out.push("<redacted>".into());
             continue;
         }
-        let au = a.to_ascii_uppercase();
         if a.starts_with('-') && a.contains('=') {
             let (k, _v) = a.split_once('=').unwrap();
             if is_secret_name(k) {
@@ -529,11 +529,7 @@ pub fn redact_args(args: &[String]) -> Vec<String> {
             }
             continue;
         }
-        if a.starts_with('-')
-            && SECRET_PREFIXES
-                .iter()
-                .any(|p| au.contains(p.trim_end_matches('_')))
-        {
+        if a.starts_with('-') && is_secret_name(a) {
             out.push(a.clone());
             skip_next = true;
         } else if is_secret_name(a) {
@@ -656,6 +652,45 @@ mod tests {
     }
 
     #[test]
+    fn ask_with_validated_approval_proceeds() {
+        let policy = PolicyEngine::with_defaults(); // Tool:* = Ask
+        let python = if cfg!(windows) {
+            "python".to_string()
+        } else {
+            "python3".to_string()
+        };
+        let req = ExecutionRequest {
+            instance_id: toolhub_core::InstanceId::new("x1").unwrap(),
+            executable: python.clone(),
+            args: vec!["--version".into()],
+            cwd: None,
+            env_overrides: BTreeMap::new(),
+            timeout_ms: 5000,
+            max_output_bytes: 4096,
+            stdin: None,
+            agent_id: None,
+        };
+        let denied = execute(&req, &policy, &[], &PolicyContext::default(), false);
+        assert_eq!(denied.status, ExecutionStatus::Denied);
+        let ok = execute(&req, &policy, &[], &PolicyContext::default(), true);
+        assert!(
+            matches!(
+                ok.status,
+                ExecutionStatus::Success | ExecutionStatus::Failed
+            ),
+            "got {:?}",
+            ok.status
+        );
+    }
+
+    #[test]
+    fn short_flag_secret_redacted() {
+        let args = vec!["-t".into(), "SECRETV".into(), "ok".into()];
+        let r = redact_args(&args);
+        assert_eq!(r[1], "<redacted>");
+    }
+
+    #[test]
     fn policy_deny_blocks_execution() {
         let policy = PolicyEngine::with_defaults();
         let req = ExecutionRequest {
@@ -669,7 +704,7 @@ mod tests {
             stdin: None,
             agent_id: None,
         };
-        let r = execute(&req, &policy, &[], &PolicyContext::default());
+        let r = execute(&req, &policy, &[], &PolicyContext::default(), false);
         assert_eq!(r.status, ExecutionStatus::Denied);
     }
 
@@ -713,7 +748,7 @@ mod tests {
             subject: "python".into(),
             action: PolicyAction::Allow,
         });
-        let r = execute(&req, &policy, &[], &PolicyContext::default());
+        let r = execute(&req, &policy, &[], &PolicyContext::default(), true);
         assert_eq!(r.status, ExecutionStatus::TimedOut);
     }
 

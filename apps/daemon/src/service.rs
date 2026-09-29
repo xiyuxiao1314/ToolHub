@@ -358,6 +358,7 @@ impl DaemonService {
                 }
 
                 // F01: authoritative approval validation before launch.
+                let mut approval_validated = false;
                 if decision.action == PolicyAction::Ask {
                     let aid = approval_id.as_deref().ok_or_else(|| {
                         ProtocolError::new(ErrorCode::Denied, "approval_required")
@@ -403,9 +404,11 @@ impl DaemonService {
                     if let Some(a) = self.approvals.get_mut(aid) {
                         a.consume();
                     }
+                    approval_validated = true;
                 }
 
-                let result = toolhub_executor::execute(&req, &self.policy, &[], &ctx);
+                let result =
+                    toolhub_executor::execute(&req, &self.policy, &[], &ctx, approval_validated);
 
                 let audit = toolhub_audit::AuditRecord::from_execution(
                     Some(&principal),
@@ -826,6 +829,17 @@ impl DaemonService {
                     "environment" => toolhub_policy::PolicyScope::Environment,
                     _ => toolhub_policy::PolicyScope::Tool,
                 };
+                // F01/F02: granting Allow is privileged; Ask/Deny are safer defaults.
+                if act == PolicyAction::Allow {
+                    let principal = self.peer_principal();
+                    let admin = std::env::var("TOOLHUB_ADMIN").ok().as_deref() == Some("1")
+                        || principal.starts_with("local.admin");
+                    if !admin {
+                        return Err(ProtocolError::denied(
+                            "policy.set allow requires admin principal (TOOLHUB_ADMIN=1 or local.admin)",
+                        ));
+                    }
+                }
                 self.policy.set(toolhub_policy::PolicyRule {
                     scope: scope_enum,
                     subject: subject.to_string(),
