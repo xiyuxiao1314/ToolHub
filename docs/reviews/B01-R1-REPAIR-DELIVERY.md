@@ -2,7 +2,7 @@
 
 - Formal review base: `46a06aa11c370b2ca4432909aa2b8b0a70127090`
 - Branch: `codex/toolhub-b01-core`
-- **Delivery HEAD: filled after commit (see bundle HEAD)**
+- **Delivery HEAD: bbaa4868c0d2088919ccb9055f74383bee0db5f8
 - Task: `task_a11c48d272163020b1ee37f1`
 
 ## Scope completed

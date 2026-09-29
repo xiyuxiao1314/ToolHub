@@ -2,7 +2,7 @@
 
 Review base: `46a06aa11c370b2ca4432909aa2b8b0a70127090`
 Implementation parent of first repair: `456d6a63fa5cdca1fb3e809cd28905f6b949b9d2`
-**Final repair HEAD: see B01-R1-REPAIR-DELIVERY.md / bundle (single consistent head after this commit).**
+**Final repair HEAD: bbaa4868c0d2088919ccb9055f74383bee0db5f8
 
 | Finding | Changes | Fresh evidence | Status |
 | --- | --- | --- | --- |
