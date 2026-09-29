@@ -2,7 +2,7 @@
 
 - Branch: `codex/toolhub-b01-core`
 - Base: `6ffc9dc3c2fb526e740f0e3b29eafb84f4c54fce`
-- Head: *(this delivery commit)*
+- Head: `159bac10c22a18b10a3aa1165b9e521f681cc5b9`
 - Workbench task: `task_a11c48d272163020b1ee37f1`
 - Checkout: `D:\ToolHub-mimo\checkout`
 - Platform: Windows x64 (host smoke). macOS compile-only.
