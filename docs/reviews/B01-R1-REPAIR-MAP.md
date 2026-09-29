@@ -1,7 +1,7 @@
 # B01-R1 repair map (F01–F18)
 
 Base reviewed: `46a06aa11c370b2ca4432909aa2b8b0a70127090`
-Repair HEAD: *(this commit)*
+Repair HEAD: `456d6a63fa5cdca1fb3e809cd28905f6b949b9d2`
 Branch: `codex/toolhub-b01-core`
 
 | Finding | Change | Fresh evidence | Status |

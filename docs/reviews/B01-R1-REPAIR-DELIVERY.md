@@ -2,7 +2,7 @@
 
 - Review base: `46a06aa11c370b2ca4432909aa2b8b0a70127090`
 - Repair branch: `codex/toolhub-b01-core`
-- Repair HEAD: *(see bundle)*
+- Repair HEAD: `456d6a63fa5cdca1fb3e809cd28905f6b949b9d2`
 - Task: `task_a11c48d272163020b1ee37f1`
 
 ## What changed
