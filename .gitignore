@@ -1,0 +1,12 @@
+/target/
+/dist/
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+/.local/
+/.workbench-cache/
