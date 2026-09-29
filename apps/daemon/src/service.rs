@@ -840,12 +840,14 @@ impl DaemonService {
                         ));
                     }
                 }
+                self.registry
+                    .set_policy(scope, subject, action)
+                    .map_err(db_err)?;
                 self.policy.set(toolhub_policy::PolicyRule {
                     scope: scope_enum,
                     subject: subject.to_string(),
                     action: act,
                 });
-                let _ = self.registry.set_policy(scope, subject, action);
                 Ok(json!({"ok": true}))
             }
             Method::ActivityList => {
@@ -1108,5 +1110,38 @@ mod tests {
         let mut svc = DaemonService::open(&dir.path().join("r.sqlite")).unwrap();
         let resp = svc.handle(&JsonRpcRequest::new(1, "nope", json!({})));
         assert!(resp.error.is_some());
+    }
+
+    #[test]
+    fn failed_policy_write_returns_error_and_keeps_effective_rule() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut svc = DaemonService::open(&dir.path().join("policy.sqlite")).unwrap();
+        let request = |id, action| {
+            JsonRpcRequest::new(
+                id,
+                "policy.set",
+                json!({
+                    "scope": "tool", "subject": "fixture", "action": action,
+                }),
+            )
+        };
+        assert!(svc.handle(&request(1, "deny")).error.is_none());
+        svc.registry
+            .db
+            .conn
+            .execute_batch(
+                "CREATE TRIGGER reject_policy BEFORE INSERT ON policy_rules
+             BEGIN SELECT RAISE(ABORT, 'fixture write failure'); END;",
+            )
+            .unwrap();
+        assert!(svc.handle(&request(2, "ask")).error.is_some());
+        let context = PolicyContext {
+            tool: Some("fixture".into()),
+            ..Default::default()
+        };
+        assert_eq!(svc.policy.decide(&context).action, PolicyAction::Deny);
+        drop(svc);
+        let svc = DaemonService::open(&dir.path().join("policy.sqlite")).unwrap();
+        assert_eq!(svc.policy.decide(&context).action, PolicyAction::Deny);
     }
 }

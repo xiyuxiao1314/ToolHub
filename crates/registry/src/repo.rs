@@ -374,11 +374,16 @@ impl Registry {
     }
 
     pub fn set_policy(&mut self, scope: &str, subject: &str, action: &str) -> RegistryResult<()> {
-        self.db.conn.execute(
-            "INSERT INTO policy_rules(scope, subject, action, created_at) VALUES (?1,?2,?3,?4)
-             ON CONFLICT(scope, subject, action) DO NOTHING",
+        let tx = self.db.conn.transaction()?;
+        tx.execute(
+            "DELETE FROM policy_rules WHERE scope = ?1 AND subject = ?2",
+            params![scope, subject],
+        )?;
+        tx.execute(
+            "INSERT INTO policy_rules(scope, subject, action, created_at) VALUES (?1,?2,?3,?4)",
             params![scope, subject, action, chrono::Utc::now().to_rfc3339()],
         )?;
+        tx.commit()?;
         Ok(())
     }
 
@@ -702,5 +707,37 @@ mod tests {
         assert_eq!(reg.count_instances().unwrap(), 2);
         let dups = reg.duplicate_groups().unwrap();
         assert_eq!(dups[0].1, 2);
+    }
+
+    #[test]
+    fn policy_updates_replace_previous_actions_for_one_subject() {
+        let mut reg = Registry::open_memory().unwrap();
+        reg.set_policy("tool", "other", "deny").unwrap();
+        for action in ["deny", "ask", "allow", "deny"] {
+            reg.set_policy("tool", "fixture", action).unwrap();
+            let rules = reg.list_policy().unwrap();
+            let matching: Vec<_> = rules.iter().filter(|r| r.1 == "fixture").collect();
+            assert_eq!(matching.len(), 1);
+            assert_eq!(matching[0].2, action);
+            assert!(rules.iter().any(|r| r.1 == "other" && r.2 == "deny"));
+        }
+    }
+
+    #[test]
+    fn policy_replacement_failure_preserves_previous_rule() {
+        let mut reg = Registry::open_memory().unwrap();
+        reg.set_policy("tool", "fixture", "deny").unwrap();
+        reg.db
+            .conn
+            .execute_batch(
+                "CREATE TRIGGER reject_policy BEFORE INSERT ON policy_rules
+             BEGIN SELECT RAISE(ABORT, 'fixture write failure'); END;",
+            )
+            .unwrap();
+        assert!(reg.set_policy("tool", "fixture", "ask").is_err());
+        assert_eq!(
+            reg.list_policy().unwrap(),
+            vec![("tool".into(), "fixture".into(), "deny".into())]
+        );
     }
 }
