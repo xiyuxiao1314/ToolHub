@@ -6,7 +6,7 @@ It discovers, identifies, catalogs, resolves, and invokes software already prese
 
 ## Current state
 
-This repository is the initial documentation baseline. Product code, binaries, build configuration, and runtime tests have not been implemented. The owner's detailed target checklist is pending.
+This repository contains the documentation and two-batch development plan. Product code, binaries, build configuration, and runtime tests have not been implemented. The full supplied design is mapped to large batch targets; later owner additions are explicit scope changes.
 
 - Local project: `D:\ToolHub`
 - Initial branch: `main`
@@ -23,6 +23,9 @@ This repository is the initial documentation baseline. Product code, binaries, b
 4. [Contribution and review process](CONTRIBUTING.md)
 5. [Dependency roadmap](docs/ROADMAP.md)
 6. [Workbench access](WORKBENCH.md) and [MiMo onboarding task](docs/tasks/MIMO-000-ONBOARDING.md)
+7. [Two-batch implementation plan](docs/superpowers/plans/2026-09-29-toolhub-two-batch-plan.md), [four-round review policy](docs/collaboration/REVIEW_POLICY.md), and [B01 core task](docs/tasks/MIMO-B01-CORE.md)
+
+B01 builds the integrated runnable core and agent-facing interfaces. B02 builds the complete real-data desktop, AI/extension/resource workflows and local release candidates. MiMo handles internal delegation, integration, review and repair; Codex has two formal reviews per batch, four total.
 
 The original design is a product baseline, not an assertion that its schemas, interfaces, or examples have been finalized. Record proposed corrections and unresolved contracts explicitly.
 

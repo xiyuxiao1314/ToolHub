@@ -9,6 +9,8 @@
 
 The initial repository contains documentation only. Build commands become required once the relevant implementation and configuration exist; do not claim Rust, desktop, or platform tests were run for this bootstrap.
 
+The owner has selected two large batches: runnable core and complete desktop/delivery lifecycle. Follow `docs/superpowers/plans/2026-09-29-toolhub-two-batch-plan.md`, the dispatched batch brief, and `docs/collaboration/REVIEW_POLICY.md`. Internal work packages remain focused and independently testable; they do not trigger per-subtask Codex reviews.
+
 ## Changes
 
 Keep domain and protocol definitions centralized. Apply SQLite migrations from the first registry implementation. Use fixture-driven scanner tests rather than depending on the developer's installed software.
@@ -34,6 +36,8 @@ Include:
 - One short Chinese owner summary.
 
 MiMo performs internal integration and review. Codex independently examines the delivered revision and critical behavior before recording acceptance. Successful self-review alone does not close a batch.
+
+Each batch has two formal Codex rounds: consolidated initial review, one MiMo repair delivery, then verification and bounded direct Codex corrections. The total project ceiling is four formal reviews; unresolved blocking behavior is not accepted to satisfy the ceiling.
 
 ## Git policy
 

@@ -1,21 +1,27 @@
-# Dependency roadmap
+# Two-delivery roadmap
 
-The complete design remains visible. The following stages organize dependencies; they do not reduce the product to an MVP or claim delivery dates.
+The owner requests large consolidated targets and at most four formal Codex product reviews across the project. The full design remains the product scope. The [implementation plan](superpowers/plans/2026-09-29-toolhub-two-batch-plan.md) maps it to two deliverables; the [review policy](collaboration/REVIEW_POLICY.md) governs handoffs.
 
-| Stage | Work domains | Gate before dependent implementation |
+| Delivery | Scope | Formal Codex review budget |
 | --- | --- | --- |
-| 0 | Documentation baseline and MiMo onboarding | Read source design; identify gaps; receive owner target checklist |
-| 1 | Domain, manifests, protocol, registry and migrations | Reviewed shared contracts and persistence behavior |
-| 2 | Scanner framework, recognition, Windows and macOS discovery | Read-only candidate pipeline with recognition fixtures |
-| 3 | Environments, ownership, origins and duplicate analysis | Evidence-based attribution and preserved multiple instances |
-| 4 | Resolver, policy, executor, sanitizer and audit | Authorization and execution security verification |
-| 5 | Daemon, IPC, CLI, MCP and agent adapters | Shared registry, bounded failure behavior and integration contracts |
-| 6 | Skills and capability requirements | Consistent manifest parsing and availability resolution |
-| 7 | Desktop and environment map | Reviewed daemon contracts and real-data client behavior |
-| 8 | Integration, platform QA, packaging and update strategy | Verified delivery scope, compatibility and release evidence |
+| B01 | Domain/protocol/SQLite, native scanners and recognition, environments/ownership, resolver/security/execution/audit, daemon/IPC/CLI/MCP, sessions/adapters and skills | R1 consolidated review -> MiMo repair -> R2 verification and bounded Codex corrections |
+| B02 | Nine-page real-data desktop, connected-agent/temporary-provider flows, scanner extension/resource/update lifecycle, SDK/docs, platform QA and local release candidates | R3 consolidated review -> MiMo repair -> R4 verification and bounded Codex corrections |
 
-Some independent work can overlap after its input contracts are reviewed. MiMo must plan concurrency from dependencies and file ownership rather than stage numbers alone.
+Formal rounds used: **0 of 4**. The onboarding assessment and planning work do not consume formal implementation-review rounds.
 
-Each dispatched batch will map owner targets to acceptance conditions, tests, allowed directories, and an explicit review gate. Stage 1 is the anticipated foundation area, not a currently authorized feature-development task.
+The original development stages now guide MiMo's internal dependencies rather than eight separate external deliveries:
 
-Recognition resources, protocol/manifests, and desktop/core release versions should remain independently versionable as the design requires. CI, fixtures, security review, and integration checks accompany implementation rather than waiting until the final stage.
+1. Domain, manifests, protocol and registry.
+2. Scanner framework, recognition and OS discovery.
+3. Environments, ownership and duplicates.
+4. Resolver, policy, executor, sanitizer and audit.
+5. Daemon, IPC, CLI, MCP and adapters.
+6. Skill availability and manifests.
+7. Desktop and full user workflows.
+8. Integration, packaging and platform delivery.
+
+MiMo internally locks contracts, delegates bounded independent work, integrates, tests, reviews and repairs before a single handoff. UI can prepare against stabilized contracts when assigned, but all shipped clients share the daemon registry and policy.
+
+B01 is dispatched by `docs/tasks/MIMO-B01-CORE.md`; B02 is planned and awaits dispatch against the reviewed B01 revision. Real access/toolchain blockers and departures from product boundaries are escalated; routine implementation decisions stay with MiMo.
+
+Unavailable host/signing checks and unfinished targets are recorded honestly. Four formal reviews do not authorize accepting blocking defects or claiming unverified platform delivery.

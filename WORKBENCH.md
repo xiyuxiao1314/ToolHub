@@ -3,7 +3,7 @@
 - Task: `task_a11c48d272163020b1ee37f1`
 - [Open ToolHub project](https://agent-workbench-hk.tail7d7b36.ts.net:9443/tasks/task_a11c48d272163020b1ee37f1)
 - Local Codex review baseline: `D:\ToolHub`
-- Owner-facing summary: 项目文档基线已建立，MiMo 从工作台读取启动任务与产物，目标清单到齐后进入开发。
+- Owner-facing summary: 两个大型批次与四次总审查规则已确定，MiMo 从最新工作台产物读取 B01 核心开发任务并自主组织内部工作。
 
 ## Profiles and binary
 
@@ -24,7 +24,7 @@ The commands below use MiMo's own enrolled profile. Flags appear before position
 & 'C:\Users\hp\AppData\Local\AgentWorkbench\bin\workbenchctl.exe' --profile mimo sync task_a11c48d272163020b1ee37f1
 ```
 
-Read the latest `MIMO-000-ONBOARDING.md` and `BOOTSTRAP_MANIFEST.json` text artifacts through the API using their returned artifact IDs. Locate the `ToolHub-bootstrap.bundle` attachment. Download it only when preparing a local checkout; use a new destination path.
+For current development, read the latest `MIMO-B01-CORE.md`, `2026-09-29-toolhub-two-batch-plan.md`, `REVIEW_POLICY.md` and `TWO_BATCH_MANIFEST.json` text artifacts through the API using their returned IDs. Locate `ToolHub-two-batch-plan.bundle` when updating an independent checkout. Original onboarding/bootstrap artifacts remain historical baseline references, not the current development task.
 
 ```powershell
 & 'C:\Users\hp\AppData\Local\AgentWorkbench\bin\workbenchctl.exe' --profile mimo read <artifact-id>
@@ -41,6 +41,16 @@ On another device, use its installed workbench client and authorized local paths
 - `MIMO-000-ONBOARDING.md`: the first readable task brief.
 - `ToolHub-bootstrap.bundle`: one documentation baseline with Git ancestry; no application code or credentials.
 - `BOOTSTRAP_MANIFEST.json`: exact baseline revision, selected file hashes, bundle hash, and verification results.
+
+## Current planning artifacts
+
+- `MIMO-B01-CORE.md`: dispatched large core-development checklist and consolidated delivery contract.
+- `2026-09-29-toolhub-two-batch-plan.md`: both milestone goal lists, dependency strategy and design coverage.
+- `REVIEW_POLICY.md`: two formal review rounds per batch and four total, including bounded Codex corrections.
+- `ToolHub-two-batch-plan.bundle`: Git history through the task/planning baseline.
+- `TWO_BATCH_MANIFEST.json`: exact required planning commit, file inventory and hashes, and clone verification.
+
+MiMo can fetch `main` from its existing local `D:\ToolHub` origin or clone the planning bundle, preserving its untracked onboarding assessment. Use the manifest to verify the starting commit. Neither local path nor bundle is an authorized hosted push destination.
 
 Artifacts are immutable versions. Use the artifact index and manifest rather than guessing attachment IDs or treating a stale registration snapshot as the latest project state.
 
