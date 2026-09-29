@@ -1,0 +1,63 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/protocol",
+    "crates/registry",
+    "crates/scanner",
+    "crates/recognizer",
+    "crates/environment",
+    "crates/resolver",
+    "crates/policy",
+    "crates/executor",
+    "crates/audit",
+    "crates/ipc",
+    "crates/mcp",
+    "crates/skills",
+    "crates/agent-bridge",
+    "apps/daemon",
+    "apps/cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.75"
+
+[workspace.dependencies]
+toolhub-core = { path = "crates/core" }
+toolhub-protocol = { path = "crates/protocol" }
+toolhub-registry = { path = "crates/registry" }
+toolhub-scanner = { path = "crates/scanner" }
+toolhub-recognizer = { path = "crates/recognizer" }
+toolhub-environment = { path = "crates/environment" }
+toolhub-resolver = { path = "crates/resolver" }
+toolhub-policy = { path = "crates/policy" }
+toolhub-executor = { path = "crates/executor" }
+toolhub-audit = { path = "crates/audit" }
+toolhub-ipc = { path = "crates/ipc" }
+toolhub-mcp = { path = "crates/mcp" }
+toolhub-skills = { path = "crates/skills" }
+toolhub-agent-bridge = { path = "crates/agent-bridge" }
+
+anyhow = "1"
+thiserror = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1"
+sha2 = "0.10"
+hex = "0.4"
+walkdir = "2"
+rusqlite = { version = "0.32", features = ["bundled"] }
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util", "io-std", "net", "sync", "time", "process", "signal"] }
+async-trait = "0.1"
+dirs = "5"
+once_cell = "1"
+tempfile = "3"
+which = "6"

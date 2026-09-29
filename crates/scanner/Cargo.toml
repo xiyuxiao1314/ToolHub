@@ -1,0 +1,19 @@
+[package]
+name = "toolhub-scanner"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+toolhub-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+walkdir = { workspace = true }
+which = { workspace = true }
+dirs = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+# registry reads via winapi-lite pattern using std + documented APIs in windows scanner
+
+[dev-dependencies]
+tempfile = { workspace = true }

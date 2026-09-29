@@ -1,0 +1,37 @@
+[package]
+name = "toolhub-daemon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "toolhubd"
+path = "src/main.rs"
+
+[dependencies]
+toolhub-core = { workspace = true }
+toolhub-protocol = { workspace = true }
+toolhub-registry = { workspace = true }
+toolhub-scanner = { workspace = true }
+toolhub-recognizer = { workspace = true }
+toolhub-environment = { workspace = true }
+toolhub-resolver = { workspace = true }
+toolhub-policy = { workspace = true }
+toolhub-executor = { workspace = true }
+toolhub-audit = { workspace = true }
+toolhub-ipc = { workspace = true }
+toolhub-mcp = { workspace = true }
+toolhub-skills = { workspace = true }
+toolhub-agent-bridge = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rusqlite = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+anyhow = { workspace = true }
+dirs = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
