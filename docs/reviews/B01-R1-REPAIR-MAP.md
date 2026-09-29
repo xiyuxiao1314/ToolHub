@@ -38,3 +38,10 @@ Implementation parent of first repair: `456d6a63fa5cdca1fb3e809cd28905f6b949b9d2
 - macOS host compile/test (no authorized macOS environment)
 - Real OpenCode/Claude session launch against external accounts (not authorized this batch)
 - Long-running multi-client named-pipe soak under load
+
+## Internal self-review (parent + subagent) after R2-ready packet
+
+- P1 F01 dead Ask path: fixed — execute(approval_validated); smoke approve/exec/replay passes.
+- P1 policy.set Allow bypass: fixed — Allow requires TOOLHUB_ADMIN=1 or local.admin principal.
+- P1 principal self-assert: residual — TOOLHUB_PRINCIPAL is process-bound for stdio spawn; named-pipe DACL/peer SID still simplified. Documented residual.
+- P2 short-flag secrets: fixed (-t/--token). Path upsert normalized. Smoke covers approve path.
