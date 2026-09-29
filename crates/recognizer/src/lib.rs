@@ -218,8 +218,21 @@ pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
         None
     };
 
-    let confidence = if ambiguity.is_some() { 0.65 } else { 0.92 };
-    let confidence = validate_confidence(confidence).unwrap_or(0.5);
+    // F07: filename/path alone is a weak hypothesis — not Known execution trust.
+    let corroborated = evidence.iter().any(|e| e.confidence >= 0.85);
+    let confidence = if !corroborated {
+        0.45
+    } else if ambiguity.is_some() {
+        0.65
+    } else {
+        0.85
+    };
+    let confidence = validate_confidence(confidence).unwrap_or(0.4);
+    let trust = if corroborated {
+        TrustRecord::known(evidence.clone())
+    } else {
+        TrustRecord::unknown()
+    };
 
     let caps: Vec<CapabilityId> = rule
         .capabilities
@@ -255,7 +268,7 @@ pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
         environment_id: None,
         origin: infer_origin(&candidate.path),
         owner: Owner::from_directory_hint(&candidate.path, rule.name),
-        trust: TrustRecord::known(evidence.clone()),
+        trust,
         interfaces: vec![],
         evidence: evidence.clone(),
         status: toolhub_core::InstanceStatus::Available,

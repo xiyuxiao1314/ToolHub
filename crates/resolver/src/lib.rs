@@ -56,16 +56,42 @@ pub fn resolve(
         }
     };
 
+    // F10: eligibility before ranking
+    candidates.retain(|c| c.trust != "blocked" && c.trust != "unknown");
+    if let Some(want_trust) = prefs.require_trust.as_deref() {
+        let rank = |t: &str| match t {
+            "verified" => 4,
+            "known" => 3,
+            "user_trusted" => 2,
+            "unknown" => 1,
+            _ => 0,
+        };
+        let min = rank(want_trust);
+        candidates.retain(|c| rank(&c.trust) >= min);
+    }
+
     if let Some(min) = prefs
         .min_version
         .as_deref()
         .or(requirement.version.as_deref())
     {
-        if let Ok(vc) = toolhub_core::VersionConstraint::parse(min) {
-            candidates.retain(|c| match &c.version {
-                Some(v) => vc.matches(v),
-                None => false,
-            });
+        match toolhub_core::VersionConstraint::parse(min) {
+            Ok(vc) => {
+                candidates.retain(|c| match &c.version {
+                    Some(v) => vc.matches(v),
+                    None => false,
+                });
+            }
+            Err(_) => {
+                return ResolveOutcome {
+                    capability: raw.to_string(),
+                    canonical: raw.to_string(),
+                    selected: None,
+                    alternatives: vec![],
+                    explanation: "invalid version constraint".into(),
+                    error: Some(format!("invalid version constraint: {min}")),
+                };
+            }
         }
     }
 

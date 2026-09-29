@@ -137,8 +137,36 @@ enum McpCmd {
     Tools,
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() {
     let cli = Cli::parse();
+    if let Err(e) = run(&cli) {
+        let msg = e.to_string();
+        let code = if msg.contains("not_found") {
+            3
+        } else if msg.contains("denied") || msg.contains("policy") || msg.contains("approval") {
+            4
+        } else if msg.contains("expired") || msg.contains("session") {
+            5
+        } else if msg.contains("unavailable") || msg.contains("daemon") {
+            6
+        } else if msg.contains("timeout") {
+            7
+        } else if msg.contains("invalid") || msg.contains("parse") {
+            2
+        } else {
+            1
+        };
+        if cli.json {
+            let v = json!({"ok": false, "error": msg});
+            println!("{}", serde_json::to_string(&v).unwrap_or_default());
+        } else {
+            eprintln!("error: {msg}");
+        }
+        std::process::exit(code);
+    }
+}
+
+fn run(cli: &Cli) -> anyhow::Result<()> {
     let mut client = DaemonClient::connect()?;
 
     let result = match &cli.command {
@@ -297,14 +325,15 @@ impl DaemonClient {
                 .get("data")
                 .and_then(|d| d.get("error_code"))
                 .and_then(|c| c.as_str())
-                .unwrap_or("internal_error");
+                .unwrap_or("internal_error")
+                .to_string();
             let msg = err
                 .get("message")
                 .and_then(|m| m.as_str())
-                .unwrap_or("error");
-            // Stable non-zero exit semantics for agents.
-            eprintln!("error: {code}: {msg}");
-            std::process::exit(exit_code_for(code));
+                .unwrap_or("error")
+                .to_string();
+            // F17: structured error without killing reusable clients (MCP).
+            return Err(anyhow::anyhow!("{code}: {msg}"));
         }
         Ok(resp.get("result").cloned().unwrap_or(Value::Null))
     }
@@ -336,6 +365,7 @@ fn daemon_bin() -> std::path::PathBuf {
     std::path::PathBuf::from("toolhubd")
 }
 
+#[allow(dead_code)]
 fn exit_code_for(code: &str) -> i32 {
     match code {
         "invalid_request" | "invalid_params" | "parse_error" => 2,
@@ -361,72 +391,114 @@ fn mcp_serve(client: &mut DaemonClient) -> anyhow::Result<()> {
         let id = req.get("id").cloned();
         let method = req.get("method").and_then(|m| m.as_str()).unwrap_or("");
         let params = req.get("params").cloned().unwrap_or(json!({}));
-        let result = match method {
-            "initialize" => json!({
-                "protocolVersion": "2024-11-05",
-                "serverInfo": {"name": "toolhub", "version": "0.1.0"},
-                "tools": [
-                    {"name":"search_tools","description":"Search installed tools by query"},
-                    {"name":"resolve_capability","description":"Resolve a capability"},
-                    {"name":"inspect_tool","description":"Inspect one tool"},
-                    {"name":"list_environments","description":"List environments"},
-                    {"name":"execute_tool","description":"Execute under policy"},
-                    {"name":"search_skills","description":"Search skills"},
-                    {"name":"inspect_skill","description":"Inspect skill"}
-                ]
-            }),
-            "tools/list" => json!([
-                {"name":"search_tools","description":"Search installed tools by query","inputSchema":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}},
-                {"name":"resolve_capability","description":"Resolve a capability","inputSchema":{"type":"object","properties":{"capability":{"type":"string"}},"required":["capability"]}},
-                {"name":"inspect_tool","description":"Inspect one tool","inputSchema":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}},
-                {"name":"list_environments","description":"List environments","inputSchema":{"type":"object","properties":{}}},
-                {"name":"execute_tool","description":"Execute under policy","inputSchema":{"type":"object","properties":{"instance_id":{"type":"string"},"args":{"type":"array","items":{"type":"string"}}},"required":["instance_id"]}},
-                {"name":"search_skills","description":"Search skills","inputSchema":{"type":"object","properties":{"query":{"type":"string"}}}},
-                {"name":"inspect_skill","description":"Inspect skill","inputSchema":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}}
-            ]),
+
+        // F13: notifications (no id) require no response
+        if id.is_none() {
+            continue;
+        }
+
+        let (result, is_error) = match method {
+            "initialize" => (
+                json!({
+                    "protocolVersion": params.get("protocolVersion").and_then(|v| v.as_str()).unwrap_or("2024-11-05"),
+                    "capabilities": {"tools": {"listChanged": false}},
+                    "serverInfo": {"name": "toolhub", "version": "0.1.0"}
+                }),
+                false,
+            ),
+            "notifications/initialized" | "initialized" | "notifications/cancelled" => {
+                continue;
+            }
+            "tools/list" => (
+                json!({
+                    "tools": [
+                        {"name":"search_tools","description":"Search installed tools by query","inputSchema":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}},
+                        {"name":"resolve_capability","description":"Resolve a capability","inputSchema":{"type":"object","properties":{"capability":{"type":"string"}},"required":["capability"]}},
+                        {"name":"inspect_tool","description":"Inspect one tool","inputSchema":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}},
+                        {"name":"list_environments","description":"List environments","inputSchema":{"type":"object","properties":{}}},
+                        {"name":"execute_tool","description":"Execute under policy","inputSchema":{"type":"object","properties":{"instance_id":{"type":"string"},"args":{"type":"array","items":{"type":"string"}},"approval_id":{"type":"string"}},"required":["instance_id"]}},
+                        {"name":"search_skills","description":"Search skills","inputSchema":{"type":"object","properties":{"query":{"type":"string"}}}},
+                        {"name":"inspect_skill","description":"Inspect skill","inputSchema":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}}
+                    ]
+                }),
+                false,
+            ),
             "tools/call" => {
                 let name = params.get("name").and_then(|n| n.as_str()).unwrap_or("");
                 let args = params.get("arguments").cloned().unwrap_or(json!({}));
-                match name {
-                    "search_tools" => {
-                        let q = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
-                        client.call("registry.search", json!({"query": q}))?
-                    }
-                    "resolve_capability" => {
-                        let c = args
-                            .get("capability")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("");
-                        client.call("resolve.capability", json!({"capability": c}))?
-                    }
-                    "inspect_tool" => {
-                        let id = args.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                        client.call("registry.inspect_instance", json!({"id": id}))?
-                    }
-                    "list_environments" => client.call("environment.list", json!({}))?,
-                    "execute_tool" => {
-                        let id = args
-                            .get("instance_id")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("");
-                        let a = args.get("args").cloned().unwrap_or(json!([]));
-                        let approval = args.get("approval_id").cloned();
-                        client.call(
-                            "execute.tool",
-                            json!({"instance_id": id, "args": a, "approval_id": approval}),
-                        )?
-                    }
-                    "search_skills" => client.call("skill.list", json!({}))?,
-                    "inspect_skill" => {
-                        let id = args.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                        client.call("skill.inspect", json!({"id": id}))?
-                    }
-                    other => json!({"error": format!("unknown tool {other}")}),
+                let call_result = (|| -> Result<Value, String> {
+                    Ok(match name {
+                        "search_tools" => {
+                            let q = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
+                            client
+                                .call("registry.search", json!({"query": q}))
+                                .map_err(|e| e.to_string())?
+                        }
+                        "resolve_capability" => {
+                            let c = args
+                                .get("capability")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
+                            client
+                                .call("resolve.capability", json!({"capability": c}))
+                                .map_err(|e| e.to_string())?
+                        }
+                        "inspect_tool" => {
+                            let id = args.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                            client
+                                .call("registry.inspect_instance", json!({"id": id}))
+                                .map_err(|e| e.to_string())?
+                        }
+                        "list_environments" => client
+                            .call("environment.list", json!({}))
+                            .map_err(|e| e.to_string())?,
+                        "execute_tool" => {
+                            let id = args
+                                .get("instance_id")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
+                            let a = args.get("args").cloned().unwrap_or(json!([]));
+                            let approval = args.get("approval_id").cloned();
+                            client
+                                .call(
+                                    "execute.tool",
+                                    json!({"instance_id": id, "args": a, "approval_id": approval}),
+                                )
+                                .map_err(|e| e.to_string())?
+                        }
+                        "search_skills" => client
+                            .call("skill.list", json!({}))
+                            .map_err(|e| e.to_string())?,
+                        "inspect_skill" => {
+                            let id = args.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                            client
+                                .call("skill.inspect", json!({"id": id}))
+                                .map_err(|e| e.to_string())?
+                        }
+                        other => return Err(format!("unknown tool {other}")),
+                    })
+                })();
+                match call_result {
+                    Ok(v) => (
+                        json!({"content":[{"type":"text","text": v.to_string()}], "isError": false}),
+                        false,
+                    ),
+                    Err(msg) => (
+                        json!({"content":[{"type":"text","text": msg}], "isError": true}),
+                        true,
+                    ),
                 }
             }
-            _ => json!({"error": format!("unsupported method {method}")}),
+            other => (
+                json!({"error": format!("unsupported method {other}")}),
+                true,
+            ),
         };
-        let resp = json!({"jsonrpc":"2.0","id":id,"result":result});
+        let resp = if is_error {
+            json!({"jsonrpc":"2.0","id":id,"error":{"code":-32000,"message": result}})
+        } else {
+            json!({"jsonrpc":"2.0","id":id,"result":result})
+        };
         writeln!(stdout, "{}", serde_json::to_string(&resp)?)?;
         stdout.flush()?;
     }

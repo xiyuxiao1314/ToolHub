@@ -64,27 +64,21 @@ fn uuid_like() -> String {
 
 /// Export policy: hide home/user identity and private paths by default.
 pub fn redact_path_for_export(path: &str) -> String {
-    let home = dirs_home();
-    let mut out = path.to_string();
-    if let Some(h) = home {
-        if !h.is_empty() && out.contains(&h) {
-            out = out.replace(&h, "~");
-        }
+    let mut homes = vec![];
+    if let Some(h) = std::env::var_os("USERPROFILE") {
+        homes.push(h.to_string_lossy().to_string());
     }
-    // Mask remaining username-looking segments.
-    out = out.replace("/Users/", "/home/");
-    if let Ok(user) = std::env::var("USERNAME") {
-        if user.len() >= 3 {
-            out = out.replace(&user, "<user>");
-        }
+    if let Some(h) = std::env::var_os("HOME") {
+        homes.push(h.to_string_lossy().to_string());
     }
-    out
-}
-
-fn dirs_home() -> Option<String> {
-    std::env::var_os("USERPROFILE")
-        .or_else(|| std::env::var_os("HOME"))
-        .map(|s| s.to_string_lossy().to_string())
+    let mut users = vec![];
+    if let Ok(u) = std::env::var("USERNAME") {
+        users.push(u);
+    }
+    if let Ok(u) = std::env::var("USER") {
+        users.push(u);
+    }
+    toolhub_executor::redact_path_for_export(path, &homes, &users)
 }
 
 #[cfg(test)]

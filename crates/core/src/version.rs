@@ -50,9 +50,13 @@ impl VersionConstraint {
         if ver.is_empty() {
             return Err(CoreError::InvalidVersion(raw.to_string()));
         }
-        if !ver
-            .chars()
-            .all(|c| c.is_ascii_digit() || c == '.' || c.is_ascii_alphanumeric())
+        // F10: reject invalid grammar (||, spaces, empty) instead of silent discard
+        if ver.is_empty()
+            || ver.contains("||")
+            || ver.contains(' ')
+            || !ver
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '+')
         {
             return Err(CoreError::InvalidVersion(raw.to_string()));
         }
@@ -63,6 +67,12 @@ impl VersionConstraint {
     }
 
     pub fn matches(&self, actual: &str) -> bool {
+        // Prerelease does not satisfy a stable constraint unless both are prerelease.
+        let a_prerelease = is_prerelease(actual);
+        let b_prerelease = is_prerelease(&self.version);
+        if a_prerelease && !b_prerelease && self.op != VersionReqOp::Eq {
+            return false;
+        }
         let a = normalize_ver(actual);
         let b = normalize_ver(&self.version);
         let cmp = compare_ver(&a, &b);
@@ -73,9 +83,25 @@ impl VersionConstraint {
             VersionReqOp::Lte => cmp != std::cmp::Ordering::Greater,
             VersionReqOp::Lt => cmp == std::cmp::Ordering::Less,
             VersionReqOp::Tilde => cmp != std::cmp::Ordering::Less && major_minor_eq(&a, &b),
-            VersionReqOp::Caret => cmp != std::cmp::Ordering::Less && major_eq(&a, &b),
+            VersionReqOp::Caret => {
+                if cmp == std::cmp::Ordering::Less {
+                    return false;
+                }
+                // Zero-major caret: ^0.2.0 allows 0.2.x only
+                let av = split_ver(&a);
+                let bv = split_ver(&b);
+                if bv.first() == Some(&0) {
+                    av.first() == Some(&0) && av.get(1) == bv.get(1)
+                } else {
+                    major_eq(&a, &b)
+                }
+            }
         }
     }
+}
+
+fn is_prerelease(v: &str) -> bool {
+    v.contains('-') || v.contains("rc") || v.contains("alpha") || v.contains("beta")
 }
 
 fn normalize_ver(v: &str) -> String {

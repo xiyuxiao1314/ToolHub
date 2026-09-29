@@ -38,11 +38,36 @@ impl DaemonService {
             registry.ensure_capability(alias, "", true, Some(canonical))?;
         }
         let sessions = load_sessions(&mut registry).unwrap_or_default();
+        let mut policy = PolicyEngine::with_defaults();
+        // F03: load persisted rules on startup
+        if let Ok(stored) = registry.list_policy() {
+            for (scope, subject, action) in stored {
+                let scope_enum = match scope.as_str() {
+                    "command" => toolhub_policy::PolicyScope::Command,
+                    "capability" => toolhub_policy::PolicyScope::Capability,
+                    "agent" => toolhub_policy::PolicyScope::Agent,
+                    "directory" => toolhub_policy::PolicyScope::Directory,
+                    "environment" => toolhub_policy::PolicyScope::Environment,
+                    _ => toolhub_policy::PolicyScope::Tool,
+                };
+                let act = match action.as_str() {
+                    "allow" => PolicyAction::Allow,
+                    "deny" => PolicyAction::Deny,
+                    _ => PolicyAction::Ask,
+                };
+                policy.set(toolhub_policy::PolicyRule {
+                    scope: scope_enum,
+                    subject,
+                    action: act,
+                });
+            }
+        }
+        let approvals = load_approvals(&mut registry).unwrap_or_default();
         Ok(Self {
             registry,
-            policy: PolicyEngine::with_defaults(),
+            policy,
             sessions,
-            approvals: BTreeMap::new(),
+            approvals,
             env_graph: toolhub_environment::EnvironmentGraph::new(),
             last_scan: None,
             seq: AtomicU64::new(1),
@@ -50,8 +75,34 @@ impl DaemonService {
         })
     }
 
+    /// F02: principal comes from transport-bound env, not caller-supplied labels.
+    fn peer_principal(&self) -> String {
+        std::env::var("TOOLHUB_PRINCIPAL")
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| "local.stdio".to_string())
+    }
+
     pub fn handle(&mut self, req: &JsonRpcRequest) -> JsonRpcResponse {
         let _peer = PeerIdentity::local_stdio();
+        // F12: validate JSON-RPC envelope
+        if req.jsonrpc != "2.0" {
+            return error_response(
+                req.id.clone(),
+                &ProtocolError::new(ErrorCode::InvalidRequest, "jsonrpc must be \"2.0\""),
+            );
+        }
+        if let Some(id) = &req.id {
+            if !id.is_string() && !id.is_number() && !id.is_null() {
+                return error_response(
+                    req.id.clone(),
+                    &ProtocolError::new(
+                        ErrorCode::InvalidRequest,
+                        "id must be string, number, or null",
+                    ),
+                );
+            }
+        }
         let id = req.id.clone();
         match Method::from_name(&req.method) {
             None => error_response(
@@ -219,13 +270,30 @@ impl DaemonService {
                     .map_err(db_err)?
                     .ok_or_else(|| ProtocolError::new(ErrorCode::NotFound, "instance not found"))?;
 
-                // Trust gate: unknown/blocked are not auto-executable.
+                // F03: blocked/missing availability prevents launch regardless of trust.
+                if row.status == "blocked" || row.status == "missing" {
+                    return Err(ProtocolError::denied(format!(
+                        "instance status {} does not permit execution",
+                        row.status
+                    )));
+                }
                 let trust = parse_trust(&row.trust);
                 if trust == "blocked" || trust == "unknown" {
                     return Err(ProtocolError::denied(format!(
                         "trust level {trust} does not permit execution without elevated approval"
                     )));
                 }
+
+                let principal = self.peer_principal();
+                let _agent_for_policy = params
+                    .get("agent_id")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| principal.clone());
+                // F02: caller labels cannot choose security principal for approval binding.
+                let agent_id = AgentId::new(principal.clone())
+                    .or_else(|_| AgentId::new("local.stdio"))
+                    .map_err(|e| ProtocolError::new(ErrorCode::InvalidParams, e.to_string()))?;
 
                 let req = ExecutionRequest {
                     instance_id: InstanceId::new(instance_id)
@@ -246,60 +314,80 @@ impl DaemonService {
                         .get("stdin")
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string()),
-                    agent_id: params
-                        .get("agent_id")
-                        .and_then(|v| v.as_str())
-                        .and_then(|s| AgentId::new(s).ok()),
+                    agent_id: Some(agent_id.clone()),
                 };
 
-                // Policy: if Ask and no approval_id, deny with approval_required.
-                let decision = self.policy.decide(&PolicyContext {
-                    tool: Some(
-                        Path::new(&row.path)
-                            .file_stem()
-                            .map(|s| s.to_string_lossy().to_string())
-                            .unwrap_or_default(),
-                    ),
-                    agent: req.agent_id.as_ref().map(|a| a.as_str().to_string()),
+                let env_s = toolhub_executor::sanitize_env(&req.env_overrides, &[]);
+                let env_dig = toolhub_executor::env_digest(&env_s);
+                let tool_name = Path::new(&row.path)
+                    .file_stem()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let ctx = PolicyContext {
+                    tool: Some(tool_name),
+                    agent: Some(principal.clone()),
+                    directory: req.cwd.clone(),
+                    environment: row.environment_id.clone(),
                     ..Default::default()
-                });
+                };
+                let decision = self.policy.decide(&ctx);
 
-                if decision.action == PolicyAction::Ask && approval_id.is_none() {
-                    return Err(ProtocolError::new(ErrorCode::Denied, "approval_required"));
+                if decision.action == PolicyAction::Deny {
+                    return Err(ProtocolError::denied(decision.explanation));
                 }
 
-                if let Some(aid) = &approval_id {
-                    match self.approvals.get(aid) {
-                        Some(a) if a.is_usable(chrono::Utc::now()) => {}
-                        Some(_) => {
-                            return Err(ProtocolError::new(
-                                ErrorCode::Expired,
-                                "approval expired, consumed, or revoked",
-                            ))
-                        }
-                        None => {
-                            return Err(ProtocolError::new(
-                                ErrorCode::ApprovalInvalid,
-                                "unknown approval",
-                            ))
-                        }
+                // F01: authoritative approval validation before launch.
+                if decision.action == PolicyAction::Ask {
+                    let aid = approval_id.as_deref().ok_or_else(|| {
+                        ProtocolError::new(ErrorCode::Denied, "approval_required")
+                    })?;
+                    let approval = self.approvals.get(aid).ok_or_else(|| {
+                        ProtocolError::new(ErrorCode::ApprovalInvalid, "unknown approval")
+                    })?;
+                    let hash = toolhub_executor::hash_file(&row.path).map_err(|e| {
+                        ProtocolError::new(ErrorCode::InternalError, format!("hash failed: {e}"))
+                    })?;
+                    let canon = row
+                        .canonical_path
+                        .clone()
+                        .unwrap_or_else(|| row.path.clone());
+                    toolhub_executor::validate_approval(
+                        approval,
+                        &req,
+                        &hash,
+                        &canon,
+                        &req.args,
+                        req.cwd.as_deref(),
+                        req.stdin.as_deref(),
+                        &env_dig,
+                        chrono::Utc::now(),
+                    )
+                    .map_err(|st| match st {
+                        toolhub_core::ExecutionStatus::Expired => ProtocolError::new(
+                            ErrorCode::Expired,
+                            "approval expired, consumed, or revoked",
+                        ),
+                        _ => ProtocolError::new(
+                            ErrorCode::ApprovalInvalid,
+                            "approval does not bind this request",
+                        ),
+                    })?;
+                    // atomic consume
+                    if !self.registry.consume_approval(aid).map_err(db_err)? {
+                        return Err(ProtocolError::new(
+                            ErrorCode::ApprovalInvalid,
+                            "approval already consumed",
+                        ));
+                    }
+                    if let Some(a) = self.approvals.get_mut(aid) {
+                        a.consume();
                     }
                 }
 
-                let result = toolhub_executor::execute(&req, &self.policy, &[]);
-                if let Some(aid) = &approval_id {
-                    if result.status == toolhub_core::ExecutionStatus::Success
-                        || result.status == toolhub_core::ExecutionStatus::Failed
-                    {
-                        if let Some(a) = self.approvals.get_mut(aid) {
-                            a.consume();
-                        }
-                        let _ = self.registry.consume_approval(aid);
-                    }
-                }
+                let result = toolhub_executor::execute(&req, &self.policy, &[], &ctx);
 
                 let audit = toolhub_audit::AuditRecord::from_execution(
-                    req.agent_id.as_ref().map(|a| a.as_str()),
+                    Some(&principal),
                     Some(instance_id),
                     None,
                     &req.executable,
@@ -328,7 +416,6 @@ impl DaemonService {
                     &audit.status,
                     audit.approval_id.as_deref(),
                 );
-
                 // Response includes stdout for the caller; audit does not persist it.
                 Ok(json!({
                     "status": result.status.as_str(),
@@ -364,13 +451,14 @@ impl DaemonService {
                     .ok_or_else(|| ProtocolError::new(ErrorCode::NotFound, "instance not found"))?;
                 let hash = toolhub_executor::hash_file(&row.path).unwrap_or_default();
                 let env = toolhub_executor::sanitize_env(&BTreeMap::new(), &[]);
-                let agent_id = params
+                let _agent_id = params
                     .get("agent_id")
                     .and_then(|v| v.as_str())
-                    .unwrap_or("local.user");
+                    .unwrap_or("local.stdio");
                 let approval = toolhub_executor::build_approval(
                     &uuid::Uuid::new_v4().to_string(),
-                    AgentId::new(agent_id).unwrap_or_else(|_| AgentId::new("local.user").unwrap()),
+                    AgentId::new(self.peer_principal())
+                        .unwrap_or_else(|_| AgentId::new("local.stdio").unwrap()),
                     "cli-session",
                     &ExecutionRequest {
                         instance_id: InstanceId::new(instance_id).unwrap(),
@@ -383,8 +471,14 @@ impl DaemonService {
                         env_overrides: BTreeMap::new(),
                         timeout_ms: 30_000,
                         max_output_bytes: 1024 * 256,
-                        stdin: None,
-                        agent_id: None,
+                        stdin: params
+                            .get("stdin")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
+                        agent_id: Some(
+                            AgentId::new(self.peer_principal())
+                                .unwrap_or_else(|_| AgentId::new("local.stdio").unwrap()),
+                        ),
                     },
                     &hash,
                     row.canonical_path.as_deref().unwrap_or(&row.path),
@@ -392,14 +486,15 @@ impl DaemonService {
                     300,
                 );
                 let aid = approval.approval_id.clone();
+                let principal = self.peer_principal();
                 let _ = self.registry.save_approval(
                     &aid,
-                    agent_id,
+                    &principal,
                     "cli-session",
                     instance_id,
                     &hash,
                     row.canonical_path.as_deref().unwrap_or(&row.path),
-                    &approval.args_digest,
+                    &format!("{}|{}", approval.args_digest, approval.stdin_digest),
                     &approval.cwd_digest,
                     &approval.env_digest,
                     &approval.expires_at.to_rfc3339(),
@@ -670,6 +765,85 @@ impl DaemonService {
             .registry
             .record_activity("scan", "native scan completed", None);
     }
+}
+
+fn load_approvals(
+    reg: &mut Registry,
+) -> Result<BTreeMap<String, toolhub_core::ExecutionApproval>, String> {
+    let mut stmt = reg
+        .db
+        .conn
+        .prepare(
+            "SELECT id, agent_id, session_id, instance_id, executable_sha256, canonical_executable,
+                    args_digest, cwd_digest, env_digest, expires_at, consumed, revoked
+             FROM execution_approvals",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+                r.get::<_, String>(4)?,
+                r.get::<_, String>(5)?,
+                r.get::<_, String>(6)?,
+                r.get::<_, String>(7)?,
+                r.get::<_, String>(8)?,
+                r.get::<_, String>(9)?,
+                r.get::<_, i32>(10)?,
+                r.get::<_, i32>(11)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    let mut out = BTreeMap::new();
+    for (
+        id,
+        agent_id,
+        session_id,
+        instance_id,
+        sha,
+        canon,
+        args_d,
+        cwd_d,
+        env_d,
+        expires,
+        consumed,
+        revoked,
+    ) in rows
+    {
+        let expires_at = chrono::DateTime::parse_from_rfc3339(&expires)
+            .map(|d| d.with_timezone(&chrono::Utc))
+            .unwrap_or_else(|_| chrono::Utc::now());
+        let (args_digest, stdin_digest) = match args_d.split_once('|') {
+            Some((a, s)) => (a.to_string(), s.to_string()),
+            None => (args_d, String::new()),
+        };
+        out.insert(
+            id.clone(),
+            toolhub_core::ExecutionApproval {
+                approval_id: id,
+                agent_id: AgentId::new(&agent_id)
+                    .unwrap_or_else(|_| AgentId::new("local.stdio").unwrap()),
+                session_id,
+                instance_id: InstanceId::new(&instance_id)
+                    .unwrap_or_else(|_| InstanceId::new("unknown").unwrap()),
+                executable_sha256: sha,
+                canonical_executable: canon,
+                args_digest,
+                cwd_digest: cwd_d,
+                stdin_digest,
+                env_digest: env_d,
+                expires_at,
+                consumed: consumed != 0,
+                revoked: revoked != 0,
+            },
+        );
+    }
+    Ok(out)
 }
 
 fn load_sessions(reg: &mut Registry) -> Result<Vec<DiscoverySession>, String> {
