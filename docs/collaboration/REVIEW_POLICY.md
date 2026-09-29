@@ -11,7 +11,7 @@ The owner requests large consolidated goals, MiMo-managed implementation and sub
 | B01 | Runnable core: native discovery through registry, resolution, authorized execution and audit, with CLI/MCP/skills/agent-session integration | R1 consolidated review; MiMo repair; R2 verification and bounded Codex corrections |
 | B02 | Complete desktop product, AI-assisted flows, extension/data lifecycle, platform QA and local release candidates | R3 consolidated review; MiMo repair; R4 verification and bounded Codex corrections |
 
-The budget starts with the first implemented B01 delivery. MIMO-000 onboarding assessment, task planning, workbench synchronization, and routine status reads are not formal product reviews. Formal rounds used: **0 of 4**. Record subsequent review results once, with exact revision IDs and evidence.
+The budget starts with the first implemented B01 delivery. MIMO-000 onboarding assessment, task planning, workbench synchronization, and routine status reads are not formal product reviews. Formal rounds used: **1 of 4**. R1 reviewed `46a06aa` and returned changes_required; [review ledger](../reviews/REVIEW_LEDGER.md) records the exact revision, evidence and next handoff. Record subsequent review results once, with exact revision IDs and evidence.
 
 ## Inside a large batch
 

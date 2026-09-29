@@ -36,7 +36,7 @@ Subagents must not duplicate domain models, change shared schemas unilaterally, 
 - Internal review and repair precede the Codex handoff. Codex acceptance is separate from developer self-assessment.
 - Mark unavailable platform checks as unverified. A Windows check is not macOS verification.
 - MiMo internally reviews and provisionally freezes shared contracts before subagents consume them. Parent-approved changes propagate atomically across schemas, clients, tests and docs and remain visible in the decision log. Codex assesses them in the consolidated batch review.
-- Formal product-review budget: B01 R1/R2, B02 R3/R4; currently 0 of 4 used. Internal tests/reviews, planning and routine status reads do not consume rounds.
+- Formal product-review budget: B01 R1/R2, B02 R3/R4; currently 1 of 4 used. R1 returned changes_required at `46a06aa`; see `docs/reviews/REVIEW_LEDGER.md` and the single `MIMO-B01-R1-REPAIR.md` brief. Internal tests/reviews, planning and routine status reads do not consume rounds.
 - Codex may make and verify bounded localized corrections during the second review of a batch. Unresolved blockers remain unaccepted; do not automatically initiate a fifth formal round.
 
 ## Repository discipline

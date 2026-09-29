@@ -1,0 +1,323 @@
+{
+  "schema": "toolhub.review-evidence/v1",
+  "review": "B01-R1",
+  "review_date_local": "2026-09-29",
+  "verdict": "changes_required",
+  "formal_rounds_used": 1,
+  "formal_rounds_limit": 4,
+  "reviewed_head": "46a06aa11c370b2ca4432909aa2b8b0a70127090",
+  "implementation_parent": "159bac10c22a18b10a3aa1165b9e521f681cc5b9",
+  "planning_base": "6ffc9dc3c2fb526e740f0e3b29eafb84f4c54fce",
+  "bundle_sha256": "ad4aeb965bd5c539d7c2f2337c35fbf840b167ba8142e367ce85f42c8a42375b",
+  "platform": "Windows x64",
+  "toolchain": "Rust/Cargo 1.95.0, VS Build Tools 2022 MSVC 14.44",
+  "macos_checks": "not executed; Unix source compilation defects identified separately",
+  "checkout_product_edits": false,
+  "checks": [
+    {
+      "command": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "log_name": "evidence/fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "cargo test --workspace --offline --locked",
+      "exit_code": 0,
+      "log_name": "evidence/tests.log",
+      "log_sha256": "857961d8b2d3bd017ffb382399b295c739965e1ad6a572f683d7c9e742ed50fe"
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --offline --locked -- -D warnings",
+      "exit_code": 0,
+      "log_name": "evidence/clippy.log",
+      "log_sha256": "c81103b89d0600b58048c05814ed386a53c770153a2206f8f3e7f1c3c8b391a7"
+    },
+    {
+      "command": "cargo build --workspace --release --offline --locked",
+      "exit_code": 0,
+      "log_name": "evidence/build.log",
+      "log_sha256": "c38cdf78dbc88a1db07b62c018463b458e7da7ebe285be4ff2f67705f84c47b9"
+    }
+  ],
+  "test_totals": {
+    "passed": 42,
+    "failed": 0,
+    "ignored": 0
+  },
+  "observations": {
+    "exact_approved_ask": {
+      "duration_ms": 0,
+      "error_code": "approval_required",
+      "exit_code": null,
+      "fallback_allowed": false,
+      "status": "denied",
+      "stderr": "policy requires ask: explicit approval required",
+      "stdout": "",
+      "truncated": false
+    },
+    "changed_approval_under_independent_allow": {
+      "status": "success",
+      "interpretation": "binding not enforced; this does not demonstrate Ask bypass"
+    },
+    "spoofed_agent_label_under_tool_allow": {
+      "original_label_status": "denied",
+      "changed_label_status": "success",
+      "omitted_label_status": "success"
+    },
+    "environment_deny_with_tool_allow_status": "success",
+    "blocked_status_known_trust_execution": "success",
+    "timeout": {
+      "requested_ms": 1,
+      "requested_sleep_ms": 300,
+      "reported_duration_ms": 332,
+      "result_status": "success"
+    },
+    "output_memory": {
+      "source_bytes": 16777216,
+      "limit_bytes": 262144,
+      "daemon_baseline_bytes": 8204288,
+      "daemon_peak_bytes": 59592704,
+      "daemon_peak_growth_bytes": 51388416,
+      "response_stdout_bytes": 262144,
+      "truncated": true,
+      "status": "success"
+    },
+    "valid_utf8_output_daemon_exit_code": 101,
+    "split_sensitive_argument_value_persisted": true,
+    "hyphenated_sensitive_argument_value_persisted": true,
+    "default_export_case_and_separator_home_path_leak": true,
+    "effective_policy_reloaded_on_restart": false,
+    "scan_fixture_instances_refreshed": false,
+    "fixture_candidate_count_first_second": [
+      1,
+      2
+    ],
+    "unknown_counts_parent_run": [
+      73,
+      146,
+      219
+    ],
+    "deleted_fixture_instances_still_available": 2,
+    "deleted_fixture_provider_still_selected": true,
+    "two_project_venvs_environment_ids": [
+      "env.user"
+    ],
+    "native_recognized_rows_and_rows_with_version": [
+      4,
+      0
+    ],
+    "persisted_evidence_interfaces_scans": [
+      0,
+      0,
+      0
+    ],
+    "filename_only_harmless_text_known_trust": true,
+    "filename_trust_caveat": "default policy is Ask; this alone does not demonstrate default unauthorized execution",
+    "blocked_aarch64_selected_as_x86_64": true,
+    "invalid_version_constraint_ignored": true,
+    "prerelease_and_zero_major_caret_false_matches": true,
+    "protocol": [
+      {
+        "probe": "invalid-jsonrpc-envelope",
+        "response": {
+          "jsonrpc": "2.0",
+          "id": {
+            "invalid": true
+          },
+          "result": {
+            "ok": true,
+            "protocol": "1.0"
+          }
+        }
+      },
+      {
+        "probe": "oversized-stdio-request",
+        "request_bytes_over_1mib": true,
+        "accepted": true
+      },
+      {
+        "probe": "resolve-wire-shape",
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 3,
+          "result": {
+            "alternatives": [],
+            "canonical": "language.python.execute",
+            "capability": "language.python.execute",
+            "error": null,
+            "explanation": "no available provider instances",
+            "selected": null
+          }
+        }
+      },
+      {
+        "probe": "export-wire-shape",
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 4,
+          "result": {
+            "generated_at": "2026-09-29T09:32:07.350105700Z",
+            "redaction": [
+              "home_path",
+              "username",
+              "secrets",
+              "sensitive_args"
+            ],
+            "tools": []
+          }
+        }
+      },
+      {
+        "probe": "registered-skill-not-visible",
+        "stored_rows": 1,
+        "list": {
+          "jsonrpc": "2.0",
+          "id": 5,
+          "result": []
+        },
+        "inspect": {
+          "jsonrpc": "2.0",
+          "id": 6,
+          "result": {
+            "id": "r1.skill",
+            "note": "no skill packages registered",
+            "status": "not_installed"
+          }
+        }
+      },
+      {
+        "probe": "empty-classification-falsely-stored",
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 8,
+          "result": {
+            "accepted": true,
+            "note": "classification stored as untrusted enrichment only",
+            "provenance": "ai"
+          }
+        },
+        "evidence_rows": 0
+      },
+      {
+        "probe": "cli-json-error",
+        "response": {
+          "exit": 3,
+          "stdout": "",
+          "stderr_last": [
+            "error: not_found: instance r1.missing-instance not found"
+          ]
+        }
+      },
+      {
+        "probe": "policy-not-reloaded",
+        "stored_rule_present": true,
+        "effective_rule_present": false
+      },
+      {
+        "probe": "mcp-contract-and-error-lifetime",
+        "initialize": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "protocolVersion": "2024-11-05",
+            "serverInfo": {
+              "name": "toolhub",
+              "version": "0.1.0"
+            },
+            "tools": [
+              {
+                "description": "Search installed tools by query",
+                "name": "search_tools"
+              },
+              {
+                "description": "Resolve a capability",
+                "name": "resolve_capability"
+              },
+              {
+                "description": "Inspect one tool",
+                "name": "inspect_tool"
+              },
+              {
+                "description": "List environments",
+                "name": "list_environments"
+              },
+              {
+                "description": "Execute under policy",
+                "name": "execute_tool"
+              },
+              {
+                "description": "Search skills",
+                "name": "search_skills"
+              },
+              {
+                "description": "Inspect skill",
+                "name": "inspect_skill"
+              }
+            ]
+          }
+        },
+        "notification_reply": {
+          "id": null,
+          "jsonrpc": "2.0",
+          "result": {
+            "error": "unsupported method notifications/initialized"
+          }
+        },
+        "tools_list_result_type": "list",
+        "tools_call_result": {
+          "id": 4,
+          "jsonrpc": "2.0",
+          "result": []
+        },
+        "failed_call_response": null,
+        "gateway_exit_on_tool_error": 3
+      }
+    ],
+    "smoke_negative_control": {
+      "smoke_exit_code": 0,
+      "failing_native_commands": 15,
+      "still_claimed_done": true,
+      "unknown_marker_fixture_created": false
+    },
+    "verified_safeguards": [
+      "explicit unknown/blocked trust denied",
+      "synthetic inherited API key absent in child",
+      "captured stdout not persisted in examined execution records"
+    ]
+  },
+  "static_review_groups": [
+    "native providers/modes/incremental gaps",
+    "shared Windows IPC and Unix compile/endpoint defects",
+    "schema/type/resource contracts",
+    "environment graph wiring",
+    "discovery identity/scopes/revocation",
+    "skill parser/path/availability wiring",
+    "adapters/config/launch",
+    "import/activity and migration coverage"
+  ],
+  "repro_package": {
+    "name": "B01-R1-REPRO.zip",
+    "sha256": "b84b513e33a6eb9e38f174fb04c852ca0c37651d1cf730afabf5ed485c9f5648",
+    "bytes": 17770,
+    "selected_scripts": [
+      "protocol-probes.py",
+      "security-probes/security_probe.py",
+      "security-probes/extra_probe.py",
+      "security-probes/privacy_probe.py",
+      "data-probes/native_pipeline_probe.py",
+      "data-probes/seeded_resolver_export_probe.py",
+      "data-probes/registry_sql_probe.py",
+      "smoke-negative-control.ps1"
+    ],
+    "selected_original_observations": [
+      "security-probes/results.json",
+      "security-probes/extra-results.json",
+      "security-probes/privacy-results.json",
+      "protocol-probes/results.json",
+      "evidence/native-pipeline.json",
+      "evidence/resolver-export.txt",
+      "evidence/smoke-negative-control.json"
+    ]
+  },
+  "local_raw_evidence_policy": "No database, machine scan inventory, environment dump, credential or full conversation published. Selected synthetic observation files are in the repro package."
+}
