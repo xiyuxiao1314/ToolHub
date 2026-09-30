@@ -21,6 +21,14 @@ Base: `6df2166` (Codex R2 policy fix adopted)
 
 Status legend: Implemented | Verified (this host) | Partial | Open
 
+## R3 evidence packs (2026-09-30)
+
+| Pack | Tests | Result |
+| --- | --- | --- |
+| Long-lived daemon soak | `apps/daemon/tests/soak.rs` (4) | 50 mixed requests, scan/query interleave, bad-request recovery, restart durability — all pass |
+| MCP conformance | `apps/cli/tests/mcp_conformance.rs` (6) | initialize/capabilities, notification silence, tools/list shape, tools/call + error recovery, error.message string, unsupported method recovery — all pass |
+| Shared multi-client | `apps/daemon/tests/integration.rs` (4) | shared registry, non-admin approve denied, invalid jsonrpc, ping/status |
+
 ## R2 blockers
 
 | ID | Status | Evidence |
