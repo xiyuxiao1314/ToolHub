@@ -58,6 +58,7 @@ pub fn resolve(
     };
 
     // F10/R2-B06: eligibility before ranking
+    let candidates_before = candidates.clone();
     candidates.retain(|c| c.trust != "blocked" && c.trust != "unknown");
     if let Some(want_arch) = prefs.require_arch.as_deref() {
         candidates.retain(|c| c.arch.eq_ignore_ascii_case(want_arch));
@@ -120,8 +121,14 @@ pub fn resolve(
             .then_with(|| a.path.cmp(&b.path))
     });
 
+    // R2-B06: distinguish blocked-only from empty.
+    let blocked_count = candidates_before.iter().filter(|c| c.trust == "blocked").count();
     let explanation = if candidates.is_empty() {
-        "no available provider instances".to_string()
+        if blocked_count > 0 {
+            format!("{blocked_count} providers exist but are blocked/untrusted")
+        } else {
+            "no available provider instances".to_string()
+        }
     } else {
         format!(
             "selected {} from {} candidates using project/version/trust/path rules; selection is not execution authority",

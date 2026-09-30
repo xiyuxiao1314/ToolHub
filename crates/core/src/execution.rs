@@ -17,6 +17,8 @@ pub struct ExecutionApproval {
     pub cwd_digest: String,
     pub stdin_digest: String,
     pub env_digest: String,
+    /// Digest of policy+trust state at mint time (R2-B01 residual).
+    pub policy_trust_digest: String,
     pub expires_at: DateTime<Utc>,
     pub consumed: bool,
     #[serde(default)]
@@ -158,6 +160,7 @@ mod tests {
             cwd_digest: "cc".into(),
             stdin_digest: "ee".into(),
             env_digest: "dd".into(),
+            policy_trust_digest: "ff".into(),
             expires_at: Utc::now() + chrono::Duration::minutes(5),
             consumed: false,
             revoked: false,

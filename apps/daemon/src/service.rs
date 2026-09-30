@@ -403,6 +403,16 @@ impl DaemonService {
                     ..Default::default()
                 };
                 let decision = self.policy.decide(&ctx);
+                let pt_dig = toolhub_executor::policy_trust_digest(
+                    match decision.action {
+                        PolicyAction::Allow => "allow",
+                        PolicyAction::Ask => "ask",
+                        PolicyAction::Deny => "deny",
+                    },
+                    &trust,
+                    &row.status,
+                    instance_id,
+                );
 
                 if decision.action == PolicyAction::Deny {
                     return Err(ProtocolError::denied(decision.explanation));
@@ -433,6 +443,7 @@ impl DaemonService {
                         req.cwd.as_deref(),
                         req.stdin.as_deref(),
                         &env_dig,
+                        &pt_dig,
                         chrono::Utc::now(),
                     )
                     .map_err(|st| match st {
@@ -532,10 +543,13 @@ impl DaemonService {
                     .ok_or_else(|| ProtocolError::new(ErrorCode::NotFound, "instance not found"))?;
                 let hash = toolhub_executor::hash_file(&row.path).unwrap_or_default();
                 let env = toolhub_executor::sanitize_env(&BTreeMap::new(), &[]);
-                let _agent_id = params
-                    .get("agent_id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("local.stdio");
+                let trust_now = parse_trust(&row.trust);
+                let pt_dig = toolhub_executor::policy_trust_digest(
+                    "ask",
+                    &trust_now,
+                    &row.status,
+                    instance_id,
+                );
                 let approval = toolhub_executor::build_approval(
                     &uuid::Uuid::new_v4().to_string(),
                     AgentId::new(self.peer_principal())
@@ -564,6 +578,7 @@ impl DaemonService {
                     &hash,
                     row.canonical_path.as_deref().unwrap_or(&row.path),
                     &toolhub_executor::env_digest(&env),
+                    &pt_dig,
                     300,
                 );
                 let aid = approval.approval_id.clone();
@@ -577,7 +592,7 @@ impl DaemonService {
                     row.canonical_path.as_deref().unwrap_or(&row.path),
                     &format!("{}|{}", approval.args_digest, approval.stdin_digest),
                     &approval.cwd_digest,
-                    &approval.env_digest,
+                    &format!("{}|{}", approval.env_digest, approval.policy_trust_digest),
                     &approval.expires_at.to_rfc3339(),
                 );
                 self.approvals.insert(aid.clone(), approval);
@@ -1161,6 +1176,10 @@ fn load_approvals(
             Some((a, s)) => (a.to_string(), s.to_string()),
             None => (args_d, String::new()),
         };
+        let (env_digest, policy_trust_digest) = match env_d.split_once('|') {
+            Some((e, p)) => (e.to_string(), p.to_string()),
+            None => (env_d, String::new()),
+        };
         out.insert(
             id.clone(),
             toolhub_core::ExecutionApproval {
@@ -1175,7 +1194,8 @@ fn load_approvals(
                 args_digest,
                 cwd_digest: cwd_d,
                 stdin_digest,
-                env_digest: env_d,
+                env_digest,
+                policy_trust_digest,
                 expires_at,
                 consumed: consumed != 0,
                 revoked: revoked != 0,

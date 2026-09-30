@@ -103,6 +103,21 @@ pub fn env_digest(env: &SanitizedEnv) -> String {
     digest_map(&env.vars)
 }
 
+/// Digest of effective policy decision + trust + status at mint/revalidate time.
+pub fn policy_trust_digest(
+    decision: &str,
+    trust_level: &str,
+    status: &str,
+    instance_id: &str,
+) -> String {
+    digest_strings(&[
+        decision.to_string(),
+        trust_level.to_string(),
+        status.to_string(),
+        instance_id.to_string(),
+    ])
+}
+
 pub fn hash_file(path: &str) -> std::io::Result<String> {
     let data = std::fs::read(path)?;
     Ok(hash_bytes(&data))
@@ -119,6 +134,7 @@ pub fn validate_approval(
     cwd: Option<&str>,
     stdin: Option<&str>,
     env_dig: &str,
+    policy_trust_digest: &str,
     now: chrono::DateTime<chrono::Utc>,
 ) -> Result<(), ExecutionStatus> {
     if approval.revoked || approval.consumed {
@@ -154,6 +170,13 @@ pub fn validate_approval(
         return Err(ExecutionStatus::Denied);
     }
     if approval.env_digest != env_dig {
+        return Err(ExecutionStatus::Denied);
+    }
+    // R2-B01: revalidate policy/trust revision binding when provided.
+    if !approval.policy_trust_digest.is_empty()
+        && !policy_trust_digest.is_empty()
+        && approval.policy_trust_digest != policy_trust_digest
+    {
         return Err(ExecutionStatus::Denied);
     }
     if request.agent_id.is_some() && request.agent_id.as_ref() != Some(&approval.agent_id) {
@@ -367,9 +390,10 @@ pub fn execute(
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let mut truncated = false;
+    // R2-B03: bounded collection — do not wait forever on hung pipes.
     let collect_deadline = Instant::now() + Duration::from_millis(500);
     while Instant::now() < collect_deadline {
-        match rx.try_recv() {
+        match rx.recv_timeout(Duration::from_millis(50)) {
             Ok((which, buf, t)) => {
                 truncated |= t;
                 if which == "stdout" {
@@ -378,13 +402,12 @@ pub fn execute(
                     stderr = buf;
                 }
             }
-            Err(mpsc::TryRecvError::Empty) => {
-                if stdout_t_finished(&stdout, &stderr) {
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                if stdout.len() + stderr.len() > 0 {
                     break;
                 }
-                std::thread::sleep(Duration::from_millis(5));
             }
-            Err(mpsc::TryRecvError::Disconnected) => break,
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
         }
     }
 
@@ -617,6 +640,7 @@ pub fn build_approval(
     executable_hash: &str,
     canonical_executable: &str,
     env_dig: &str,
+    policy_trust_digest: &str,
     ttl_seconds: i64,
 ) -> ExecutionApproval {
     let stdin_d = digest_strings(&[request.stdin.clone().unwrap_or_default()]);
@@ -631,6 +655,7 @@ pub fn build_approval(
         cwd_digest: digest_strings(&[request.cwd.clone().unwrap_or_default()]),
         stdin_digest: stdin_d,
         env_digest: env_dig.to_string(),
+        policy_trust_digest: policy_trust_digest.to_string(),
         expires_at: chrono::Utc::now() + chrono::Duration::seconds(ttl_seconds),
         consumed: false,
         revoked: false,
