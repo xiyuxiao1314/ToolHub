@@ -847,6 +847,7 @@ dependencies = [
  "clap",
  "serde",
  "serde_json",
+ "tempfile",
  "toolhub-ipc",
  "toolhub-protocol",
 ]
