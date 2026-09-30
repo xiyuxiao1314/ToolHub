@@ -928,6 +928,68 @@ impl DaemonService {
                 Ok(json!(items))
             }
             Method::ExportReport => {
+                // R2-B10: optional validated report import (foreign paths stay untrusted)
+                if let Some(import) = params.get("import") {
+                    let schema = import
+                        .get("schema")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    if schema != "toolhub.report/v1" {
+                        return Err(ProtocolError::new(
+                            ErrorCode::InvalidParams,
+                            "unsupported report schema",
+                        ));
+                    }
+                    let mut imported = 0;
+                    if let Some(tools) = import.get("tools").and_then(|v| v.as_array()) {
+                        for t in tools.iter().take(500) {
+                            let name = t.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                            if name.is_empty() {
+                                continue;
+                            }
+                            // Foreign paths are recorded as unavailable/untrusted only.
+                            let path = t
+                                .get("path")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
+                            if path.is_empty() {
+                                continue;
+                            }
+                            let id = format!("import-{}", toolhub_core::path_fingerprint(path));
+                            let input = UpsertInstanceInput {
+                                id,
+                                definition_id: format!("imported.{}", name.replace(' ', "_").to_lowercase()),
+                                definition_name: name.to_string(),
+                                version: t
+                                    .get("version")
+                                    .and_then(|v| v.as_str())
+                                    .map(|s| s.to_string()),
+                                platform: t
+                                    .get("platform")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("unknown")
+                                    .to_string(),
+                                arch: t
+                                    .get("arch")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("unknown")
+                                    .to_string(),
+                                path: path.to_string(),
+                                canonical_path: None,
+                                environment_id: None,
+                                origin_json: "{\"unknown\":{}}".into(),
+                                owner_json: "{\"kind\":\"unknown\",\"certainty\":\"unknown\",\"evidence\":[]}".into(),
+                                trust_json: "{\"level\":\"unknown\"}".into(),
+                                status: "missing".into(),
+                                capabilities: vec![],
+                            };
+                            if self.registry.upsert_instance(&input).is_ok() {
+                                imported += 1;
+                            }
+                        }
+                    }
+                    return Ok(json!({"imported": imported, "note": "foreign paths remain unavailable/untrusted"}));
+                }
                 let instances = self.registry.list_instances().map_err(db_err)?;
                 let tools: Vec<_> = instances
                     .into_iter()

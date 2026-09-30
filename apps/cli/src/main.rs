@@ -543,7 +543,15 @@ fn mcp_serve(client: &mut DaemonClient) -> anyhow::Result<()> {
             ),
         };
         let resp = if is_error {
-            json!({"jsonrpc":"2.0","id":id,"error":{"code":-32000,"message": result}})
+            // R2-B07: error.message must be a string
+            let msg = result
+                .get("content")
+                .and_then(|c| c.get(0))
+                .and_then(|t| t.get("text"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("tool call failed")
+                .to_string();
+            json!({"jsonrpc":"2.0","id":id,"error":{"code":-32000,"message": msg}})
         } else {
             json!({"jsonrpc":"2.0","id":id,"result":result})
         };
