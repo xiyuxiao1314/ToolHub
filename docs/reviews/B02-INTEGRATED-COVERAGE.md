@@ -25,9 +25,9 @@ Status legend: Implemented | Verified (this host) | Partial | Open
 
 | ID | Status | Evidence |
 | --- | --- | --- |
-| R2-B01 authority | Partial | approve requires admin; policy Allow gated; principal still process-env bound |
+| R2-B01 authority | Improved | per-connection pipe principal; admin excludes pipe; approval policy/trust digest |
 | R2-B02 shared IPC | Partial | ConnectNamedPipe accept + CLI shared transport; multi-client soak not full |
-| R2-B03 process bounds | Improved | timeout + taskkill /T tree kill; join bounds still best-effort |
+| R2-B03 process bounds | Improved | timeout + taskkill /T; bounded I/O collect; execute.cancel |
 | R2-B04 scan integrity | Improved | preserve blocked trust; path identity upsert |
 | R2-B05 trust/env | Improved | MZ/size required before Known; renamed text python stays unknown |
 | R2-B06 resolver | Improved | arch/trust prefs wired; invalid version rejects |
@@ -49,7 +49,7 @@ Status legend: Implemented | Verified (this host) | Partial | Open
 | B02-15 product updates | Open |
 | B02-16 cross-client | Partial |
 | B02-17 usability | Partial |
-| B02-18 Windows RC | Partial — release binaries exist |
+| B02-18 Windows RC | Implemented — `scripts/package.ps1` + checksums + uninstall docs |
 | B02-19 macOS | Unverified-host |
 | B02-20 QA/privacy | Partial |
 | B02-21 docs/SDK | Open |
