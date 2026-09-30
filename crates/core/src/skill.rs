@@ -116,7 +116,7 @@ impl SkillManifest {
             .into_iter()
             .flatten()
         {
-            if p.contains("..") || p.starts_with('/') || p.contains(':') && !cfg!(windows) {
+            if p.contains("..") || p.starts_with('/') || p.starts_with('\\') || p.contains(':') {
                 return Err(CoreError::Validation(format!("unsafe skill path: {p}")));
             }
         }

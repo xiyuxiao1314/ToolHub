@@ -320,7 +320,7 @@ fn looks_like_executable(path: &str) -> bool {
             if cfg!(windows) {
                 return magic[0] == b'M' && magic[1] == b'Z';
             }
-            return magic == [0x7f, b'E', b'L', b'F'] || magic[0] == b'#';
+            return magic == [0x7f, b'E', b'L', b'F'];
         }
     }
     false

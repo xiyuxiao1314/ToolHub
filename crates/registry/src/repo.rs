@@ -38,7 +38,8 @@ impl Registry {
     }
 
     /// F06: idempotent upsert keyed by (definition_id, path); preserves identity across rescans.
-    pub fn upsert_instance(&mut self, input: &UpsertInstanceInput) -> RegistryResult<()> {
+    /// Returns the persisted instance id (may differ from input.id after path identity).
+    pub fn upsert_instance(&mut self, input: &UpsertInstanceInput) -> RegistryResult<String> {
         let now = chrono::Utc::now().to_rfc3339();
         let tx = self.db.conn.transaction()?;
         tx.execute(
@@ -131,7 +132,7 @@ impl Registry {
             params![id, now],
         )?;
         tx.commit()?;
-        Ok(())
+        Ok(id)
     }
 
     pub fn find_instance_by_path(&mut self, path: &str) -> RegistryResult<Option<String>> {

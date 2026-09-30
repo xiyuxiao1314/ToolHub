@@ -45,6 +45,14 @@ fn main() -> anyhow::Result<()> {
         if line.trim().is_empty() {
             continue;
         }
+        // R2-B07: notifications (no id) must not receive a response.
+        let is_notification = serde_json::from_str::<serde_json::Value>(&line)
+            .ok()
+            .map(|v| v.get("id").map(|i| i.is_null()).unwrap_or(true))
+            .unwrap_or(false);
+        if is_notification {
+            continue;
+        }
         let response = match serde_json::from_str::<JsonRpcRequest>(&line) {
             Ok(req) => {
                 let mut svc = service.lock().unwrap();

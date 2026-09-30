@@ -127,6 +127,12 @@ pub fn validate_approval(
     if now >= approval.expires_at {
         return Err(ExecutionStatus::Expired);
     }
+    if approval.session_id.is_empty() {
+        return Err(ExecutionStatus::Denied);
+    }
+    if request.agent_id.is_some() && request.agent_id.as_ref() != Some(&approval.agent_id) {
+        return Err(ExecutionStatus::Denied);
+    }
     if approval.instance_id != request.instance_id {
         return Err(ExecutionStatus::Denied);
     }

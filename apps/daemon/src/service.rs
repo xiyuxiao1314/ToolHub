@@ -565,7 +565,16 @@ impl DaemonService {
                     .ok_or_else(|| {
                         ProtocolError::new(ErrorCode::InvalidParams, "approval_id required")
                     })?;
+                let principal = self.peer_principal();
                 if let Some(a) = self.approvals.get_mut(aid) {
+                    if a.agent_id.as_str() != principal
+                        && !principal.starts_with("local.admin")
+                        && std::env::var("TOOLHUB_ADMIN").ok().as_deref() != Some("1")
+                    {
+                        return Err(ProtocolError::denied(
+                            "execute.revoke requires owner or admin principal",
+                        ));
+                    }
                     a.revoke();
                 }
                 let _ = self.registry.revoke_approval(aid);
@@ -1042,8 +1051,8 @@ impl DaemonService {
                             .map(|c| c.as_str().to_string())
                             .collect(),
                     };
-                    if self.registry.upsert_instance(&input).is_ok() {
-                        seen.push(inst.id.as_str().to_string());
+                    if let Ok(stored_id) = self.registry.upsert_instance(&input) {
+                        seen.push(stored_id);
                     }
                     let _ = self.registry.db.conn.execute(
                         "INSERT INTO environments(id, name, kind, root_path, parent_id, origin_json, owner_json, labels_json)
