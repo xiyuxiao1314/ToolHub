@@ -1,6 +1,8 @@
 //! Native desktop bridge to the authenticated shared user service.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use serde_json::{json, Value};
+use std::path::{Path, PathBuf};
+
 fn daemon_bin() -> Result<std::path::PathBuf, String> {
     if let Some(path) = std::env::var_os("TOOLHUBD_BIN") {
         return Ok(path.into());
@@ -15,6 +17,16 @@ fn daemon_bin() -> Result<std::path::PathBuf, String> {
             "toolhubd"
         }))
 }
+
+fn default_export_path() -> PathBuf {
+    let docs = std::env::var_os("USERPROFILE")
+        .map(PathBuf::from)
+        .map(|p| p.join("Documents"))
+        .filter(|p| p.is_dir())
+        .unwrap_or_else(std::env::temp_dir);
+    docs.join("toolhub-export.json")
+}
+
 #[tauri::command]
 async fn rpc(method: String, params: Value) -> Result<Value, String> {
     // Each request has a separate authenticated connection, so cancellation and health queries
@@ -30,13 +42,110 @@ async fn rpc(method: String, params: Value) -> Result<Value, String> {
     .await
     .map_err(|error| format!("desktop worker failed: {error}"))?
 }
+
 #[tauri::command]
 fn app_versions() -> Value {
     json!({"app":env!("CARGO_PKG_VERSION"),"core":env!("CARGO_PKG_VERSION"),"protocol":toolhub_protocol::PROTOCOL_VERSION})
 }
+
+#[tauri::command]
+fn default_export_path_string() -> String {
+    default_export_path().to_string_lossy().to_string()
+}
+
+#[tauri::command]
+fn save_text_file(path: String, contents: String) -> Result<String, String> {
+    if contents.len() > 8 * 1024 * 1024 {
+        return Err("file too large".into());
+    }
+    let path = PathBuf::from(path.trim());
+    if path.as_os_str().is_empty() {
+        return Err("path required".into());
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&path, contents).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn read_text_file(path: String) -> Result<String, String> {
+    let path = PathBuf::from(path.trim());
+    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
+/// Open a terminal in the tool's directory (or parent of the executable).
+#[tauri::command]
+fn open_terminal(path: String) -> Result<String, String> {
+    let raw = path.trim();
+    if raw.is_empty() {
+        return Err("path required".into());
+    }
+    let p = Path::new(raw);
+    let cwd = if p.is_dir() {
+        p.to_path_buf()
+    } else {
+        p.parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| PathBuf::from("."))
+    };
+    if !cwd.exists() {
+        return Err(format!("path not found: {}", cwd.display()));
+    }
+    #[cfg(windows)]
+    {
+        std::process::Command::new("cmd.exe")
+            .args(["/C", "start", "cmd.exe", "/K", "cd", "/d"])
+            .arg(&cwd)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(windows))]
+    {
+        std::process::Command::new("x-terminal-emulator")
+            .current_dir(&cwd)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(cwd.to_string_lossy().to_string())
+}
+
+/// Reveal a path in Explorer (Windows) or open directory.
+#[tauri::command]
+fn reveal_path(path: String) -> Result<String, String> {
+    let raw = path.trim();
+    if raw.is_empty() {
+        return Err("path required".into());
+    }
+    #[cfg(windows)]
+    {
+        std::process::Command::new("explorer.exe")
+            .arg(raw)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(windows))]
+    {
+        std::process::Command::new("open")
+            .arg(raw)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(raw.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![rpc, app_versions])
+        .invoke_handler(tauri::generate_handler![
+            rpc,
+            app_versions,
+            default_export_path_string,
+            save_text_file,
+            read_text_file,
+            open_terminal,
+            reveal_path
+        ])
         .run(tauri::generate_context!())
         .expect("error while running ToolHub Desktop");
 }
