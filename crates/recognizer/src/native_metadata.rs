@@ -182,8 +182,10 @@ fn parse_block(b: &[u8], at: usize, end: usize, depth: usize, out: &mut BTreeMap
     {
         if kind == 1 && value_len > 0 {
             let value: Vec<_> = value
-                .chunks_exact(2)
-                .map(|x| u16::from_le_bytes([x[0], x[1]]))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|x| u16::from_le_bytes(*x))
                 .take_while(|x| *x != 0)
                 .collect();
             out.insert(key, String::from_utf16_lossy(&value));

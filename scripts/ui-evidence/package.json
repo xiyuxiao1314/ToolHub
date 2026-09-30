@@ -1,0 +1,14 @@
+{
+  "name": "toolhub-ui-evidence",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Local evidence harness: serve desktop UI dist with Tauri invoke shim and capture nine-page screenshots.",
+  "scripts": {
+    "server": "node server.mjs",
+    "capture": "node capture.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.63.0"
+  }
+}

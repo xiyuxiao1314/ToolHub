@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 
 type Json = Record<string, unknown> | unknown[] | string | number | boolean | null
@@ -41,8 +41,10 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [query, setQuery] = useState('python')
+  const loadSeq = useRef(0)
 
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current
     setLoading(true)
     setError(null)
     try {
@@ -81,11 +83,13 @@ export default function App() {
           }
           break
       }
+      if (seq !== loadSeq.current) return
       setData(d)
     } catch (e: any) {
+      if (seq !== loadSeq.current) return
       setError(String(e))
     } finally {
-      setLoading(false)
+      if (seq === loadSeq.current) setLoading(false)
     }
   }, [page, query])
 
@@ -93,6 +97,44 @@ export default function App() {
     localStorage.setItem('th.page', page)
     void load()
   }, [page, load])
+
+  const switchPage = (p: Page) => {
+    // Drop the previous page payload before the next load so render never
+    // maps a stale non-array onto a new page's list UI.
+    setData(null)
+    setError(null)
+    setLoading(true)
+    if (p === page) {
+      void load()
+    } else {
+      setPage(p)
+    }
+  }
+
+  const listFrom = (value: unknown): any[] => {
+    if (Array.isArray(value)) return value
+    if (value && typeof value === 'object' && Array.isArray((value as any).result)) {
+      return (value as any).result
+    }
+    return []
+  }
+
+  const trustLabel = (raw: unknown): string => {
+    if (raw == null) return ''
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw)
+        return String(parsed?.level ?? parsed?.kind ?? raw)
+      } catch {
+        return raw
+      }
+    }
+    if (typeof raw === 'object') {
+      const obj = raw as any
+      return String(obj.level ?? obj.kind ?? '')
+    }
+    return String(raw)
+  }
 
   return (
     <div className="shell">
@@ -103,7 +145,7 @@ export default function App() {
             <button
               key={p}
               className={p === page ? 'active' : ''}
-              onClick={() => setPage(p)}
+              onClick={() => switchPage(p)}
               aria-current={p === page ? 'page' : undefined}
             >
               {p}
@@ -135,9 +177,9 @@ export default function App() {
               </button>
             </Card>
             <Card title="Activity">
-              {Array.isArray(data?.activity?.result || data?.activity) ? (
+              {listFrom(data?.activity).length > 0 ? (
                 <ul>
-                  {((data.activity.result ?? data.activity) as any[]).slice(0, 20).map((a, i) => (
+                  {listFrom(data?.activity).slice(0, 20).map((a, i) => (
                     <li key={i}>
                       {String(a.ts ?? '')} — {String(a.kind ?? '')} — {String(a.summary ?? '')}
                     </li>
@@ -165,19 +207,20 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {((data?.result ?? data ?? []) as any[]).map((t, i) => (
+                {listFrom(data).slice(0, 50).map((t, i) => (
                   <tr key={i}>
                     <td>{String(t.name)}</td>
                     <td>{String(t.version ?? '')}</td>
-                    <td>{String(t.trust ?? '')}</td>
+                    <td>{trustLabel(t.trust)}</td>
                     <td>
-                      <code>{String(t.path ?? '')}</code>
+                      <code>{String(t.path ?? t.canonical_path ?? '')}</code>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {((data?.result ?? data ?? []) as any[]).length === 0 && <Empty text="无匹配工具" />}
+            {listFrom(data).length === 0 && <Empty text="无匹配工具" />}
+            {listFrom(data).length > 50 && <Empty text={`仅显示前 50 条（共 ${listFrom(data).length} 条）`} />}
           </Card>
         )}
         {!loading && !error && page === 'Environments' && (
@@ -192,7 +235,7 @@ export default function App() {
         )}
         {!loading && !error && page === 'Skills' && (
           <Card title="Skills">
-            {Array.isArray(data?.result ?? data) && ((data.result ?? data) as any[]).length === 0 ? (
+            {listFrom(data).length === 0 ? (
               <Empty text="尚未注册技能" />
             ) : (
               <pre>{JSON.stringify(data, null, 2)}</pre>
