@@ -224,5 +224,3 @@ mod tests {
         assert!(serde_json::from_value::<JsonRpcResponse>(serde_json::json!({"jsonrpc":"2.0","id":1,"result":false,"error":{"code":-1,"message":"bad"}})).is_err());
     }
 }
-
-

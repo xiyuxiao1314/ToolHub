@@ -361,5 +361,3 @@ mod tests {
         assert_eq!(unknown.error.unwrap().code, -32601);
     }
 }
-
-

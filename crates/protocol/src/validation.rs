@@ -37,11 +37,17 @@ pub fn validate_method_params(request: &JsonRpcRequest) -> Result<(), ProtocolEr
     };
     for key in required {
         match params.get(*key).and_then(Value::as_str) {
-            Some(value) if !value.is_empty() || *key=="query" => {},
-            _=>return Err(invalid(format!("{key} must be a string"))),
+            Some(value) if !value.is_empty() || *key == "query" => {}
+            _ => return Err(invalid(format!("{key} must be a string"))),
         }
     }
-    if method==Method::SkillRegister && !params.contains_key("path") && !params.get("manifest").is_some_and(Value::is_object) && !params.contains_key("schema") {return Err(invalid("path or declarative manifest required".into()));}
+    if method == Method::SkillRegister
+        && !params.contains_key("path")
+        && !params.get("manifest").is_some_and(Value::is_object)
+        && !params.contains_key("schema")
+    {
+        return Err(invalid("path or declarative manifest required".into()));
+    }
     if method == Method::Negotiate
         && !params.get("versions").is_some_and(|v| {
             v.as_array().is_some_and(|versions| {
@@ -90,9 +96,9 @@ pub fn validate_method_params(request: &JsonRpcRequest) -> Result<(), ProtocolEr
     for key in strings {
         if let Some(value) = params.get(key) {
             match value {
-                Value::Null=>{},
-                Value::String(text) if text.len()<=16384=>{},
-                _=>return Err(invalid(format!("{key} must be a bounded string"))),
+                Value::Null => {}
+                Value::String(text) if text.len() <= 16384 => {}
+                _ => return Err(invalid(format!("{key} must be a bounded string"))),
             }
         }
     }
@@ -126,9 +132,9 @@ pub fn validate_method_params(request: &JsonRpcRequest) -> Result<(), ProtocolEr
     }
     if let Some(value) = params.get("stdin") {
         match value {
-            Value::Null=>{},
-            Value::String(text) if text.len()<=crate::limits::MAX_OUTPUT_BYTES as usize=>{},
-            _=>return Err(invalid("stdin must be a bounded string".into())),
+            Value::Null => {}
+            Value::String(text) if text.len() <= crate::limits::MAX_OUTPUT_BYTES as usize => {}
+            _ => return Err(invalid("stdin must be a bounded string".into())),
         }
     }
     Ok(())
@@ -150,4 +156,3 @@ mod tests {
         }
     }
 }
-

@@ -177,11 +177,7 @@ fn listen_loop(service: Arc<Mutex<DaemonService>>) -> anyhow::Result<()> {
                 Ok(value) => value,
                 Err(_) => return,
             };
-            loop {
-                let bytes = match toolhub_ipc::read_frame(&mut stream) {
-                    Ok(value) => value,
-                    Err(_) => break,
-                };
+            while let Ok(bytes) = toolhub_ipc::read_frame(&mut stream) {
                 // Recheck the pinned image on each request, including substitution after connect.
                 let trusted = controller
                     .as_ref()

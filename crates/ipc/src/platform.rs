@@ -47,10 +47,7 @@ mod windows {
         let token = Handle(token);
         let mut len = 0;
         GetTokenInformation(token.0, TokenUser, std::ptr::null_mut(), 0, &mut len);
-        let mut buffer = vec![
-            0usize;
-            (len as usize).div_ceil(std::mem::size_of::<usize>())
-        ];
+        let mut buffer = vec![0usize; (len as usize).div_ceil(std::mem::size_of::<usize>())];
         if GetTokenInformation(
             token.0,
             TokenUser,

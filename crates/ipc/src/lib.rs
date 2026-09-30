@@ -54,14 +54,25 @@ pub fn read_response(r: &mut impl Read) -> IpcResult<JsonRpcResponse> {
 }
 
 /// Every server transport shares the encoded response cap, including JSON escaping overhead.
-pub fn serialize_response(response:&JsonRpcResponse)->IpcResult<Vec<u8>> {
-    let bytes=serde_json::to_vec(response)?;
-    if bytes.len()<=toolhub_protocol::limits::MAX_REQUEST_BYTES {return Ok(bytes);}
-    Ok(serde_json::to_vec(&error_response(response.id.clone(),&ProtocolError::new(toolhub_protocol::ErrorCode::PayloadTooLarge,"encoded response exceeds byte limit")))?)
+pub fn serialize_response(response: &JsonRpcResponse) -> IpcResult<Vec<u8>> {
+    let bytes = serde_json::to_vec(response)?;
+    if bytes.len() <= toolhub_protocol::limits::MAX_REQUEST_BYTES {
+        return Ok(bytes);
+    }
+    Ok(serde_json::to_vec(&error_response(
+        response.id.clone(),
+        &ProtocolError::new(
+            toolhub_protocol::ErrorCode::PayloadTooLarge,
+            "encoded response exceeds byte limit",
+        ),
+    ))?)
 }
-pub fn write_response_frame(writer:&mut impl Write,response:&JsonRpcResponse)->IpcResult<()> {
-    let bytes=serialize_response(response)?;
-    writer.write_all(&(bytes.len() as u32).to_be_bytes())?;writer.write_all(&bytes)?;writer.flush()?;Ok(())
+pub fn write_response_frame(writer: &mut impl Write, response: &JsonRpcResponse) -> IpcResult<()> {
+    let bytes = serialize_response(response)?;
+    writer.write_all(&(bytes.len() as u32).to_be_bytes())?;
+    writer.write_all(&bytes)?;
+    writer.flush()?;
+    Ok(())
 }
 
 /// Reads one line without allocating beyond the wire limit. Oversized lines are drained.

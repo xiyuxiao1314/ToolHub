@@ -3,3 +3,4 @@ CREATE TABLE settings(key TEXT PRIMARY KEY, value_json TEXT NOT NULL);
 CREATE TABLE authorization_revision(id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER NOT NULL);
 INSERT INTO authorization_revision VALUES(1,1);
 CREATE TABLE discovery_disclosures(session_id TEXT NOT NULL REFERENCES discovery_sessions(id),candidate_id TEXT NOT NULL REFERENCES scan_candidates(id), PRIMARY KEY(session_id,candidate_id));
+CREATE TABLE discovery_membership(session_id TEXT NOT NULL REFERENCES discovery_sessions(id),candidate_id TEXT NOT NULL REFERENCES scan_candidates(id), PRIMARY KEY(session_id,candidate_id));

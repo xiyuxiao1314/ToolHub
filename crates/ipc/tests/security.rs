@@ -49,9 +49,19 @@ fn malformed_frame_keeps_next_frame_boundary() {
 
 #[test]
 fn oversized_response_becomes_structured_bounded_error() {
-    let response=toolhub_protocol::JsonRpcResponse{jsonrpc:"2.0".into(),id:Some(serde_json::json!(3)),result:Some(serde_json::json!({"data":"x".repeat(toolhub_protocol::limits::MAX_REQUEST_BYTES)})),error:None};
-    let bytes=serialize_response(&response).unwrap();
-    let bounded:toolhub_protocol::JsonRpcResponse=serde_json::from_slice(&bytes).unwrap();
-    assert_eq!(bounded.id,Some(serde_json::json!(3)));
-    assert_eq!(bounded.error.unwrap().data.unwrap()["error_code"],"payload_too_large");
+    let response = toolhub_protocol::JsonRpcResponse {
+        jsonrpc: "2.0".into(),
+        id: Some(serde_json::json!(3)),
+        result: Some(
+            serde_json::json!({"data":"x".repeat(toolhub_protocol::limits::MAX_REQUEST_BYTES)}),
+        ),
+        error: None,
+    };
+    let bytes = serialize_response(&response).unwrap();
+    let bounded: toolhub_protocol::JsonRpcResponse = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(bounded.id, Some(serde_json::json!(3)));
+    assert_eq!(
+        bounded.error.unwrap().data.unwrap()["error_code"],
+        "payload_too_large"
+    );
 }

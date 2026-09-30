@@ -475,7 +475,7 @@ impl ScannerProvider for WslMetadataProvider {
                 candidate.metadata = serde_json::json!({"source":"wsl_distribution_registry","distribution":display,"wsl_version":version,"execution_interface":"not inferred from distribution metadata"});
                 out.push(candidate);
             }
-            return Ok(out);
+            Ok(out)
         }
         #[cfg(not(windows))]
         {

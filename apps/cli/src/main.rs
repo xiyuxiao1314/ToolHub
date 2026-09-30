@@ -252,12 +252,16 @@ fn run(cli: &Cli) -> anyhow::Result<()> {
             "scan.start",
             json!({"mode": mode,"roots":if roots.is_empty(){None}else{Some(roots)},"scan_session_id":scan_id}),
         )?,
-        Commands::ScanStatus { scan_id } => {
-            call(&mut client, "scan.status", json!({"scan_session_id":scan_id}))?
-        }
-        Commands::ScanCancel { scan_id } => {
-            call(&mut client, "scan.cancel", json!({"scan_session_id":scan_id}))?
-        }
+        Commands::ScanStatus { scan_id } => call(
+            &mut client,
+            "scan.status",
+            json!({"scan_session_id":scan_id}),
+        )?,
+        Commands::ScanCancel { scan_id } => call(
+            &mut client,
+            "scan.cancel",
+            json!({"scan_session_id":scan_id}),
+        )?,
         Commands::Search { query } => {
             call(&mut client, "registry.search", json!({"query": query}))?
         }
@@ -543,4 +547,3 @@ fn mcp_serve(client: &mut DaemonClient) -> anyhow::Result<()> {
     }
     Ok(())
 }
-
