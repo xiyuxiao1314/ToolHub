@@ -80,12 +80,19 @@ fn listen_loop(service: Arc<Mutex<DaemonService>>) -> anyhow::Result<()> {
             match toolhub_ipc::accept_named_pipe(&pipe) {
                 Ok(file) => {
                     let service = Arc::clone(&service);
+                    let conn_id = format!(
+                        "pipe.conn.{}",
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_nanos())
+                            .unwrap_or_default()
+                    );
                     std::thread::spawn(move || {
                         let mut reader = BufReader::new(file.try_clone().expect("clone"));
                         let mut writer = file;
                         while let Ok(req) = toolhub_ipc::read_request(&mut reader) {
                             let mut svc = service.lock().unwrap();
-                            let resp = svc.handle(&req);
+                            let resp = svc.handle_with_principal(&req, Some(conn_id.clone()));
                             drop(svc);
                             if toolhub_ipc::write_frame(&mut writer, &resp).is_err() {
                                 break;

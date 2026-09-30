@@ -21,6 +21,8 @@ pub struct DaemonService {
     pub approvals: BTreeMap<String, toolhub_core::ExecutionApproval>,
     pub env_graph: toolhub_environment::EnvironmentGraph,
     pub last_scan: Option<chrono::DateTime<chrono::Utc>>,
+    /// Per-connection principal override (named pipe / unix socket peers).
+    pub connection_principal: Option<String>,
     #[allow(dead_code)]
     pub seq: AtomicU64,
     pub registry_path: String,
@@ -70,17 +72,43 @@ impl DaemonService {
             approvals,
             env_graph: toolhub_environment::EnvironmentGraph::new(),
             last_scan: None,
+            connection_principal: None,
             seq: AtomicU64::new(1),
             registry_path: path.to_string_lossy().to_string(),
         })
     }
 
-    /// F02: principal comes from transport-bound env, not caller-supplied labels.
-    fn peer_principal(&self) -> String {
-        std::env::var("TOOLHUB_PRINCIPAL")
-            .ok()
-            .filter(|s| !s.trim().is_empty())
-            .unwrap_or_else(|| "local.stdio".to_string())
+    /// F02/R2-B01: principal from transport; caller labels cannot choose it.
+    /// F02/R2-B01: principal from transport; caller labels cannot choose it.
+    pub fn peer_principal(&self) -> String {
+        self.connection_principal.clone().unwrap_or_else(|| {
+            std::env::var("TOOLHUB_PRINCIPAL")
+                .ok()
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_else(|| "local.stdio".to_string())
+        })
+    }
+
+    /// R2-B01: admin only for local stdio spawn with TOOLHUB_ADMIN, or explicit local.admin.*
+    /// principal. Pipe/socket connection principals are never admin via daemon env.
+    pub fn is_admin(&self) -> bool {
+        let p = self.peer_principal();
+        if p.starts_with("pipe.") || p.starts_with("sock.") {
+            return false;
+        }
+        p.starts_with("local.admin") || std::env::var("TOOLHUB_ADMIN").ok().as_deref() == Some("1")
+    }
+
+    pub fn handle_with_principal(
+        &mut self,
+        req: &JsonRpcRequest,
+        principal: Option<String>,
+    ) -> JsonRpcResponse {
+        let prev = self.connection_principal.clone();
+        self.connection_principal = principal;
+        let resp = self.handle(req);
+        self.connection_principal = prev;
+        resp
     }
 
     pub fn handle(&mut self, req: &JsonRpcRequest) -> JsonRpcResponse {
@@ -478,9 +506,7 @@ impl DaemonService {
             Method::ApproveExecution => {
                 // R2-B01: only a trusted approver channel may mint execution approvals.
                 let principal = self.peer_principal();
-                let admin = std::env::var("TOOLHUB_ADMIN").ok().as_deref() == Some("1")
-                    || principal.starts_with("local.admin");
-                if !admin {
+                if !self.is_admin() {
                     return Err(ProtocolError::denied(
                         "execute.approve requires trusted approver (TOOLHUB_ADMIN=1 or local.admin)",
                     ));
@@ -567,10 +593,7 @@ impl DaemonService {
                     })?;
                 let principal = self.peer_principal();
                 if let Some(a) = self.approvals.get_mut(aid) {
-                    if a.agent_id.as_str() != principal
-                        && !principal.starts_with("local.admin")
-                        && std::env::var("TOOLHUB_ADMIN").ok().as_deref() != Some("1")
-                    {
+                    if a.agent_id.as_str() != principal && !self.is_admin() {
                         return Err(ProtocolError::denied(
                             "execute.revoke requires owner or admin principal",
                         ));
@@ -910,9 +933,7 @@ impl DaemonService {
                 // F01/F02: granting Allow is privileged; Ask/Deny are safer defaults.
                 if act == PolicyAction::Allow {
                     let principal = self.peer_principal();
-                    let admin = std::env::var("TOOLHUB_ADMIN").ok().as_deref() == Some("1")
-                        || principal.starts_with("local.admin");
-                    if !admin {
+                    if !self.is_admin() {
                         return Err(ProtocolError::denied(
                             "policy.set allow requires admin principal (TOOLHUB_ADMIN=1 or local.admin)",
                         ));
