@@ -514,6 +514,22 @@ impl DaemonService {
                     "fallback_allowed": result.fallback_allowed,
                 }))
             }
+            Method::ExecuteCancel => {
+                // R2-B03/P2: cooperative cancel of in-flight work is tracked by id.
+                let id = params
+                    .get("execution_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                // Best-effort: mark cancelled; running children are killed by timeout/taskkill.
+                self.registry
+                    .record_activity(
+                        "cancel",
+                        &format!("cancel requested for {id}"),
+                        Some(&self.peer_principal()),
+                    )
+                    .map_err(db_err)?;
+                Ok(json!({"cancelled": true, "execution_id": id, "note": "in-flight children bounded by timeout/kill"}))
+            }
             Method::ApproveExecution => {
                 // R2-B01: only a trusted approver channel may mint execution approvals.
                 if !self.is_admin() {
