@@ -817,6 +817,7 @@ name = "toolhub-agent-bridge"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "once_cell",
  "serde",
  "serde_json",
  "toolhub-core",
@@ -970,6 +971,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tempfile",
+ "thiserror",
  "toolhub-core",
  "uuid",
 ]

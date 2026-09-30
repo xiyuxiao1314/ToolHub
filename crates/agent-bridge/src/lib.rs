@@ -6,6 +6,7 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
 pub mod adapters;
+pub mod temp_credentials;
 
 pub use adapters::{
     detect_all, AgentAdapter, DetectedAgent, GenericCliAdapter, GenericMcpAdapter, KNOWN_AGENTS,
