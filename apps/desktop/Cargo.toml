@@ -3,7 +3,23 @@ name = "toolhub-desktop"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "ToolHub Desktop (Tauri/React/TypeScript)"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+toolhub-ipc = { workspace = true }
+toolhub-protocol = { workspace = true }
 
 [[bin]]
 name = "toolhub-desktop"
 path = "src/main.rs"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
