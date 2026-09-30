@@ -453,6 +453,15 @@ impl DaemonService {
                 }))
             }
             Method::ApproveExecution => {
+                // R2-B01: only a trusted approver channel may mint execution approvals.
+                let principal = self.peer_principal();
+                let admin = std::env::var("TOOLHUB_ADMIN").ok().as_deref() == Some("1")
+                    || principal.starts_with("local.admin");
+                if !admin {
+                    return Err(ProtocolError::denied(
+                        "execute.approve requires trusted approver (TOOLHUB_ADMIN=1 or local.admin)",
+                    ));
+                }
                 let instance_id = params
                     .get("instance_id")
                     .and_then(|v| v.as_str())

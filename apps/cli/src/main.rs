@@ -281,18 +281,39 @@ fn run(cli: &Cli) -> anyhow::Result<()> {
     Ok(())
 }
 
+enum Transport {
+    SharedFile {
+        file: std::fs::File,
+        reader: BufReader<std::fs::File>,
+    },
+    Child {
+        child: std::process::Child,
+        stdin: std::process::ChildStdin,
+        reader: BufReader<std::process::ChildStdout>,
+    },
+}
+
 struct DaemonClient {
-    child: std::process::Child,
-    stdin: std::process::ChildStdin,
-    reader: BufReader<std::process::ChildStdout>,
+    transport: Transport,
     next_id: u64,
 }
 
 impl DaemonClient {
     fn connect() -> anyhow::Result<Self> {
-        // Prefer an already-running toolhubd on stdio via spawn.
-        // For B01, CLI always starts a short-lived daemon for the request set
-        // (shared registry file provides durable state).
+        // R2-B02: prefer shared named-pipe service when present.
+        #[cfg(windows)]
+        {
+            if let Ok(file) =
+                toolhub_ipc::connect_named_pipe(&toolhub_ipc::user_scoped_pipe_name())
+            {
+                let reader = BufReader::new(file.try_clone()?);
+                return Ok(Self {
+                    transport: Transport::SharedFile { file, reader },
+                    next_id: 1,
+                });
+            }
+        }
+        // Fallback: private stdio daemon (durable registry still shared by file).
         let mut child = Command::new(daemon_bin())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -301,9 +322,11 @@ impl DaemonClient {
         let stdin = child.stdin.take().expect("stdin");
         let stdout = child.stdout.take().expect("stdout");
         Ok(Self {
-            child,
-            stdin,
-            reader: BufReader::new(stdout),
+            transport: Transport::Child {
+                child,
+                stdin,
+                reader: BufReader::new(stdout),
+            },
             next_id: 1,
         })
     }
@@ -312,14 +335,23 @@ impl DaemonClient {
         let id = self.next_id;
         self.next_id += 1;
         let req = json!({"jsonrpc":"2.0","id":id,"method":method,"params":params});
-        writeln!(self.stdin, "{}", serde_json::to_string(&req)?)?;
-        self.stdin.flush()?;
-        let mut line = String::new();
-        let n = self.reader.read_line(&mut line)?;
-        if n == 0 {
-            anyhow::bail!("daemon closed connection");
-        }
-        let resp: Value = serde_json::from_str(&line)?;
+        let resp: Value = match &mut self.transport {
+            Transport::SharedFile { file, reader } => {
+                toolhub_ipc::write_frame(file, &req)?;
+                let framed = toolhub_ipc::read_response(reader)?;
+                serde_json::to_value(&framed)?
+            }
+            Transport::Child { stdin, reader, .. } => {
+                writeln!(stdin, "{}", serde_json::to_string(&req)?)?;
+                stdin.flush()?;
+                let mut line = String::new();
+                let n = reader.read_line(&mut line)?;
+                if n == 0 {
+                    anyhow::bail!("daemon closed connection");
+                }
+                serde_json::from_str(&line)?
+            }
+        };
         if let Some(err) = resp.get("error") {
             let code = err
                 .get("data")
@@ -341,8 +373,10 @@ impl DaemonClient {
 
 impl Drop for DaemonClient {
     fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        if let Transport::Child { child, .. } = &mut self.transport {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
     }
 }
 

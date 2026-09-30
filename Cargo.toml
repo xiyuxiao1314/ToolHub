@@ -17,6 +17,7 @@ members = [
     "crates/agent-bridge",
     "apps/daemon",
     "apps/cli",
+    "apps/desktop",
 ]
 
 [workspace.package]

@@ -26,7 +26,8 @@ $env:TOOLHUBD_BIN = Join-Path $bin 'toolhubd.exe'
 $reg = Join-Path $env:TEMP ("toolhub-smoke-" + [guid]::NewGuid().ToString('n'))
 New-Item -ItemType Directory -Force -Path $reg | Out-Null
 $env:TOOLHUB_REGISTRY = Join-Path $reg 'registry.sqlite'
-$env:TOOLHUB_PRINCIPAL = 'smoke.local'
+$env:TOOLHUB_PRINCIPAL = 'local.admin'
+$env:TOOLHUB_ADMIN = '1'
 
 # F18: owned negative fixture — marker-producing unknown executable
 $fixture = Join-Path $reg 'fixtures'

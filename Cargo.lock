@@ -892,6 +892,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "toolhub-desktop"
+version = "0.1.0"
+
+[[package]]
 name = "toolhub-environment"
 version = "0.1.0"
 dependencies = [

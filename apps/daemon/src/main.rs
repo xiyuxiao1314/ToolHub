@@ -67,20 +67,29 @@ fn listen_loop(service: Arc<Mutex<DaemonService>>) -> anyhow::Result<()> {
     if cfg!(windows) {
         let pipe = toolhub_ipc::user_scoped_pipe_name();
         tracing::info!(endpoint=%pipe, "listening on user-scoped named pipe");
+        // Multi-instance pipe: accept loop keeps the daemon alive for many clients.
         loop {
-            let file = toolhub_ipc::create_named_pipe(&pipe)?;
-            let service = Arc::clone(&service);
-            std::thread::spawn(move || {
-                let mut reader = BufReader::new(file.try_clone().expect("clone"));
-                let mut writer = file;
-                while let Ok(req) = toolhub_ipc::read_request(&mut reader) {
-                    let mut svc = service.lock().unwrap();
-                    let resp = svc.handle(&req);
-                    if toolhub_ipc::write_frame(&mut writer, &resp).is_err() {
-                        break;
-                    }
+            match toolhub_ipc::accept_named_pipe(&pipe) {
+                Ok(file) => {
+                    let service = Arc::clone(&service);
+                    std::thread::spawn(move || {
+                        let mut reader = BufReader::new(file.try_clone().expect("clone"));
+                        let mut writer = file;
+                        while let Ok(req) = toolhub_ipc::read_request(&mut reader) {
+                            let mut svc = service.lock().unwrap();
+                            let resp = svc.handle(&req);
+                            drop(svc);
+                            if toolhub_ipc::write_frame(&mut writer, &resp).is_err() {
+                                break;
+                            }
+                        }
+                    });
                 }
-            });
+                Err(e) => {
+                    tracing::warn!(error=%e, "accept failed; retrying");
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+            }
         }
     } else {
         #[cfg(unix)]

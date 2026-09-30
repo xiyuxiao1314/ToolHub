@@ -99,17 +99,18 @@ pub fn user_scoped_pipe_name() -> String {
     format!(r"\\.\pipe\toolhubd-{user}")
 }
 
-/// F11: create a named pipe instance for one client connection (read/write duplex).
+/// F11/R2-B02: create a named pipe instance and wait for one client (ConnectNamedPipe).
 #[cfg(windows)]
-pub fn create_named_pipe(name: &str) -> IpcResult<std::fs::File> {
+pub fn accept_named_pipe(name: &str) -> IpcResult<std::fs::File> {
     use std::os::windows::io::FromRawHandle;
-    use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
-    use windows_sys::Win32::System::Pipes::CreateNamedPipeW;
+    use windows_sys::Win32::Foundation::{FALSE, INVALID_HANDLE_VALUE};
+    use windows_sys::Win32::System::Pipes::{ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe};
 
     const PIPE_ACCESS_DUPLEX: u32 = 0x3;
     const PIPE_TYPE_BYTE: u32 = 0x0;
     const PIPE_READMODE_BYTE: u32 = 0x0;
     const PIPE_WAIT: u32 = 0x0;
+    const PIPE_UNLIMITED_INSTANCES: u32 = 255;
 
     let wide: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
     unsafe {
@@ -117,7 +118,7 @@ pub fn create_named_pipe(name: &str) -> IpcResult<std::fs::File> {
             wide.as_ptr(),
             PIPE_ACCESS_DUPLEX,
             PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
-            1,
+            PIPE_UNLIMITED_INSTANCES,
             65536,
             65536,
             0,
@@ -126,8 +127,24 @@ pub fn create_named_pipe(name: &str) -> IpcResult<std::fs::File> {
         if handle == INVALID_HANDLE_VALUE {
             return Err(IpcError::Message("create_named_pipe failed".into()));
         }
+        // Block until a client connects.
+        let ok = ConnectNamedPipe(handle, std::ptr::null_mut());
+        // ERROR_PIPE_CONNECTED (535) means client already connected.
+        let err = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+        if ok == FALSE && err != 535 {
+            let _ = DisconnectNamedPipe(handle);
+            return Err(IpcError::Message(format!(
+                "ConnectNamedPipe failed: {err}"
+            )));
+        }
         Ok(std::fs::File::from_raw_handle(handle as *mut _))
     }
+}
+
+/// Backward-compatible name used by older call sites.
+#[cfg(windows)]
+pub fn create_named_pipe(name: &str) -> IpcResult<std::fs::File> {
+    accept_named_pipe(name)
 }
 
 /// F11: connect to an existing named pipe as a client.
