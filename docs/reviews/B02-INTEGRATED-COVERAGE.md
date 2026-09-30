@@ -1,5 +1,21 @@
 # B02 integrated coverage (work in progress toward R3)
 
+## Internal review (3 subagents) — 2026-09-30
+
+| Finding | Disposition |
+| --- | --- |
+| Notifications answered on stdio | **Fixed** — skip no-id |
+| Shebang text → Known (Unix) | **Fixed** — ELF/MZ only |
+| upsert id vs mark_missing desync | **Fixed** — return stored id |
+| Skill Windows drive/UNC paths | **Fixed** |
+| execute.revoke unauthenticated | **Fixed** — owner/admin |
+| Env-based principal on shared pipe | **Open residual** — needs per-connection SID/token ACL |
+| Approval session/policy revision bind | **Partial** — session non-empty check; full revision digest open |
+| Timeout I/O join hang | **Partial** — tree kill improved; joins unbounded |
+| Resolver blocked-only signal | **Open** — empty vs blocked-only indistinct |
+
+
+
 Branch: `codex/toolhub-b02-integrated`
 Base: `6df2166` (Codex R2 policy fix adopted)
 
