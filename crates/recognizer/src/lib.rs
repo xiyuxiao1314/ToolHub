@@ -1,6 +1,8 @@
 //! Tool recognition from static metadata and reviewed known probes only.
 //! Unknown executables are NEVER run (including --version/--help).
 
+pub mod resources;
+
 use std::collections::BTreeMap;
 use std::path::Path;
 
