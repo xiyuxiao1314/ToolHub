@@ -85,6 +85,71 @@ pub trait ScannerProvider: Send + Sync {
     fn scan_root(&self, root: &str) -> Result<Vec<ScanCandidate>, std::io::Error>;
 }
 
+/// B02-13: permission-limited scanner extension. No write/install/execute authority.
+pub trait ScannerExtension: Send + Sync {
+    fn id(&self) -> &str;
+    /// Allowed operations: discover, inspect, classify only.
+    fn allowed_ops(&self) -> &'static [&'static str] {
+        &["discover", "inspect", "classify"]
+    }
+    fn discover(&self, root: &str) -> Result<Vec<ScanCandidate>, String>;
+}
+
+/// In-process extension registry (fixture plugins only; no arbitrary code loading).
+pub struct ExtensionHost {
+    pub extensions: Vec<Box<dyn ScannerExtension>>,
+}
+
+impl ExtensionHost {
+    pub fn new() -> Self {
+        Self {
+            extensions: vec![],
+        }
+    }
+
+    pub fn register(&mut self, ext: Box<dyn ScannerExtension>) {
+        self.extensions.push(ext);
+    }
+
+    pub fn run_discover(&self, root: &str) -> Vec<ScanCandidate> {
+        let mut out = vec![];
+        for e in &self.extensions {
+            if e.allowed_ops().contains(&"discover") {
+                if let Ok(mut found) = e.discover(root) {
+                    out.append(&mut found);
+                }
+            }
+        }
+        out
+    }
+}
+
+impl Default for ExtensionHost {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Fixture extension used in tests — discovers only a marker file, never executes.
+pub struct MarkerFixtureExtension {
+    pub id: String,
+}
+
+impl ScannerExtension for MarkerFixtureExtension {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn discover(&self, root: &str) -> Result<Vec<ScanCandidate>, String> {
+        let marker = std::path::Path::new(root).join("fixture-tool.marker");
+        if marker.is_file() {
+            Ok(vec![ScanCandidate::from_path(marker.to_string_lossy())])
+        } else {
+            Ok(vec![])
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
