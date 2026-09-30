@@ -1,0 +1,226 @@
+{
+  "review": "R3",
+  "formal_reviews_used": 3,
+  "formal_review_ceiling": 4,
+  "decision": "changes_required",
+  "reviewed_head": "b62604095b248e7c13d44cfdfba8e789c0503c89",
+  "branch": "codex/toolhub-b02-integrated",
+  "comparison_base": "6df2166e0c55ec64667021e386e75ca93acb066d",
+  "input_bundle": {
+    "name": "ToolHub-B02.bundle",
+    "sha256": "fc90c63f8c525447f0a81eb08c741bf67bd68369e77c2ec55103d0b6e02ebf26",
+    "bytes": 214566,
+    "workbench_artifact": "art_b8984f70788d6f075a94782a",
+    "ancestry_verified": true,
+    "checkout_clean": true
+  },
+  "packet_stamp_discrepancy": "Coverage and delivery owner-summary stamp 706fcc5; reviewed actual bundle tip b626040.",
+  "platform": "Windows x86_64; existing Rust/Cargo 1.95.0 and MSVC 14.44/Windows SDK; PowerShell 7; existing Python",
+  "independent_checks": [
+    {
+      "check": "fmt",
+      "exit_code": 0,
+      "log": "<REVIEW_ROOT>\\evidence\\fmt.log"
+    },
+    {
+      "check": "tests",
+      "exit_code": 0,
+      "log": "<REVIEW_ROOT>\\evidence\\tests.log"
+    },
+    {
+      "check": "clippy",
+      "exit_code": 0,
+      "log": "<REVIEW_ROOT>\\evidence\\clippy.log"
+    },
+    {
+      "check": "build",
+      "exit_code": 0,
+      "log": "<REVIEW_ROOT>\\evidence\\build.log"
+    }
+  ],
+  "tests_passed": 71,
+  "tests_failed": 0,
+  "delivered_suite_subsets_included": {
+    "soak": 4,
+    "mcp": 6,
+    "integration": 4
+  },
+  "original_scripts": {
+    "reviewed_head": "b62604095b248e7c13d44cfdfba8e789c0503c89",
+    "checks": [
+      {
+        "script": "smoke",
+        "exit_code": 0,
+        "log": "<REVIEW_ROOT>\\evidence\\smoke.log"
+      },
+      {
+        "script": "package",
+        "exit_code": 0,
+        "log": "<REVIEW_ROOT>\\evidence\\package.log"
+      }
+    ],
+    "package_files": [
+      "README.md",
+      "SHA256SUMS.txt",
+      "toolhub-desktop.exe",
+      "toolhub.exe",
+      "toolhubd.exe",
+      "UNINSTALL.md",
+      "schemas\\capability.schema.json",
+      "schemas\\protocol.schema.json",
+      "schemas\\skill.schema.json",
+      "schemas\\tool.schema.json"
+    ],
+    "binary_version": "toolhub 0.1.0",
+    "package_label": "0.2.0"
+  },
+  "runtime_observations": {
+    "primary": 37,
+    "supplementary": 13,
+    "results": "Published sanitized copies inside B02-R3-REPRO.zip"
+  },
+  "actual_library_helpers": {
+    "different_argv_same_digest": true,
+    "malformed_resource_accepted": true,
+    "nonnumeric_resource_compatibility_accepted": true,
+    "previous_artifact_exists_after_failed_apply": false,
+    "previous_backup_exists": true,
+    "reviewed_head": "b62604095b248e7c13d44cfdfba8e789c0503c89",
+    "update_bad_version_and_minimum_verified": true,
+    "update_relative_payload_apply_error": "io: 系统找不到指定的文件。 (os error 2)"
+  },
+  "ui": {
+    "browser": "Codex IAB",
+    "actual_reviewed_desktop": true,
+    "native_tauri_verified": false,
+    "screenshots": [
+      "desktop-settings.jpg (local only)",
+      "desktop-security.jpg"
+    ],
+    "fixture_process_tree_stopped": true,
+    "prompt_limitation": "IAB prompt() unsupported; not claimed universal native failure"
+  },
+  "unverified": [
+    "macOS host build/runtime",
+    "Tauri native packaging/screenshots",
+    "actual external Agent launch/account"
+  ],
+  "evidence_limits": [
+    "Source-only internal lanes did not run product tests.",
+    "Approval environment labels were synthetic fixture configuration, not demonstrated authenticated OS authority.",
+    "Argv ambiguity was actual helper-only; no execution attack demonstrated.",
+    "Junk MZ fixture was metadata-only, never executed.",
+    "Finite descendant timeout is a finite observed delay; source establishes unbounded joins.",
+    "Failed update left a backup present; no claim of irrecoverable loss."
+  ],
+  "selected_reproduction_archive": {
+    "name": "B02-R3-REPRO.zip",
+    "bytes": 90965,
+    "sha256": "740bba3d6762b7c34709e7013744533a33ef6b726b644ffe8201f9cc3bbbb1ae",
+    "integrity_test": "pass"
+  },
+  "raw_local_evidence_hashes": [
+    {
+      "name": "verification.json",
+      "sha256": "6513b95cd712a3ba80b1336668d64e81cbc9604fcaad73de343a3e3479f836d4",
+      "published": true
+    },
+    {
+      "name": "runtime-results.json",
+      "sha256": "a0890756a60354be97274ee4928d7eb78f383fe2641bc98489add7a7e9fdfd12",
+      "published": true
+    },
+    {
+      "name": "supplemental-results.json",
+      "sha256": "8676c101bd545afe01e4f65c11cb8bead2970b41d5b8b4cddcb26982bcded7c2",
+      "published": true
+    },
+    {
+      "name": "helper-results.json",
+      "sha256": "35ec1979c0eaf3187189315ffc6b49051159289bba95d0ea37cfbaa2db52cc40",
+      "published": true
+    },
+    {
+      "name": "delivery-scripts.json",
+      "sha256": "f30a478c84be512468a22d7a264fc20cb1927c0f0080dd33124582674be77a2d",
+      "published": true
+    },
+    {
+      "name": "desktop-ui.json",
+      "sha256": "dc089c751a1a0afac26e979274b6266ac4129b611d5f4ddb747144b380bfabfc",
+      "published": true
+    },
+    {
+      "name": "fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "published": true
+    },
+    {
+      "name": "tests.log",
+      "sha256": "24e206ac2ba3cc99d5ccb5367e60e3921dec1dd7af25025a0cc1dd16107accf2",
+      "published": true
+    },
+    {
+      "name": "clippy.log",
+      "sha256": "e537e6aeba160bb67be877af7c4f44012b2a225e684f7c75a0a752f581f995c6",
+      "published": true
+    },
+    {
+      "name": "build.log",
+      "sha256": "bed9bb8f7aac1b4242110c85c8342e4f96eab5474a8d6d07f4178d82ce19a16b",
+      "published": true
+    },
+    {
+      "name": "helper-build.log",
+      "sha256": "108af05944281fef7f8a9eadb26ef1a78923a11b021b51bfa726ac690ff6edac",
+      "published": true
+    },
+    {
+      "name": "package.log",
+      "sha256": "fe29a03ac086f881eed1d3fddee69d14fc882722c92093fba5a6a7c005091d8a",
+      "published": true
+    },
+    {
+      "name": "smoke.log",
+      "sha256": "3eac16a6db47c4cf38625730e05364b30d446c846b66c5395f8f1223cc0eb606",
+      "published": false
+    },
+    {
+      "name": "desktop-settings.jpg",
+      "sha256": "218384c563ec6fd406f006708f538b7531056bd97b36bbac9d313088b24e6ad5",
+      "published": false
+    },
+    {
+      "name": "desktop-security.jpg",
+      "sha256": "5c4f9a5d92d18dd110bebeb1abb226498624d495b9ccf33e65ad3e87da14967b",
+      "published": true
+    }
+  ],
+  "raw_executed_script_hashes": [
+    {
+      "name": "runtime-probes.py",
+      "sha256": "c4e2366ca6274842353615fe3de0315d64d9202090f5938bee7468b43eb79a1c"
+    },
+    {
+      "name": "supplemental-probes.py",
+      "sha256": "4ea12d71319bcddeadb7690bc704f972c6231ffb1dd1b112f5af1512a39247eb"
+    },
+    {
+      "name": "desktop-fixture.py",
+      "sha256": "ee123fa602d5d0851205d7e33336cab8e4825b2e93e5a69f677ab7b80f8d8046"
+    },
+    {
+      "name": "run-checks.ps1",
+      "sha256": "ceb6b8a48827ce0ca47b4c315576adb986984c12b00d3c093e4cfd2d53101e0c"
+    },
+    {
+      "name": "run-delivery-scripts.ps1",
+      "sha256": "ce65e9a73e6952703aec96c45e64c794d8ed255751785c29174376885d7eb3c1"
+    }
+  ],
+  "finding_count": 15,
+  "next": "One consolidated MiMo repair using MIMO-B02-R3-REPAIR.md, then R4 verification; no fifth review implicit.",
+  "product_edits_by_codex_in_r3": false,
+  "implementation_merged": false,
+  "accepted": false
+}
