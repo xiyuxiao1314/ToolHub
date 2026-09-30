@@ -102,9 +102,7 @@ pub struct ExtensionHost {
 
 impl ExtensionHost {
     pub fn new() -> Self {
-        Self {
-            extensions: vec![],
-        }
+        Self { extensions: vec![] }
     }
 
     pub fn register(&mut self, ext: Box<dyn ScannerExtension>) {

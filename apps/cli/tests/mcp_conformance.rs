@@ -89,9 +89,7 @@ fn mcp_initialize_lists_capabilities() {
     let db = dir.path().join("mcp1.sqlite");
     let mut c = McpClient::spawn(&db);
     c.send_line(r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"0"}}}"#);
-    let line = c
-        .read_line_timeout(5000)
-        .expect("initialize response");
+    let line = c.read_line_timeout(5000).expect("initialize response");
     assert!(line.contains("serverInfo"), "{line}");
     assert!(line.contains("capabilities"), "{line}");
     assert!(line.contains("toolhub"), "{line}");
@@ -105,12 +103,13 @@ fn mcp_notification_gets_no_response() {
     c.send_line(r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#);
     // Next real request should get exactly one response (the request's).
     c.send_line(r#"{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}"#);
-    let line = c
-        .read_line_timeout(5000)
-        .expect("tools/list response");
+    let line = c.read_line_timeout(5000).expect("tools/list response");
     // Must be the tools/list reply, not a notification ack.
     assert!(line.contains("tools"), "{line}");
-    assert!(line.contains("\"id\":2") || line.contains("\"id\": 2"), "{line}");
+    assert!(
+        line.contains("\"id\":2") || line.contains("\"id\": 2"),
+        "{line}"
+    );
 }
 
 #[test]
@@ -122,7 +121,10 @@ fn mcp_tools_list_object_shape() {
     let line = c.read_line_timeout(5000).unwrap();
     assert!(line.contains("\"tools\""), "{line}");
     assert!(line.contains("search_tools"), "{line}");
-    assert!(line.contains("inputSchema") || line.contains("input_schema"), "{line}");
+    assert!(
+        line.contains("inputSchema") || line.contains("input_schema"),
+        "{line}"
+    );
 }
 
 #[test]
@@ -156,12 +158,17 @@ fn mcp_error_message_is_string() {
     let line = c.read_line_timeout(8000).unwrap();
     // Either isError content or error.message as string — not a JSON object message.
     assert!(
-        line.contains("isError") || line.contains("\"message\":\"") || line.contains("\"message\": \""),
+        line.contains("isError")
+            || line.contains("\"message\":\"")
+            || line.contains("\"message\": \""),
         "{line}"
     );
     // If error object present, message must be quoted string
     if line.contains("\"error\"") && line.contains("message") {
-        assert!(!line.contains("\"message\":{"), "message must be string: {line}");
+        assert!(
+            !line.contains("\"message\":{"),
+            "message must be string: {line}"
+        );
     }
 }
 

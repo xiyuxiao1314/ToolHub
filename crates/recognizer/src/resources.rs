@@ -37,7 +37,11 @@ pub fn load_package(path: &Path) -> Result<ResourcePackage, ResourceError> {
         return Err(ResourceError::Malformed("name/version required".into()));
     }
     for c in &pkg.capabilities {
-        if !c.contains('.') || !c.chars().all(|ch| ch.is_ascii_lowercase() || ch == '.' || ch.is_ascii_digit()) {
+        if !c.contains('.')
+            || !c
+                .chars()
+                .all(|ch| ch.is_ascii_lowercase() || ch == '.' || ch.is_ascii_digit())
+        {
             return Err(ResourceError::Malformed(format!("bad capability {c}")));
         }
     }
@@ -46,14 +50,8 @@ pub fn load_package(path: &Path) -> Result<ResourcePackage, ResourceError> {
 
 /// Compare resource versions (semver-ish major.minor.patch).
 pub fn is_compatible(current: &str, required: &str) -> bool {
-    let cur: Vec<u64> = current
-        .split('.')
-        .filter_map(|s| s.parse().ok())
-        .collect();
-    let req: Vec<u64> = required
-        .split('.')
-        .filter_map(|s| s.parse().ok())
-        .collect();
+    let cur: Vec<u64> = current.split('.').filter_map(|s| s.parse().ok()).collect();
+    let req: Vec<u64> = required.split('.').filter_map(|s| s.parse().ok()).collect();
     if req.is_empty() {
         return true;
     }

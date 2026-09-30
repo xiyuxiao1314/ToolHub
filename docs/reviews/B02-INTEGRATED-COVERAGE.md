@@ -1,64 +1,66 @@
-# B02 integrated coverage (work in progress toward R3)
+# B02 integrated coverage — R3
 
-## Internal review (3 subagents) — 2026-09-30
+HEAD: `706fcc5e15b9a1130085796f2f81d43df5593c09`
 
-| Finding | Disposition |
-| --- | --- |
-| Notifications answered on stdio | **Fixed** — skip no-id |
-| Shebang text → Known (Unix) | **Fixed** — ELF/MZ only |
-| upsert id vs mark_missing desync | **Fixed** — return stored id |
-| Skill Windows drive/UNC paths | **Fixed** |
-| execute.revoke unauthenticated | **Fixed** — owner/admin |
-| Env-based principal on shared pipe | **Open residual** — needs per-connection SID/token ACL |
-| Approval session/policy revision bind | **Partial** — session non-empty check; full revision digest open |
-| Timeout I/O join hang | **Partial** — tree kill improved; joins unbounded |
-| Resolver blocked-only signal | **Open** — empty vs blocked-only indistinct |
+Legend: **V** = verified this host | **I** = implemented (code+tests) | **P** = partial | **U** = unverified-host | **O** = open
 
-
-
-Branch: `codex/toolhub-b02-integrated`
-Base: `6df2166` (Codex R2 policy fix adopted)
-
-Status legend: Implemented | Verified (this host) | Partial | Open
-
-## R3 evidence packs (2026-09-30)
-
-| Pack | Tests | Result |
-| --- | --- | --- |
-| Long-lived daemon soak | `apps/daemon/tests/soak.rs` (4) | 50 mixed requests, scan/query interleave, bad-request recovery, restart durability — all pass |
-| MCP conformance | `apps/cli/tests/mcp_conformance.rs` (6) | initialize/capabilities, notification silence, tools/list shape, tools/call + error recovery, error.message string, unsupported method recovery — all pass |
-| Shared multi-client | `apps/daemon/tests/integration.rs` (4) | shared registry, non-admin approve denied, invalid jsonrpc, ping/status |
-
-## R2 blockers
+## R2 findings
 
 | ID | Status | Evidence |
 | --- | --- | --- |
-| R2-B01 authority | Improved | per-connection pipe principal; admin excludes pipe; approval policy/trust digest |
-| R2-B02 shared IPC | Partial | ConnectNamedPipe accept + CLI shared transport; multi-client soak not full |
-| R2-B03 process bounds | Improved | timeout + taskkill /T; bounded I/O collect; execute.cancel |
-| R2-B04 scan integrity | Improved | preserve blocked trust; path identity upsert |
-| R2-B05 trust/env | Improved | MZ/size required before Known; renamed text python stays unknown |
-| R2-B06 resolver | Improved | arch/trust prefs wired; invalid version rejects |
-| R2-B07 protocol/MCP | Partial | jsonrpc 2.0 validation; MCP error.message string; full conformance suite open |
-| R2-B08 discovery | Improved | session bound to principal; cross-principal denied |
-| R2-B09 skills | Improved | path/hook rejection; registry-backed inspect |
-| R2-B10 cross-client | Partial | CLI semantic exits; activity.list real; full soak open |
+| R2-B01 authority | I/V | per-connection `pipe.conn.*` principal; admin excludes pipe; approval policy/trust digest; tests approve denial + replay |
+| R2-B02 shared IPC | I/P | ConnectNamedPipe accept + CLI shared transport; soak 50 reqs; multi-client pipe load not full |
+| R2-B03 process bounds | I/V | timeout+taskkill /T; bounded I/O collect; execute.cancel; unit timeout test |
+| R2-B04 scan integrity | I/V | path identity upsert returns stored id; blocked/user_trusted preserved |
+| R2-B05 trust | I/V | MZ/ELF+size before Known; renamed text stays unknown (unit+smoke) |
+| R2-B06 resolver | I/V | arch/trust prefs; invalid version rejects; blocked-only explanation |
+| R2-B07 protocol/MCP | I/V | jsonrpc 2.0 validate; notifications silent; MCP conformance 6/6 |
+| R2-B08 discovery | I/V | session principal isolation; classification untrusted evidence |
+| R2-B09 skills | I/V | path/hook rejection; registry-backed inspect/resolve |
+| R2-B10 CLI/report | I/V | semantic exits; report import untrusted paths; activity.list |
 
-## B02 targets (selected)
+## B01-01..18 (mapped)
 
-| Target | Status |
-| --- | --- |
-| B02-01 Desktop shell | Partial — nine-page local SPA shell (`apps/desktop`), not packaged Tauri |
-| B02-02..10 pages | Partial — live RPC views; polish/screenshots pending |
-| B02-11 connected agent | Open — detect/config only |
-| B02-12 temp credentials | Implemented — memory store + tests |
-| B02-13 scanner extensions | Implemented — trait + fixture host |
-| B02-14 resource versions | Implemented — package loader + compatibility |
-| B02-15 product updates | Open |
-| B02-16 cross-client | Partial |
-| B02-17 usability | Partial |
-| B02-18 Windows RC | Implemented — `scripts/package.ps1` + checksums + uninstall docs |
-| B02-19 macOS | Unverified-host |
-| B02-20 QA/privacy | Partial |
-| B02-21 docs/SDK | Open |
-| B02-22 delivery packet | Open (this doc is interim) |
+| Target | Status | Notes |
+| --- | --- | --- |
+| B01-01 identities | I/V | stable path-hash IDs, confidence/trust split |
+| B01-02 capabilities/schemas | I/V | canonical taxonomy, schemas/*.schema.json |
+| B01-03 protocol | I/V | methods, errors, limits, conformance tests |
+| B01-04 authorization | I/V | approval binding + admin gates |
+| B01-05 registry | I/V | SQLite migrations, evidence, sessions |
+| B01-06 scanner modes | I | quick/full, scan sessions |
+| B01-07 OS discovery | I/U | winreg providers; macOS unverified |
+| B01-08 recognition | I/V | MZ corroboration, fixtures |
+| B01-09 environments | I | project/venv/conda/agent tags |
+| B01-10 resolver | I/V | eligibility + explanation |
+| B01-11 execution/audit | I/V | sanitizer, redaction, timeout |
+| B01-12 daemon/IPC | I/V | shared service + soak |
+| B01-13 CLI/report | I/V | commands, exits, export |
+| B01-14 MCP | I/V | 7 metatools + conformance |
+| B01-15 sessions/adapters | I/P | principal sessions; real launch U |
+| B01-16 skills | I/V | register/inspect/resolve |
+| B01-17 QA | I/V | soak+MCP+smoke+package |
+| B01-18 operational | I/V | package.ps1, runbook, checksums |
+
+## B02-01..22
+
+| Target | Status | Notes |
+| --- | --- | --- |
+| B02-01 shell | I/P | local SPA desktop (Tauri packaging P) |
+| B02-02..10 pages | I | nine pages over live RPC |
+| B02-11 connected agent | P | detect/config; launch U |
+| B02-12 temp credentials | I/V | memory store tests |
+| B02-13 extensions | I | trait + fixture host |
+| B02-14 resources | I/V | package loader + tests |
+| B02-15 updates | I/V | verify/apply/cancel tests |
+| B02-16 cross-client | I/P | shared registry tests; UI soak P |
+| B02-17 usability | P | reduced-motion CSS; full a11y pass P |
+| B02-18 Windows RC | I/V | package.ps1 + SHA256SUMS |
+| B02-19 macOS | U | no host |
+| B02-20 QA/privacy | I/V | secret/redaction tests |
+| B02-21 docs/SDK | I | DEVELOPER.md + TS SDK |
+| B02-22 packet | I | this delivery set + bundle |
+
+## Internal reviews
+
+Three subagent reviews (security / scan-trust / protocol) at `1da0b64`; P1 fixes through `e46dccc`; residual listed in decisions.

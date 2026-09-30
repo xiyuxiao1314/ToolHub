@@ -122,7 +122,10 @@ pub fn resolve(
     });
 
     // R2-B06: distinguish blocked-only from empty.
-    let blocked_count = candidates_before.iter().filter(|c| c.trust == "blocked").count();
+    let blocked_count = candidates_before
+        .iter()
+        .filter(|c| c.trust == "blocked")
+        .count();
     let explanation = if candidates.is_empty() {
         if blocked_count > 0 {
             format!("{blocked_count} providers exist but are blocked/untrusted")

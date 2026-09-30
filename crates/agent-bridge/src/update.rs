@@ -53,7 +53,11 @@ pub fn verify_package(manifest_path: &Path) -> Result<UpdatePackage, UpdateError
 }
 
 /// Explicit apply: caller must have verified package. Records nothing to discovered tools.
-pub fn apply_update(pkg: &UpdatePackage, dest: &Path, cancelled: &dyn Fn() -> bool) -> Result<(), UpdateError> {
+pub fn apply_update(
+    pkg: &UpdatePackage,
+    dest: &Path,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<(), UpdateError> {
     if cancelled() {
         return Err(UpdateError::Cancelled);
     }

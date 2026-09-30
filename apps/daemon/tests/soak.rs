@@ -91,13 +91,13 @@ fn soak_one_daemon_many_requests() {
             ("activity.list", "{}")
         };
         let resp = d.call(method, params);
-        assert!(resp.contains("jsonrpc") || resp.contains("result") || resp.contains("error"), "{resp}");
+        assert!(
+            resp.contains("jsonrpc") || resp.contains("result") || resp.contains("error"),
+            "{resp}"
+        );
     }
     let elapsed = start.elapsed();
-    assert!(
-        elapsed < Duration::from_secs(120),
-        "soak took {elapsed:?}"
-    );
+    assert!(elapsed < Duration::from_secs(120), "soak took {elapsed:?}");
 
     // Still healthy
     let p2 = d.call("ping", "{}");
@@ -114,7 +114,10 @@ fn soak_scan_query_interleave() {
         let s = d.call("scan.start", r#"{"mode":"quick"}"#);
         assert!(s.contains("candidates"), "i={i} {s}");
         let q = d.call("registry.search", r#"{"query":"a"}"#);
-        assert!(q.contains("result") || q.contains("[]") || q.contains("[{"), "{q}");
+        assert!(
+            q.contains("result") || q.contains("[]") || q.contains("[{"),
+            "{q}"
+        );
         let a = d.call("activity.list", "{}");
         assert!(a.contains("result"), "{a}");
     }

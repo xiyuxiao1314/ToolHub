@@ -147,7 +147,10 @@ fn approve_requires_admin() {
     stdin.flush().unwrap();
     let mut line = String::new();
     reader.read_line(&mut line).unwrap();
-    assert!(line.contains("denied") || line.contains("approval"), "got {line}");
+    assert!(
+        line.contains("denied") || line.contains("approval"),
+        "got {line}"
+    );
     let _ = child.kill();
     let _ = child.wait();
 }

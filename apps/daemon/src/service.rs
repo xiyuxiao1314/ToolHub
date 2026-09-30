@@ -528,7 +528,9 @@ impl DaemonService {
                         Some(&self.peer_principal()),
                     )
                     .map_err(db_err)?;
-                Ok(json!({"cancelled": true, "execution_id": id, "note": "in-flight children bounded by timeout/kill"}))
+                Ok(
+                    json!({"cancelled": true, "execution_id": id, "note": "in-flight children bounded by timeout/kill"}),
+                )
             }
             Method::ApproveExecution => {
                 // R2-B01: only a trusted approver channel may mint execution approvals.
@@ -988,10 +990,7 @@ impl DaemonService {
             Method::ExportReport => {
                 // R2-B10: optional validated report import (foreign paths stay untrusted)
                 if let Some(import) = params.get("import") {
-                    let schema = import
-                        .get("schema")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
+                    let schema = import.get("schema").and_then(|v| v.as_str()).unwrap_or("");
                     if schema != "toolhub.report/v1" {
                         return Err(ProtocolError::new(
                             ErrorCode::InvalidParams,
@@ -1006,10 +1005,7 @@ impl DaemonService {
                                 continue;
                             }
                             // Foreign paths are recorded as unavailable/untrusted only.
-                            let path = t
-                                .get("path")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("");
+                            let path = t.get("path").and_then(|v| v.as_str()).unwrap_or("");
                             if path.is_empty() {
                                 continue;
                             }
@@ -1046,7 +1042,9 @@ impl DaemonService {
                             }
                         }
                     }
-                    return Ok(json!({"imported": imported, "note": "foreign paths remain unavailable/untrusted"}));
+                    return Ok(
+                        json!({"imported": imported, "note": "foreign paths remain unavailable/untrusted"}),
+                    );
                 }
                 let instances = self.registry.list_instances().map_err(db_err)?;
                 let tools: Vec<_> = instances
