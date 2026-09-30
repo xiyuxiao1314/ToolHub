@@ -1,7 +1,6 @@
-use serde::{Deserialize, Serialize};
-
 use crate::error::{CoreError, CoreResult};
-
+use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum VersionReqOp {
@@ -13,135 +12,170 @@ pub enum VersionReqOp {
     Tilde,
     Caret,
 }
-
-/// Simple version constraint: `>=17`, `=3.12`, `^1.2`, `~1.2.3`, `*`.
+/// Numeric one-to-three-component versions with SemVer prerelease/build identifiers.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VersionConstraint {
     pub op: VersionReqOp,
     pub version: String,
 }
-
+#[derive(Debug)]
+struct Version {
+    numbers: [u64; 3],
+    precision: usize,
+    pre: Vec<String>,
+}
+fn parse_version(raw: &str) -> CoreResult<Version> {
+    let invalid = || CoreError::InvalidVersion(raw.into());
+    let raw = raw.strip_prefix('v').unwrap_or(raw);
+    let (base, build) = raw
+        .split_once('+')
+        .map_or((raw, None), |(a, b)| (a, Some(b)));
+    let valid_ids = |s: &str| {
+        !s.is_empty()
+            && s.split('.')
+                .all(|p| !p.is_empty() && p.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-'))
+    };
+    if build.is_some_and(|b| !valid_ids(b)) {
+        return Err(invalid());
+    }
+    let (numbers, pre) = base
+        .split_once('-')
+        .map_or((base, None), |(a, b)| (a, Some(b)));
+    let parts: Vec<_> = numbers.split('.').collect();
+    if parts.is_empty() || parts.len() > 3 {
+        return Err(invalid());
+    }
+    let mut n = [0; 3];
+    for (i, p) in parts.iter().enumerate() {
+        if p.is_empty()
+            || !p.bytes().all(|c| c.is_ascii_digit())
+            || (p.len() > 1 && p.starts_with('0'))
+        {
+            return Err(invalid());
+        }
+        n[i] = p.parse().map_err(|_| invalid())?;
+    }
+    let pre = match pre {
+        Some(p) => {
+            if !valid_ids(p)
+                || p.split('.').any(|s| {
+                    s.bytes().all(|c| c.is_ascii_digit()) && s.len() > 1 && s.starts_with('0')
+                })
+            {
+                return Err(invalid());
+            }
+            p.split('.').map(str::to_string).collect()
+        }
+        None => vec![],
+    };
+    Ok(Version {
+        numbers: n,
+        precision: parts.len(),
+        pre,
+    })
+}
+fn compare(a: &Version, b: &Version) -> Ordering {
+    let numbers = a.numbers.cmp(&b.numbers);
+    if numbers != Ordering::Equal {
+        return numbers;
+    }
+    match (a.pre.is_empty(), b.pre.is_empty()) {
+        (true, false) => return Ordering::Greater,
+        (false, true) => return Ordering::Less,
+        _ => {}
+    }
+    for (x, y) in a.pre.iter().zip(&b.pre) {
+        let numeric = |s: &str| s.bytes().all(|c| c.is_ascii_digit());
+        let c = match (numeric(x), numeric(y)) {
+            (true, true) => x.len().cmp(&y.len()).then_with(|| x.cmp(y)),
+            (true, false) => Ordering::Less,
+            (false, true) => Ordering::Greater,
+            (false, false) => x.cmp(y),
+        };
+        if c != Ordering::Equal {
+            return c;
+        }
+    }
+    a.pre.len().cmp(&b.pre.len())
+}
+pub fn compare_versions(a: &str, b: &str) -> CoreResult<Ordering> {
+    Ok(compare(&parse_version(a)?, &parse_version(b)?))
+}
 impl VersionConstraint {
     pub fn parse(raw: &str) -> CoreResult<Self> {
         let raw = raw.trim();
-        if raw == "*" || raw.is_empty() {
+        if raw == "*" {
             return Ok(Self {
                 op: VersionReqOp::Gte,
                 version: "0".into(),
             });
         }
-        let (op, ver) = if let Some(v) = raw.strip_prefix(">=") {
-            (VersionReqOp::Gte, v.trim())
-        } else if let Some(v) = raw.strip_prefix("<=") {
-            (VersionReqOp::Lte, v.trim())
-        } else if let Some(v) = raw.strip_prefix('>') {
-            (VersionReqOp::Gt, v.trim())
-        } else if let Some(v) = raw.strip_prefix('<') {
-            (VersionReqOp::Lt, v.trim())
-        } else if let Some(v) = raw.strip_prefix('=') {
-            (VersionReqOp::Eq, v.trim())
-        } else if let Some(v) = raw.strip_prefix('^') {
-            (VersionReqOp::Caret, v.trim())
-        } else if let Some(v) = raw.strip_prefix('~') {
-            (VersionReqOp::Tilde, v.trim())
-        } else {
-            (VersionReqOp::Eq, raw)
-        };
-        if ver.is_empty() {
-            return Err(CoreError::InvalidVersion(raw.to_string()));
-        }
-        // F10: reject invalid grammar (||, spaces, empty) instead of silent discard
-        if ver.is_empty()
-            || ver.contains("||")
-            || ver.contains(' ')
-            || !ver
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '+')
-        {
-            return Err(CoreError::InvalidVersion(raw.to_string()));
-        }
+        let (op, ver) = [
+            (">=", VersionReqOp::Gte),
+            ("<=", VersionReqOp::Lte),
+            (">", VersionReqOp::Gt),
+            ("<", VersionReqOp::Lt),
+            ("=", VersionReqOp::Eq),
+            ("^", VersionReqOp::Caret),
+            ("~", VersionReqOp::Tilde),
+        ]
+        .into_iter()
+        .find_map(|(prefix, op)| raw.strip_prefix(prefix).map(|v| (op, v.trim())))
+        .unwrap_or((VersionReqOp::Eq, raw));
+        parse_version(ver)?;
         Ok(Self {
             op,
-            version: ver.to_string(),
+            version: ver.into(),
         })
     }
-
     pub fn matches(&self, actual: &str) -> bool {
-        // Prerelease does not satisfy a stable constraint unless both are prerelease.
-        let a_prerelease = is_prerelease(actual);
-        let b_prerelease = is_prerelease(&self.version);
-        if a_prerelease && !b_prerelease && self.op != VersionReqOp::Eq {
+        let (Ok(a), Ok(b)) = (parse_version(actual), parse_version(&self.version)) else {
+            return false;
+        };
+        if !a.pre.is_empty() && (b.pre.is_empty() || a.numbers != b.numbers) {
             return false;
         }
-        let a = normalize_ver(actual);
-        let b = normalize_ver(&self.version);
-        let cmp = compare_ver(&a, &b);
+        let cmp = compare(&a, &b);
         match self.op {
-            VersionReqOp::Eq => cmp == std::cmp::Ordering::Equal && a_prerelease == b_prerelease,
-            VersionReqOp::Gte => cmp != std::cmp::Ordering::Less,
-            VersionReqOp::Gt => cmp == std::cmp::Ordering::Greater,
-            VersionReqOp::Lte => cmp != std::cmp::Ordering::Greater,
-            VersionReqOp::Lt => cmp == std::cmp::Ordering::Less,
-            VersionReqOp::Tilde => cmp != std::cmp::Ordering::Less && major_minor_eq(&a, &b),
+            VersionReqOp::Eq => cmp == Ordering::Equal,
+            VersionReqOp::Gte => cmp != Ordering::Less,
+            VersionReqOp::Gt => cmp == Ordering::Greater,
+            VersionReqOp::Lte => cmp != Ordering::Greater,
+            VersionReqOp::Lt => cmp == Ordering::Less,
+            VersionReqOp::Tilde => {
+                cmp != Ordering::Less
+                    && a.numbers[0] == b.numbers[0]
+                    && (b.precision == 1 || a.numbers[1] == b.numbers[1])
+            }
             VersionReqOp::Caret => {
-                if cmp == std::cmp::Ordering::Less {
-                    return false;
-                }
-                // Zero-major caret: ^0.2.0 allows 0.2.x only
-                let av = split_ver(&a);
-                let bv = split_ver(&b);
-                if bv.first() == Some(&0) {
-                    av.first() == Some(&0) && av.get(1) == bv.get(1)
+                let i = if b.numbers[0] > 0 || b.precision == 1 {
+                    0
+                } else if b.numbers[1] > 0 || b.precision == 2 {
+                    1
                 } else {
-                    major_eq(&a, &b)
-                }
+                    2
+                };
+                cmp != Ordering::Less && a.numbers[..=i] == b.numbers[..=i]
             }
         }
     }
 }
-
-fn is_prerelease(v: &str) -> bool {
-    v.contains('-') || v.contains("rc") || v.contains("alpha") || v.contains("beta")
-}
-
-fn normalize_ver(v: &str) -> String {
-    v.trim().trim_start_matches('v').to_string()
-}
-
-fn split_ver(v: &str) -> Vec<u64> {
-    v.split(['.', '-'])
-        .filter_map(|p| p.parse::<u64>().ok())
-        .collect()
-}
-
-fn compare_ver(a: &str, b: &str) -> std::cmp::Ordering {
-    let av = split_ver(a);
-    let bv = split_ver(b);
-    for i in 0..av.len().max(bv.len()) {
-        let x = av.get(i).copied().unwrap_or(0);
-        let y = bv.get(i).copied().unwrap_or(0);
-        match x.cmp(&y) {
-            std::cmp::Ordering::Equal => {}
-            other => return other,
-        }
-    }
-    std::cmp::Ordering::Equal
-}
-
-fn major_eq(a: &str, b: &str) -> bool {
-    split_ver(a).first().copied().unwrap_or(0) == split_ver(b).first().copied().unwrap_or(0)
-}
-
-fn major_minor_eq(a: &str, b: &str) -> bool {
-    let av = split_ver(a);
-    let bv = split_ver(b);
-    av.first().copied() == bv.first().copied() && av.get(1).copied() == bv.get(1).copied()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    #[test]
+    fn rejects_non_numeric_versions_and_orders_prereleases() {
+        for bad in [">=banana", "1..2", "01.2", "1.2.3-01", "1.2.3+", "1.2.3.4"] {
+            assert!(VersionConstraint::parse(bad).is_err(), "accepted {bad}");
+        }
+        assert!(!VersionConstraint::parse("=1.2.3-alpha")
+            .unwrap()
+            .matches("1.2.3-beta"));
+        assert!(VersionConstraint::parse(">1.2.3-alpha.2")
+            .unwrap()
+            .matches("1.2.3-alpha.10"));
+        assert!(!VersionConstraint::parse("^0.0.2").unwrap().matches("0.0.3"));
+    }
     #[test]
     fn version_constraints() {
         let c = VersionConstraint::parse(">=17").unwrap();

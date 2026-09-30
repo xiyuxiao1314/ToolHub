@@ -6,8 +6,15 @@ use sha2::{Digest, Sha256};
 /// - Windows: lowercase drive/path separators for comparison keys
 /// - POSIX: collapse duplicate separators
 pub fn normalize_path(path: &str) -> String {
+    let canonical = canonicalize_best_effort(path);
+    let path = canonical.as_str();
     if cfg!(windows) {
-        path.replace('/', "\\").to_lowercase()
+        let path = path.replace('/', "\\").to_lowercase();
+        if let Some(unc) = path.strip_prefix(r"\\?\unc\") {
+            format!(r"\\{unc}")
+        } else {
+            path.strip_prefix(r"\\?\").unwrap_or(&path).to_string()
+        }
     } else {
         let mut out = String::with_capacity(path.len());
         let mut prev_slash = false;
@@ -52,5 +59,18 @@ mod tests {
             assert_eq!(a, b);
         }
         assert_eq!(path_fingerprint("x"), path_fingerprint("x"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn extended_drive_and_unc_paths_have_same_identity() {
+        assert_eq!(
+            normalize_path(r"C:\Owned\fixture.exe"),
+            normalize_path(r"\\?\C:\Owned\fixture.exe")
+        );
+        assert_eq!(
+            normalize_path(r"\\server\share\fixture.exe"),
+            normalize_path(r"\\?\UNC\server\share\fixture.exe")
+        );
     }
 }

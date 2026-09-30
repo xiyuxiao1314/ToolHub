@@ -21,10 +21,10 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
-rust-version = "1.75"
+rust-version = "1.88"
 
 [workspace.dependencies]
 toolhub-core = { path = "crates/core" }

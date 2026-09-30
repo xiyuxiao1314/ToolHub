@@ -140,7 +140,7 @@ impl PolicyEngine {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PolicyContext {
     pub tool: Option<String>,
     pub capability: Option<String>,

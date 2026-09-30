@@ -36,7 +36,7 @@ pub use owner::{Origin, Owner, OwnerCertainty, OwnerKind};
 pub use path_norm::{normalize_path, path_fingerprint};
 pub use skill::{SkillManifest, SkillRequirement, SkillStatus};
 pub use trust::{TrustLevel, TrustRecord};
-pub use version::{VersionConstraint, VersionReqOp};
+pub use version::{compare_versions, VersionConstraint, VersionReqOp};
 
 /// Domain validation helper: identifiers must be non-empty and charset-safe.
 pub fn validate_id(raw: &str, kind: &str) -> CoreResult<()> {

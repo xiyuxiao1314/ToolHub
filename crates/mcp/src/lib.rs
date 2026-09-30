@@ -26,12 +26,13 @@ pub struct McpToolSpec {
 }
 
 pub fn tool_specs() -> Vec<McpToolSpec> {
-    vec![
+    let mut specs = vec![
         McpToolSpec {
             name: "search_tools",
             description: "Search installed tools by query",
             input_schema: json!({
                 "type": "object",
+                "additionalProperties": false,
                 "properties": {"query": {"type": "string"}},
                 "required": ["query"]
             }),
@@ -70,7 +71,10 @@ pub fn tool_specs() -> Vec<McpToolSpec> {
                 "properties": {
                     "instance_id": {"type": "string"},
                     "args": {"type": "array", "items": {"type": "string"}},
-                    "approval_id": {"type": "string"}
+                    "approval_id": {"type": "string"},
+                    "session_id": {"type": "string"},
+                    "execution_id": {"type": "string"},
+                    "cwd": {"type": "string"}
                 },
                 "required": ["instance_id"]
             }),
@@ -92,7 +96,11 @@ pub fn tool_specs() -> Vec<McpToolSpec> {
                 "required": ["id"]
             }),
         },
-    ]
+    ];
+    for spec in &mut specs {
+        spec.input_schema["additionalProperties"] = json!(false);
+    }
+    specs
 }
 
 /// Tool count must remain bounded — never grow per installed instance.
@@ -101,41 +109,196 @@ pub fn tool_count() -> usize {
 }
 
 pub fn validate_meta_input(name: &str, input: &Value) -> Result<(), String> {
-    if !META_TOOLS.iter().any(|(n, _)| *n == name) {
-        return Err(format!("unknown meta-tool: {name}"));
+    let spec = tool_specs()
+        .into_iter()
+        .find(|tool| tool.name == name)
+        .ok_or_else(|| format!("unknown meta-tool: {name}"))?;
+    let object = input
+        .as_object()
+        .ok_or_else(|| "input must be an object".to_string())?;
+    if let Some(required) = spec.input_schema.get("required").and_then(Value::as_array) {
+        for key in required.iter().filter_map(Value::as_str) {
+            if !object.contains_key(key) {
+                return Err(format!("{key} required"));
+            }
+        }
     }
-    if !input.is_object() {
-        return Err("input must be an object".into());
+    let properties = spec.input_schema["properties"].as_object().unwrap();
+    for (key, value) in object {
+        let schema = properties
+            .get(key)
+            .ok_or_else(|| format!("unknown argument {key}"))?;
+        let valid = match schema["type"].as_str().unwrap_or("") {
+            "string" => value.as_str().is_some_and(|s| s.len() <= 16384),
+            "array" => value.as_array().is_some_and(|items| {
+                items.len() <= 1024
+                    && items
+                        .iter()
+                        .all(|v| v.as_str().is_some_and(|s| s.len() <= 16384))
+            }),
+            _ => false,
+        };
+        if !valid {
+            return Err(format!("invalid type or bounds for {key}"));
+        }
     }
-    match name {
-        "search_tools" | "resolve_capability" | "inspect_tool" | "inspect_skill" => {
-            if input
-                .get("query")
-                .or(input.get("capability"))
-                .or(input.get("id"))
-                .is_none()
-                && name != "list_environments"
+    Ok(())
+}
+#[derive(Default)]
+pub struct Server {
+    initialized: bool,
+    ready: bool,
+}
+impl Server {
+    pub fn handle(
+        &mut self,
+        req: &toolhub_protocol::JsonRpcRequest,
+        mut call: impl FnMut(&str, Value) -> Result<Value, String>,
+    ) -> Option<toolhub_protocol::JsonRpcResponse> {
+        use toolhub_protocol::{JsonRpcErrorObject, JsonRpcResponse};
+        let result = self.dispatch(req, &mut call);
+        req.id.as_ref()?;
+        Some(match result {
+            Ok(value) => JsonRpcResponse {
+                jsonrpc: "2.0".into(),
+                id: req.id.clone(),
+                result: Some(value),
+                error: None,
+            },
+            Err((code, message)) => JsonRpcResponse {
+                jsonrpc: "2.0".into(),
+                id: req.id.clone(),
+                result: None,
+                error: Some(JsonRpcErrorObject {
+                    code,
+                    message,
+                    data: None,
+                }),
+            },
+        })
+    }
+    fn dispatch(
+        &mut self,
+        req: &toolhub_protocol::JsonRpcRequest,
+        call: &mut impl FnMut(&str, Value) -> Result<Value, String>,
+    ) -> Result<Value, (i64, String)> {
+        let invalid = |message: &str| (-32602, message.to_string());
+        if req.method == "notifications/initialized" {
+            if req.id.is_some() || !self.initialized {
+                return Err((-32600, "invalid lifecycle transition".into()));
+            }
+            self.ready = true;
+            return Ok(json!({}));
+        }
+        if req.method == "ping" {
+            return Ok(json!({}));
+        }
+        if req.method == "initialize" {
+            if self.initialized || req.id.is_none() {
+                return Err((-32600, "initialize must occur once as a request".into()));
+            }
+            let params = req
+                .params
+                .as_object()
+                .ok_or_else(|| invalid("initialize params required"))?;
+            if !params.get("protocolVersion").is_some_and(Value::is_string)
+                || !params.get("capabilities").is_some_and(Value::is_object)
+                || !params.get("clientInfo").is_some_and(|v| {
+                    v.get("name").is_some_and(Value::is_string)
+                        && v.get("version").is_some_and(Value::is_string)
+                })
             {
-                if name == "search_tools" && input.get("query").is_none() {
-                    return Err("query required".into());
-                }
-                if name == "resolve_capability" && input.get("capability").is_none() {
-                    return Err("capability required".into());
-                }
-                if (name == "inspect_tool" || name == "inspect_skill") && input.get("id").is_none()
-                {
-                    return Err("id required".into());
-                }
+                return Err(invalid("invalid initialize types"));
             }
-            Ok(())
+            self.initialized = true;
+            return Ok(
+                json!({"protocolVersion":"2024-11-05","capabilities":{"tools":{"listChanged":false}},"serverInfo":{"name":"toolhub","version":env!("CARGO_PKG_VERSION")}}),
+            );
         }
-        "execute_tool" => {
-            if input.get("instance_id").is_none() {
-                return Err("instance_id required".into());
+        if !self.ready {
+            return Err((
+                -32600,
+                "initialize and notifications/initialized required".into(),
+            ));
+        }
+        match req.method.as_str() {
+            "tools/list" => Ok(
+                json!({"tools":tool_specs().into_iter().map(|spec|json!({"name":spec.name,"description":spec.description,"inputSchema":spec.input_schema})).collect::<Vec<_>>()}),
+            ),
+            "tools/call" => {
+                let params = req
+                    .params
+                    .as_object()
+                    .ok_or_else(|| invalid("tools/call params must be object"))?;
+                let name = params
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| invalid("tool name required"))?;
+                let arguments = params
+                    .get("arguments")
+                    .cloned()
+                    .unwrap_or_else(|| json!({}));
+                validate_meta_input(name, &arguments).map_err(|message| (-32602, message))?;
+                let method = match name {
+                    "search_tools" => "registry.search",
+                    "resolve_capability" => "resolve.capability",
+                    "inspect_tool" => "registry.inspect_instance",
+                    "list_environments" => "environment.list",
+                    "execute_tool" => "execute.tool",
+                    "search_skills" => "skill.list",
+                    "inspect_skill" => "skill.inspect",
+                    _ => return Err(invalid("unknown tool")),
+                };
+                let result = call(
+                    method,
+                    if name == "search_skills" {
+                        json!({})
+                    } else {
+                        arguments.clone()
+                    },
+                );
+                let (value, error) = match result {
+                    Ok(mut value) => {
+                        if name == "search_skills" {
+                            if let (Some(query), Some(list)) = (
+                                arguments.get("query").and_then(Value::as_str),
+                                value.as_array(),
+                            ) {
+                                let query = query.to_lowercase();
+                                value = Value::Array(
+                                    list.iter()
+                                        .filter(|item| {
+                                            item.to_string().to_lowercase().contains(&query)
+                                        })
+                                        .cloned()
+                                        .collect(),
+                                );
+                            }
+                        }
+                        let error =
+                            value
+                                .get("status")
+                                .and_then(Value::as_str)
+                                .is_some_and(|status| {
+                                    matches!(
+                                        status,
+                                        "failed"
+                                            | "timed_out"
+                                            | "cancelled"
+                                            | "denied"
+                                            | "expired"
+                                            | "unavailable"
+                                            | "invalid_request"
+                                    )
+                                });
+                        (value, error)
+                    }
+                    Err(message) => (json!({"error":message}), true),
+                };
+                Ok(json!({"content":[{"type":"text","text":value.to_string()}],"isError":error}))
             }
-            Ok(())
+            _ => Err((-32601, format!("method not found: {}", req.method))),
         }
-        _ => Ok(()),
     }
 }
 
@@ -150,4 +313,53 @@ mod tests {
         assert!(validate_meta_input("search_tools", &json!({})).is_err());
         assert!(validate_meta_input("install_everything", &json!({})).is_err());
     }
+
+    #[test]
+    fn rejects_wrong_required_field_and_types() {
+        for input in [json!({"id":"x"}), json!({"query":false})] {
+            assert!(validate_meta_input("search_tools", &input).is_err());
+        }
+        assert!(
+            validate_meta_input("execute_tool", &json!({"instance_id":"x","args":[5]})).is_err()
+        );
+    }
+
+    #[test]
+    fn lifecycle_errors_and_semantic_tool_failures() {
+        let mut server = Server::default();
+        let request =
+            |id, method, params| toolhub_protocol::JsonRpcRequest::new(id, method, params);
+        let early = server
+            .handle(&request(1, "tools/list", json!({})), |_, _| Ok(json!([])))
+            .unwrap();
+        assert_eq!(early.error.unwrap().code, -32600);
+        let initialized=server.handle(&request(2,"initialize",json!({"protocolVersion":"2099-01-01","capabilities":{},"clientInfo":{"name":"test","version":"1"}})),|_,_|Ok(json!(null))).unwrap();
+        assert_eq!(initialized.result.unwrap()["protocolVersion"], "2024-11-05");
+        let notification =
+            serde_json::from_value(json!({"jsonrpc":"2.0","method":"notifications/initialized"}))
+                .unwrap();
+        assert!(server
+            .handle(&notification, |_, _| Ok(json!(null)))
+            .is_none());
+        let failed = server
+            .handle(
+                &request(
+                    3,
+                    "tools/call",
+                    json!({"name":"execute_tool","arguments":{"instance_id":"missing"}}),
+                ),
+                |_, _| Err("denied".into()),
+            )
+            .unwrap();
+        assert!(failed.error.is_none());
+        assert_eq!(failed.result.unwrap()["isError"], true);
+        let unknown = server
+            .handle(&request(4, "resources/list", json!({})), |_, _| {
+                Ok(json!(null))
+            })
+            .unwrap();
+        assert_eq!(unknown.error.unwrap().code, -32601);
+    }
 }
+
+

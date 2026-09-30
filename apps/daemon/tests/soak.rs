@@ -9,6 +9,9 @@ fn toolhubd_bin() -> String {
     std::env::var("TOOLHUBD_BIN").unwrap_or_else(|_| {
         let mut p = std::env::current_exe().unwrap();
         p.pop();
+        if p.ends_with("deps") {
+            p.pop();
+        }
         p.push(if cfg!(windows) {
             "toolhubd.exe"
         } else {
@@ -28,8 +31,6 @@ impl ChildDaemon {
     fn spawn(db: &std::path::Path) -> Self {
         let mut child = Command::new(toolhubd_bin())
             .env("TOOLHUB_REGISTRY", db)
-            .env("TOOLHUB_PRINCIPAL", "local.admin")
-            .env("TOOLHUB_ADMIN", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())

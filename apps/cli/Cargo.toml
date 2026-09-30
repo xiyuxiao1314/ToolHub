@@ -11,6 +11,7 @@ path = "src/main.rs"
 [dependencies]
 toolhub-protocol = { workspace = true }
 toolhub-ipc = { workspace = true }
+toolhub-mcp = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 clap = { workspace = true }

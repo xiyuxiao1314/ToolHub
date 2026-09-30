@@ -1,6 +1,7 @@
 //! Tool recognition from static metadata and reviewed known probes only.
 //! Unknown executables are NEVER run (including --version/--help).
 
+pub mod native_metadata;
 pub mod resources;
 
 use std::collections::BTreeMap;
@@ -222,18 +223,50 @@ pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
 
     // F07/R2-B05: path/name alone is a weak hypothesis.
     // Known trust requires corroborating executable metadata (MZ/size), not a renamed text file.
-    let binary_ok = looks_like_executable(&candidate.path);
-    if binary_ok {
+    let native = native_metadata::read(Path::new(&candidate.path));
+    if let Some(format) = &native.format {
         evidence.push(
             Evidence::native(
                 EvidenceSource::ExecutableMetadata,
                 0.85,
-                "executable metadata corroborates recognition",
+                format!("measured native format {format}; architecture {}; format does not prove product identity", native.arch.as_deref().unwrap_or("unknown")),
             )
             .unwrap(),
         );
     }
-    let corroborated = binary_ok && evidence.iter().any(|e| e.confidence >= 0.75);
+    let corroborated = native
+        .product
+        .as_deref()
+        .map(|p| {
+            p.eq_ignore_ascii_case(rule.name)
+                || (rule.name == "Python" && p.to_ascii_lowercase().starts_with("python"))
+        })
+        .unwrap_or(false)
+        && native
+            .publisher
+            .as_deref()
+            .map(|p| p.eq_ignore_ascii_case(rule.vendor))
+            .unwrap_or(false)
+        && native
+            .original_filename
+            .as_deref()
+            .map(|n| rule.file_names.iter().any(|f| f.eq_ignore_ascii_case(n)))
+            .unwrap_or(false);
+    if corroborated {
+        evidence.push(
+            Evidence::native(
+                EvidenceSource::PublisherMetadata,
+                0.85,
+                format!(
+                    "native product {}, publisher {}, original filename {}",
+                    native.product.as_deref().unwrap(),
+                    native.publisher.as_deref().unwrap(),
+                    native.original_filename.as_deref().unwrap()
+                ),
+            )
+            .unwrap(),
+        );
+    }
     let confidence = if !corroborated {
         0.4
     } else if ambiguity.is_some() {
@@ -263,20 +296,26 @@ pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
         description: None,
     };
 
-    let platform = if cfg!(windows) {
-        "windows".to_string()
-    } else if cfg!(target_os = "macos") {
-        "macos".to_string()
-    } else {
-        "linux".to_string()
-    };
+    let platform = match native.format.as_deref() {
+        Some("pe") => "windows",
+        Some("elf") => "linux",
+        Some("mach_o" | "mach_o_fat") => "macos",
+        _ => "unknown",
+    }
+    .to_string();
 
     let instance = ToolInstance {
-        id: InstanceId::new(stable_instance_id(&candidate.path)).expect("stable id"),
+        id: InstanceId::new(stable_instance_id(
+            candidate
+                .canonical_path
+                .as_deref()
+                .unwrap_or(&candidate.path),
+        ))
+        .expect("stable id"),
         definition_id: definition.id.clone(),
-        version: candidate.version_hint.clone(),
+        version: native.version.clone(),
         platform,
-        arch: std::env::consts::ARCH.to_string(),
+        arch: native.arch.unwrap_or_else(|| "unknown".into()),
         path: candidate.path.clone(),
         canonical_path: candidate.canonical_path.clone(),
         environment_id: None,
@@ -300,48 +339,114 @@ pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
     }
 }
 
-/// R2-B05: require real executable metadata before Known trust (not a renamed text file).
-fn looks_like_executable(path: &str) -> bool {
-    let Ok(meta) = std::fs::metadata(path) else {
-        return false;
+/// Active data rules participate in the real recognition path; trust still requires native identity.
+pub fn recognize_with_resources(
+    candidate: &ScanCandidate,
+    store: &resources::ResourceStore,
+) -> RecognitionResult {
+    let file = candidate.file_name.as_deref().unwrap_or("");
+    let Some(rule) = store
+        .rules()
+        .into_iter()
+        .find(|r| r.file_names.iter().any(|n| n.eq_ignore_ascii_case(file)))
+    else {
+        return recognize(candidate);
     };
-    if !meta.is_file() {
-        return false;
+    let native = native_metadata::read(Path::new(&candidate.path));
+    let mut evidence = vec![Evidence::native(
+        EvidenceSource::PathPattern,
+        0.4,
+        format!("active resource name hypothesis for {}", rule.name),
+    )
+    .unwrap()];
+    let known = native.product.as_deref() == Some(rule.name.as_str())
+        && native.publisher.as_deref() == Some(rule.vendor.as_str())
+        && native
+            .original_filename
+            .as_deref()
+            .is_some_and(|n| rule.file_names.iter().any(|f| f.eq_ignore_ascii_case(n)));
+    if native.format.is_some() {
+        evidence.push(
+            Evidence::native(
+                EvidenceSource::ExecutableMetadata,
+                0.8,
+                format!(
+                    "measured {} {}",
+                    native.format.as_deref().unwrap_or("unknown"),
+                    native.arch.as_deref().unwrap_or("unknown")
+                ),
+            )
+            .unwrap(),
+        )
     }
-    // Tiny files are almost certainly not real tool binaries.
-    if meta.len() < 1024 {
-        return false;
+    if known {
+        evidence.push(
+            Evidence::native(
+                EvidenceSource::PublisherMetadata,
+                0.85,
+                "native product/publisher/original filename corroborate active rule",
+            )
+            .unwrap(),
+        )
     }
-    // Windows PE MZ + PE\\0\\0; Unix ELF only. R3-F06: junk MZ is not product identity.
-    if let Ok(mut f) = std::fs::File::open(path) {
-        use std::io::{Read, Seek, SeekFrom};
-        let mut magic = [0u8; 4];
-        if f.read_exact(&mut magic).is_ok() {
-            if cfg!(windows) {
-                if magic[0] != b'M' || magic[1] != b'Z' {
-                    return false;
-                }
-                if f.seek(SeekFrom::Start(0x3c)).is_ok() {
-                    let mut off = [0u8; 4];
-                    if f.read_exact(&mut off).is_ok() {
-                        let pe_off = u32::from_le_bytes(off) as u64;
-                        if pe_off < 0x40 || pe_off + 4 > meta.len() {
-                            return false;
-                        }
-                        let mut pe = [0u8; 4];
-                        if f.seek(SeekFrom::Start(pe_off)).is_ok()
-                            && f.read_exact(&mut pe).is_ok()
-                        {
-                            return &pe == b"PE\0\0";
-                        }
-                    }
-                }
-                return false;
-            }
-            return magic == [0x7f, b'E', b'L', b'F'];
+    let definition = ToolDefinition {
+        id: DefinitionId::new(&rule.definition_id).unwrap(),
+        name: rule.name.clone(),
+        vendor: Some(rule.vendor),
+        categories: vec![],
+        capabilities: rule
+            .capabilities
+            .iter()
+            .map(|c| CapabilityId::new(c).unwrap())
+            .collect(),
+        description: Some("active recognition resource".into()),
+    };
+    let instance = ToolInstance {
+        id: InstanceId::new(stable_instance_id(
+            candidate
+                .canonical_path
+                .as_deref()
+                .unwrap_or(&candidate.path),
+        ))
+        .unwrap(),
+        definition_id: definition.id.clone(),
+        version: native.version,
+        platform: match native.format.as_deref() {
+            Some("pe") => "windows",
+            Some("elf") => "linux",
+            Some("mach_o" | "mach_o_fat") => "macos",
+            _ => "unknown",
         }
+        .into(),
+        arch: native.arch.unwrap_or_else(|| "unknown".into()),
+        path: candidate.path.clone(),
+        canonical_path: candidate.canonical_path.clone(),
+        environment_id: None,
+        origin: infer_origin(&candidate.path),
+        owner: Owner::unknown(),
+        trust: if known {
+            TrustRecord::known(evidence.clone())
+        } else {
+            TrustRecord::unknown()
+        },
+        interfaces: vec![],
+        evidence: evidence.clone(),
+        status: toolhub_core::InstanceStatus::Available,
+        first_seen: chrono::Utc::now(),
+        last_seen: chrono::Utc::now(),
+    };
+    RecognitionResult {
+        recognized: true,
+        definition: Some(definition),
+        instance: Some(instance),
+        evidence,
+        confidence: if known { 0.85 } else { 0.4 },
+        ambiguity: if known {
+            None
+        } else {
+            Some("resource rule is a hypothesis; independent product identity missing".into())
+        },
     }
-    false
 }
 
 /// F06: stable instance identity from normalized path (not per-discovery UUID).
@@ -431,6 +536,22 @@ fn _unused_map() -> BTreeMap<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn valid_pe_format_is_not_product_identity() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("python.exe");
+        let mut bytes = vec![0u8; 2048];
+        bytes[..2].copy_from_slice(b"MZ");
+        bytes[0x3c..0x40].copy_from_slice(&128u32.to_le_bytes());
+        bytes[128..132].copy_from_slice(b"PE\0\0");
+        bytes[132..134].copy_from_slice(&0xaa64u16.to_le_bytes());
+        std::fs::write(&path, bytes).unwrap();
+        let instance = recognize(&cand(&path.to_string_lossy())).instance.unwrap();
+        assert_eq!(instance.trust.level, toolhub_core::TrustLevel::Unknown);
+        assert_eq!(instance.arch, "aarch64");
+        assert_eq!(instance.version, None);
+    }
 
     fn cand(path: &str) -> ScanCandidate {
         let mut c = ScanCandidate::from_path(path);

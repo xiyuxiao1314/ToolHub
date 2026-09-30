@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-app-versions"
+description = "Enables the app_versions command without any pre-configured scope."
+commands.allow = ["app_versions"]
+
+[[permission]]
+identifier = "deny-app-versions"
+description = "Denies the app_versions command without any pre-configured scope."
+commands.deny = ["app_versions"]

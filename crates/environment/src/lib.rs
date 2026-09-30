@@ -51,27 +51,23 @@ impl EnvironmentGraph {
 
     /// F09: detect distinct project/venv/conda/package/agent environments from path markers.
     pub fn environment_for_path(&self, path: &str) -> EnvironmentId {
-        let p = path.replace('\\', "/").to_ascii_lowercase();
+        let p = toolhub_core::path_norm::canonicalize_best_effort(path).replace('\\', "/");
         // Project venv: .../project/.venv or .../project/venv
         if let Some(env_id) = detect_project_env(&p) {
             return env_id;
         }
-        if p.contains("homebrew") || p.contains("cellar") {
-            return EnvironmentId::new("env.homebrew").unwrap();
+        if let Some((kind, root)) = manager_root(&p) {
+            return EnvironmentId::new(format!(
+                "env.{kind}.{}",
+                &toolhub_core::path_fingerprint(&root)[..20]
+            ))
+            .unwrap();
         }
-        if p.contains("scoop") {
-            return EnvironmentId::new("env.scoop").unwrap();
-        }
-        if p.contains("chocolatey") {
-            return EnvironmentId::new("env.chocolatey").unwrap();
-        }
-        if p.contains("conda") {
-            return EnvironmentId::new("env.conda").unwrap();
-        }
-        if p.contains("cursor") || p.contains("opencode") || p.contains("codex") {
-            return EnvironmentId::new("env.agent").unwrap();
-        }
-        if p.contains("program files") || p.contains("/usr/bin") || p.contains("/usr/local/bin") {
+        let lower = p.to_ascii_lowercase();
+        if lower.contains("program files")
+            || lower.contains("/usr/bin")
+            || lower.contains("/usr/local/bin")
+        {
             return EnvironmentId::new("env.system").unwrap();
         }
         EnvironmentId::new("env.user").unwrap()
@@ -96,19 +92,61 @@ impl EnvironmentGraph {
                 "env.chocolatey" => EnvironmentKind::Chocolatey,
                 "env.conda" => EnvironmentKind::Conda,
                 "env.agent" => EnvironmentKind::AgentSandbox,
+                s if s.starts_with("env.homebrew.") => EnvironmentKind::Homebrew,
+                s if s.starts_with("env.scoop.") => EnvironmentKind::Scoop,
+                s if s.starts_with("env.chocolatey.") => EnvironmentKind::Chocolatey,
+                s if s.starts_with("env.conda.") => EnvironmentKind::Conda,
+                s if s.starts_with("env.agent.") => EnvironmentKind::AgentSandbox,
+                s if s.starts_with("env.cargo.") => EnvironmentKind::Cargo,
+                s if s.starts_with("env.nvm.") => EnvironmentKind::Nvm,
+                s if s.starts_with("env.pyenv.") => EnvironmentKind::Pyenv,
+                s if s.starts_with("env.uv.") => EnvironmentKind::Uv,
+                s if s.starts_with("env.winget.") => EnvironmentKind::Winget,
                 s if s.starts_with("env.project.") => EnvironmentKind::Venv,
                 _ => EnvironmentKind::Unknown,
             };
-            let name = id.as_str().trim_start_matches("env.").replace('.', " ");
+            let root = detected_root(path);
+            let name = std::path::Path::new(&root)
+                .file_name()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| id.as_str().into());
+            let parent_id = if id.as_str().starts_with("env.project.") {
+                let parent_root = root.rsplit_once('/').map(|(p, _)| p).unwrap_or(&root);
+                let parent = EnvironmentId::new(format!(
+                    "env.projectroot.{}",
+                    &toolhub_core::path_fingerprint(parent_root)[..20]
+                ))
+                .unwrap();
+                self.insert(Environment {
+                    id: parent.clone(),
+                    name: std::path::Path::new(parent_root)
+                        .file_name()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "Project".into()),
+                    kind: EnvironmentKind::ProjectLocal,
+                    root_path: Some(parent_root.into()),
+                    parent_id: Some(EnvironmentId::new("env.user").unwrap()),
+                    origin: Origin::ProjectLocal,
+                    owner: attribute_owner(path),
+                    labels: vec!["root inferred from venv marker; size unknown".into()],
+                });
+                Some(parent)
+            } else {
+                Some(EnvironmentId::new("env.user").unwrap())
+            };
             self.insert(Environment {
                 id: id.clone(),
                 name,
-                kind,
-                root_path: Some(path.to_string()),
-                parent_id: None,
-                origin: Origin::Unknown,
-                owner: Owner::unknown(),
-                labels: vec![],
+                kind: kind.clone(),
+                root_path: Some(root),
+                parent_id,
+                origin: if kind == EnvironmentKind::Venv {
+                    Origin::ProjectLocal
+                } else {
+                    Origin::Unknown
+                },
+                owner: attribute_owner(path),
+                labels: vec!["inferred from path; size unknown".into()],
             });
         }
         id
@@ -119,11 +157,88 @@ impl EnvironmentGraph {
 fn detect_project_env(p: &str) -> Option<EnvironmentId> {
     let parts: Vec<&str> = p.split('/').collect();
     for (i, seg) in parts.iter().enumerate() {
-        if (*seg == ".venv" || *seg == "venv" || *seg == "env") && i > 0 {
-            let project = parts[i - 1];
-            let id = format!("env.project.{}", project.replace(' ', "_"));
+        if ([".venv", "venv", "env"]
+            .iter()
+            .any(|s| seg.eq_ignore_ascii_case(s)))
+            && i > 0
+        {
+            let root = parts[..=i].join("/");
+            let id = format!(
+                "env.project.{}",
+                &toolhub_core::path_fingerprint(&root)[..20]
+            );
             return EnvironmentId::new(id).ok();
         }
+    }
+    None
+}
+
+fn detected_root(path: &str) -> String {
+    let p = toolhub_core::path_norm::canonicalize_best_effort(path)
+        .replace('\\', "/")
+        .trim_start_matches("//?/")
+        .to_string();
+    let parts: Vec<_> = p.split('/').collect();
+    for (i, part) in parts.iter().enumerate() {
+        if [".venv", "venv", "env"].contains(&part.to_ascii_lowercase().as_str()) {
+            return parts[..=i].join("/");
+        }
+    }
+    if let Some((_, root)) = manager_root(&p) {
+        return root;
+    }
+    p.rsplit_once('/').map(|(p, _)| p.to_string()).unwrap_or(p)
+}
+
+fn manager_root(path: &str) -> Option<(&'static str, String)> {
+    let parts: Vec<_> = path.trim_start_matches("//?/").split('/').collect();
+    for (index, part) in parts.iter().enumerate() {
+        let lower = part.to_ascii_lowercase();
+        let kind = if lower == "homebrew" || lower == "cellar" {
+            "homebrew"
+        } else if lower == "scoop" {
+            "scoop"
+        } else if lower == "chocolatey" {
+            "chocolatey"
+        } else if lower.contains("conda") {
+            "conda"
+        } else if [
+            ".cursor",
+            "cursor",
+            ".codex",
+            "codex",
+            "opencode",
+            ".opencode",
+        ]
+        .contains(&lower.as_str())
+        {
+            "agent"
+        } else if lower == ".cargo" {
+            "cargo"
+        } else if lower == ".nvm" || lower == "nvm" {
+            "nvm"
+        } else if lower == ".pyenv" {
+            "pyenv"
+        } else if lower == "uv" {
+            "uv"
+        } else if lower == "winget" {
+            "winget"
+        } else {
+            continue;
+        };
+        let end = if kind == "conda"
+            && parts
+                .get(index + 1)
+                .is_some_and(|p| p.eq_ignore_ascii_case("envs"))
+            && parts.get(index + 2).is_some()
+        {
+            index + 2
+        } else if lower == "cellar" {
+            index.saturating_sub(1)
+        } else {
+            index
+        };
+        return Some((kind, parts[..=end].join("/")));
     }
     None
 }
@@ -220,6 +335,31 @@ pub fn analyze_duplicates(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn same_basename_projects_have_distinct_root_identity() {
+        let mut graph = EnvironmentGraph::new();
+        let a = graph.ensure_detected("C:/first/same/.venv/Scripts/python.exe");
+        let b = graph.ensure_detected("C:/second/same/.venv/Scripts/python.exe");
+        assert_ne!(a, b);
+        let env = graph.environments.iter().find(|e| e.id == a).unwrap();
+        assert_eq!(env.root_path.as_deref(), Some("C:/first/same/.venv"));
+        assert!(env.parent_id.is_some());
+    }
+
+    #[test]
+    fn conda_environments_preserve_each_canonical_root() {
+        let mut graph = EnvironmentGraph::new();
+        let a = graph.ensure_detected("C:/first/miniconda3/envs/same/python.exe");
+        let b = graph.ensure_detected("C:/second/miniconda3/envs/same/python.exe");
+        assert_ne!(a, b);
+        let env = graph.environments.iter().find(|e| e.id == a).unwrap();
+        assert_eq!(
+            env.root_path.as_deref(),
+            Some("C:/first/miniconda3/envs/same")
+        );
+        assert_eq!(env.kind, EnvironmentKind::Conda);
+    }
 
     #[test]
     fn ownership_probable_for_agent_dirs() {

@@ -3,7 +3,12 @@
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
-use std::sync::mpsc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc};
+mod process_tree;
+pub use process_tree::Tree as OwnedProcessTree;
+mod executable_pin;
+pub use executable_pin::ExecutablePin;
 use std::time::{Duration, Instant};
 
 use toolhub_core::{
@@ -148,13 +153,19 @@ pub fn validate_approval(
     }
     // R3-F03: fail closed on missing digests (legacy approvals invalidated).
     if approval.executable_sha256.is_empty()
-        || approval.args_digest.is_empty()
-        || approval.env_digest.is_empty()
-        || approval.policy_trust_digest.is_empty()
+        || [
+            &approval.args_digest,
+            &approval.cwd_digest,
+            &approval.stdin_digest,
+            &approval.env_digest,
+            &approval.policy_trust_digest,
+        ]
+        .iter()
+        .any(|d| !d.starts_with("v2:"))
     {
         return Err(ExecutionStatus::Denied);
     }
-    if request.agent_id.is_some() && request.agent_id.as_ref() != Some(&approval.agent_id) {
+    if request.agent_id.as_ref() != Some(&approval.agent_id) {
         return Err(ExecutionStatus::Denied);
     }
     if approval.instance_id != request.instance_id {
@@ -169,11 +180,11 @@ pub fn validate_approval(
     if approval.args_digest != digest_strings(args) {
         return Err(ExecutionStatus::Denied);
     }
-    let cwd_d = digest_strings(&[cwd.unwrap_or_default().to_string()]);
+    let cwd_d = digest_optional(cwd);
     if approval.cwd_digest != cwd_d {
         return Err(ExecutionStatus::Denied);
     }
-    let stdin_d = digest_strings(&[stdin.unwrap_or_default().to_string()]);
+    let stdin_d = digest_optional(stdin);
     if approval.stdin_digest != stdin_d {
         return Err(ExecutionStatus::Denied);
     }
@@ -181,16 +192,17 @@ pub fn validate_approval(
         return Err(ExecutionStatus::Denied);
     }
     // R2-B01: revalidate policy/trust revision binding when provided.
-    if !approval.policy_trust_digest.is_empty()
-        && !policy_trust_digest.is_empty()
-        && approval.policy_trust_digest != policy_trust_digest
-    {
-        return Err(ExecutionStatus::Denied);
-    }
-    if request.agent_id.is_some() && request.agent_id.as_ref() != Some(&approval.agent_id) {
+    if approval.policy_trust_digest != policy_trust_digest {
         return Err(ExecutionStatus::Denied);
     }
     Ok(())
+}
+
+fn digest_optional(value: Option<&str>) -> String {
+    match value {
+        Some(value) => digest_strings(&["some".into(), value.into()]),
+        None => digest_strings(&["none".into()]),
+    }
 }
 
 pub fn execute(
@@ -199,6 +211,66 @@ pub fn execute(
     allow_extra_env: &[String],
     ctx_extra: &PolicyContext,
     approval_validated: bool,
+) -> ExecutionResult {
+    execute_with_cancel(
+        request,
+        policy,
+        allow_extra_env,
+        ctx_extra,
+        approval_validated,
+        Arc::new(AtomicBool::new(false)),
+    )
+}
+
+pub fn execute_with_cancel(
+    request: &ExecutionRequest,
+    policy: &PolicyEngine,
+    allow_extra_env: &[String],
+    ctx_extra: &PolicyContext,
+    approval_validated: bool,
+    cancel: Arc<AtomicBool>,
+) -> ExecutionResult {
+    execute_internal(
+        request,
+        policy,
+        allow_extra_env,
+        ctx_extra,
+        approval_validated,
+        None,
+        cancel,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn execute_with_pin(
+    request: &ExecutionRequest,
+    policy: &PolicyEngine,
+    allow_extra_env: &[String],
+    ctx_extra: &PolicyContext,
+    approval_validated: bool,
+    pin: &ExecutablePin,
+    cancel: Arc<AtomicBool>,
+) -> ExecutionResult {
+    execute_internal(
+        request,
+        policy,
+        allow_extra_env,
+        ctx_extra,
+        approval_validated,
+        Some(pin),
+        cancel,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn execute_internal(
+    request: &ExecutionRequest,
+    policy: &PolicyEngine,
+    allow_extra_env: &[String],
+    ctx_extra: &PolicyContext,
+    approval_validated: bool,
+    pin: Option<&ExecutablePin>,
+    cancel: Arc<AtomicBool>,
 ) -> ExecutionResult {
     let cmd_name = std::path::Path::new(&request.executable)
         .file_stem()
@@ -250,7 +322,34 @@ pub fn execute(
 
     let env = sanitize_env(&request.env_overrides, allow_extra_env);
     let start = Instant::now();
-    let mut cmd = Command::new(&request.executable);
+    let fail = |status, code: &str, message: String| ExecutionResult {
+        status,
+        exit_code: None,
+        stdout: String::new(),
+        stderr: message,
+        duration_ms: start.elapsed().as_millis() as u64,
+        truncated: false,
+        error_code: Some(code.into()),
+        fallback_allowed: Some(false),
+    };
+    if cancel.load(Ordering::Acquire) {
+        return fail(
+            ExecutionStatus::Cancelled,
+            "cancelled",
+            "cancelled before launch".into(),
+        );
+    }
+    let mut cmd = match pin.map(ExecutablePin::command).transpose() {
+        Ok(Some(command)) => command,
+        Ok(None) => Command::new(&request.executable),
+        Err(error) => {
+            return fail(
+                ExecutionStatus::Unavailable,
+                "executable_pin_failed",
+                redact_text(&error.to_string()),
+            )
+        }
+    };
     cmd.args(&request.args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -262,229 +361,256 @@ pub fn execute(
     if let Some(cwd) = &request.cwd {
         cmd.current_dir(cwd);
     }
-
-    let mut child = match cmd.spawn() {
+    let mut tree = match process_tree::Tree::prepare(&mut cmd) {
+        Ok(t) => t,
         Err(e) => {
-            return ExecutionResult {
-                status: ExecutionStatus::Unavailable,
-                exit_code: None,
-                stdout: String::new(),
-                stderr: format!("spawn failed: {e}"),
-                duration_ms: start.elapsed().as_millis() as u64,
-                truncated: false,
-                error_code: Some("daemon_error".into()),
-                fallback_allowed: Some(true),
-            }
+            return fail(
+                ExecutionStatus::Unavailable,
+                "process_tree_unavailable",
+                redact_text(&e.to_string()),
+            )
         }
+    };
+    let mut child = match cmd.spawn() {
         Ok(c) => c,
+        Err(e) => {
+            return fail(
+                ExecutionStatus::Unavailable,
+                "spawn_failed",
+                redact_text(&e.to_string()),
+            )
+        }
     };
-
-    let mut stdin_handle = child.stdin.take();
-    let mut stdout_pipe = child.stdout.take();
-    let mut stderr_pipe = child.stderr.take();
-    let max_out = request.max_output_bytes as usize;
-    let timeout = Duration::from_millis(request.timeout_ms.clamp(1, 600_000));
-
-    let stdin_data = request.stdin.clone().unwrap_or_default();
+    if let Err(e) = tree.attach(&mut child) {
+        let _ = child.kill();
+        tree.terminate();
+        return fail(
+            ExecutionStatus::Unavailable,
+            "process_tree_unavailable",
+            redact_text(&e.to_string()),
+        );
+    }
+    if let Err(error) = process_tree::make_pipes_interruptible(&child) {
+        tree.terminate();
+        let _ = child.kill();
+        return fail(
+            ExecutionStatus::Unavailable,
+            "pipe_setup_failed",
+            redact_text(&error.to_string()),
+        );
+    }
+    let max_out = request.max_output_bytes.min(1024 * 256) as usize;
     let (tx, rx) = mpsc::channel();
-    let tx2 = tx.clone();
-
-    // Writer thread: bounded stdin write.
+    let stop_pipes = Arc::new(AtomicBool::new(false));
+    let reader =
+        |pipe: Box<dyn Read + Send>, which: bool, tx: mpsc::Sender<(bool, Vec<u8>, bool)>| {
+            let stop = stop_pipes.clone();
+            std::thread::spawn(move || {
+                let mut pipe = pipe;
+                let mut buf = Vec::new();
+                let mut truncated = false;
+                let mut chunk = [0u8; 8192];
+                loop {
+                    if stop.load(Ordering::Acquire) {
+                        truncated = true;
+                        break;
+                    }
+                    match pipe.read(&mut chunk) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            let room = max_out.saturating_sub(buf.len());
+                            buf.extend_from_slice(&chunk[..n.min(room)]);
+                            truncated |= n > room;
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            std::thread::sleep(Duration::from_millis(5))
+                        }
+                        Err(_) => break,
+                    }
+                }
+                let _ = tx.send((which, buf, truncated));
+            })
+        };
+    let out = reader(Box::new(child.stdout.take().unwrap()), true, tx.clone());
+    let err = reader(Box::new(child.stderr.take().unwrap()), false, tx.clone());
+    drop(tx);
+    let input = request.stdin.clone().unwrap_or_default();
+    let stdin = child.stdin.take();
+    let writer_stop = stop_pipes.clone();
     let writer = std::thread::spawn(move || {
-        if let Some(mut sin) = stdin_handle.take() {
-            let data = stdin_data.into_bytes();
-            let mut off = 0usize;
-            while off < data.len() {
-                match sin.write(&data[off..]) {
+        if let Some(mut stdin) = stdin {
+            let mut offset = 0;
+            while offset < input.len() && !writer_stop.load(Ordering::Acquire) {
+                match stdin.write(&input.as_bytes()[offset..]) {
                     Ok(0) => break,
-                    Ok(n) => off += n,
-                    Err(_) => break,
-                }
-            }
-            let _ = sin.flush();
-        }
-    });
-
-    // Reader threads with hard caps.
-    let out_tx = tx.clone();
-    let stdout_t = std::thread::spawn(move || {
-        let mut buf: Vec<u8> = Vec::new();
-        let mut truncated = false;
-        if let Some(mut r) = stdout_pipe.take() {
-            let mut chunk = [0u8; 8192];
-            loop {
-                match r.read(&mut chunk) {
-                    Ok(0) => break,
-                    Ok(n) => {
-                        if buf.len() + n > max_out {
-                            let room = max_out.saturating_sub(buf.len());
-                            buf.extend_from_slice(&chunk[..room]);
-                            truncated = true;
-                            // drain rest without storing
-                            let mut drain = [0u8; 8192];
-                            while r.read(&mut drain).unwrap_or(0) > 0 {}
-                            break;
-                        }
-                        buf.extend_from_slice(&chunk[..n]);
+                    Ok(n) => offset += n,
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(5))
                     }
                     Err(_) => break,
                 }
             }
         }
-        let _ = out_tx.send(("stdout", buf, truncated));
     });
-    let err_tx = tx2.clone();
-    let stderr_t = std::thread::spawn(move || {
-        let mut buf: Vec<u8> = Vec::new();
-        let mut truncated = false;
-        if let Some(mut r) = stderr_pipe.take() {
-            let mut chunk = [0u8; 8192];
-            loop {
-                match r.read(&mut chunk) {
-                    Ok(0) => break,
-                    Ok(n) => {
-                        if buf.len() + n > max_out {
-                            let room = max_out.saturating_sub(buf.len());
-                            buf.extend_from_slice(&chunk[..room]);
-                            truncated = true;
-                            let mut drain = [0u8; 8192];
-                            while r.read(&mut drain).unwrap_or(0) > 0 {}
-                            break;
-                        }
-                        buf.extend_from_slice(&chunk[..n]);
-                    }
-                    Err(_) => break,
-                }
-            }
-        }
-        let _ = err_tx.send(("stderr", buf, truncated));
-    });
-
-    // Wait with deadline; kill on timeout.
-    let deadline = Instant::now() + timeout;
+    let deadline = start + Duration::from_millis(request.timeout_ms.clamp(1, 600_000));
     let status_loop = loop {
-        match child.try_wait() {
-            Ok(Some(st)) => break Ok(st),
-            Ok(None) => {
-                if Instant::now() >= deadline {
-                    let _ = child.kill();
-                    // R2-B03: kill descendant process tree on Windows.
-                    #[cfg(windows)]
-                    {
-                        let pid = child.id();
-                        let _ = std::process::Command::new("taskkill")
-                            .args(["/PID", &pid.to_string(), "/T", "/F"])
-                            .stdout(std::process::Stdio::null())
-                            .stderr(std::process::Stdio::null())
-                            .status();
-                    }
-                    let _ = child.wait();
-                    break Err(ExecutionStatus::TimedOut);
-                }
-                std::thread::sleep(Duration::from_millis(10));
-            }
-            Err(_) => {
-                let _ = child.kill();
-                break Err(ExecutionStatus::Failed);
-            }
+        if cancel.load(Ordering::Acquire) {
+            break Err(ExecutionStatus::Cancelled);
+        }
+        match tree.poll_child(&mut child) {
+            Ok(Some(status)) => break Ok(status),
+            Ok(None) if Instant::now() >= deadline => break Err(ExecutionStatus::TimedOut),
+            Ok(None) => std::thread::sleep(Duration::from_millis(10)),
+            Err(_) => break Err(ExecutionStatus::Failed),
         }
     };
-
-    let _ = writer.join();
-    let _ = stdout_t.join();
-    let _ = stderr_t.join();
-
-    // Collect up to two I/O messages (may have timed out before send).
+    // Close the owned tree on every outcome, including a normally exiting parent whose
+    // descendants still retain stdin/stdout/stderr. Never join a pipe before teardown.
+    tree.terminate();
+    if status_loop.is_err() {
+        let _ = child.kill();
+    }
+    let cleanup_deadline = Instant::now() + Duration::from_millis(500);
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let mut truncated = false;
-    // R2-B03: bounded collection — do not wait forever on hung pipes.
-    let collect_deadline = Instant::now() + Duration::from_millis(500);
-    while Instant::now() < collect_deadline {
-        match rx.recv_timeout(Duration::from_millis(50)) {
-            Ok((which, buf, t)) => {
+    let mut received = 0;
+    while received < 2 && Instant::now() < cleanup_deadline {
+        match rx.recv_timeout(Duration::from_millis(10)) {
+            Ok((which, data, t)) => {
+                received += 1;
                 truncated |= t;
-                if which == "stdout" {
-                    stdout = buf;
+                if which {
+                    stdout = data;
                 } else {
-                    stderr = buf;
-                }
-            }
-            Err(mpsc::RecvTimeoutError::Timeout) => {
-                if stdout.len() + stderr.len() > 0 {
-                    break;
+                    stderr = data;
                 }
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
         }
     }
-
-    let duration_ms = start.elapsed().as_millis() as u64;
-    let stdout = utf8_lossy_cap(&stdout, max_out, &mut truncated);
-    let stderr = utf8_lossy_cap(&stderr, max_out, &mut truncated);
-
-    match status_loop {
-        Err(ExecutionStatus::TimedOut) => ExecutionResult {
-            status: ExecutionStatus::TimedOut,
-            exit_code: None,
-            stdout,
-            stderr,
-            duration_ms,
-            truncated,
-            error_code: Some("timeout".into()),
-            fallback_allowed: Some(false),
-        },
-        Err(other) => ExecutionResult {
-            status: other,
-            exit_code: None,
-            stdout,
-            stderr,
-            duration_ms,
-            truncated,
-            error_code: Some("daemon_error".into()),
-            fallback_allowed: Some(true),
-        },
-        Ok(st) => {
-            let status = if st.success() {
+    stop_pipes.store(true, Ordering::Release);
+    // Interruptible Unix collectors finish promptly even if a detached descendant
+    // escaped its process group and retained a pipe. Capture their bounded remainder.
+    let final_deadline = Instant::now() + Duration::from_millis(20);
+    while received < 2 && Instant::now() < final_deadline {
+        match rx.recv_timeout(Duration::from_millis(5)) {
+            Ok((which, data, t)) => {
+                received += 1;
+                truncated |= t;
+                if which {
+                    stdout = data;
+                } else {
+                    stderr = data;
+                }
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+        }
+    }
+    for thread in [&out, &err] {
+        if !thread.is_finished() {
+            process_tree::cancel_io(thread);
+        }
+    }
+    if !writer.is_finished() {
+        process_tree::cancel_io(&writer);
+    }
+    // Join only finished threads. Detached collectors own their handles and fixed-size
+    // buffers; an OS pipe failure cannot hold the service response indefinitely.
+    if out.is_finished() {
+        let _ = out.join();
+    } else {
+        truncated = true;
+    }
+    if err.is_finished() {
+        let _ = err.join();
+    } else {
+        truncated = true;
+    }
+    if writer.is_finished() {
+        let _ = writer.join();
+    }
+    let _ = child.try_wait();
+    let mut stdout = utf8_lossy_cap(&stdout, max_out, &mut truncated);
+    let mut stderr = utf8_lossy_cap(&stderr, max_out, &mut truncated);
+    cap_json_output(&mut stdout, &mut stderr, max_out, &mut truncated);
+    let (status, exit_code, error_code) = match status_loop {
+        Ok(st) => (
+            if st.success() {
                 ExecutionStatus::Success
             } else {
                 ExecutionStatus::Failed
-            };
-            ExecutionResult {
-                status,
-                exit_code: st.code(),
-                stdout,
-                stderr,
-                duration_ms,
-                truncated,
-                error_code: None,
-                fallback_allowed: Some(false),
-            }
-        }
+            },
+            st.code(),
+            if st.success() {
+                None
+            } else {
+                Some("child_failed".into())
+            },
+        ),
+        Err(st) => (
+            st,
+            None,
+            Some(
+                match st {
+                    ExecutionStatus::TimedOut => "timeout",
+                    ExecutionStatus::Cancelled => "cancelled",
+                    _ => "process_failed",
+                }
+                .into(),
+            ),
+        ),
+    };
+    ExecutionResult {
+        status,
+        exit_code,
+        stdout,
+        stderr,
+        duration_ms: start.elapsed().as_millis() as u64,
+        truncated,
+        error_code,
+        fallback_allowed: Some(false),
     }
 }
 
 /// UTF-8-safe truncation that never panics on multibyte boundaries.
 fn utf8_lossy_cap(bytes: &[u8], max: usize, truncated: &mut bool) -> String {
-    let slice = if bytes.len() > max {
+    let mut out = String::from_utf8_lossy(bytes).into_owned();
+    if out.len() > max {
         *truncated = true;
-        // walk back to a char boundary
         let mut end = max;
-        while end > 0 && !char_boundary(bytes, end) {
+        while !out.is_char_boundary(end) {
             end -= 1;
         }
-        &bytes[..end]
-    } else {
-        bytes
-    };
-    String::from_utf8_lossy(slice).into_owned()
+        out.truncate(end);
+    }
+    out
 }
 
-fn char_boundary(b: &[u8], i: usize) -> bool {
-    if i == 0 || i >= b.len() {
-        return true;
+/// Aggregate output budget counts UTF-8 JSON escaped bytes, excluding the two quote pairs.
+fn cap_json_output(stdout: &mut String, stderr: &mut String, max: usize, truncated: &mut bool) {
+    let mut remaining = max;
+    for text in [stdout, stderr] {
+        let mut end = 0;
+        for (offset, c) in text.char_indices() {
+            let cost = match c {
+                '"' | '\\' | '\n' | '\r' | '\t' | '\u{8}' | '\u{c}' => 2,
+                c if c <= '\u{1f}' => 6,
+                c => c.len_utf8(),
+            };
+            if cost > remaining {
+                break;
+            }
+            remaining -= cost;
+            end = offset + c.len_utf8();
+        }
+        if end < text.len() {
+            *truncated = true;
+            text.truncate(end);
+        }
     }
-    (b[i] & 0xC0) != 0x80
 }
 
 /// Redact secrets from free-form text (logs/audit/errors).
@@ -525,11 +651,20 @@ fn mask_flag_values(text: &str) -> String {
             result.push(' ');
         }
         first = false;
-        let pu = p.to_ascii_uppercase();
-        let is_flag = p.starts_with('-')
-            && SECRET_PREFIXES
-                .iter()
-                .any(|s| pu.contains(s.trim_end_matches('_')));
+        let key = p.trim_matches(['"', '\'', ':']);
+        if p.ends_with(':') && is_secret_name(key) {
+            result.push_str(key);
+            result.push_str(": <redacted>");
+            if let Some(next) = parts.next() {
+                if key.eq_ignore_ascii_case("authorization")
+                    && (next.eq_ignore_ascii_case("bearer") || next.eq_ignore_ascii_case("basic"))
+                {
+                    parts.next();
+                }
+            }
+            continue;
+        }
+        let is_flag = is_secret_flag(p);
         if is_flag {
             result.push_str(p);
             if let Some(next) = parts.peek() {
@@ -548,9 +683,6 @@ fn mask_flag_values(text: &str) -> String {
 
 /// Redact argv for audit persistence (flag values too).
 pub fn redact_args(args: &[String]) -> Vec<String> {
-    let joined = args.join(" ");
-    let red = redact_text(&joined);
-    // keep as single redacted line plus individual mask for unknowns
     let mut out = vec![];
     let mut skip_next = false;
     for a in args {
@@ -561,14 +693,14 @@ pub fn redact_args(args: &[String]) -> Vec<String> {
         }
         if a.starts_with('-') && a.contains('=') {
             let (k, _v) = a.split_once('=').unwrap();
-            if is_secret_name(k) {
+            if is_secret_flag(k) {
                 out.push(format!("{k}=<redacted>"));
             } else {
                 out.push(a.clone());
             }
             continue;
         }
-        if a.starts_with('-') && is_secret_name(a) {
+        if is_secret_flag(a) {
             out.push(a.clone());
             skip_next = true;
         } else if is_secret_name(a) {
@@ -577,7 +709,6 @@ pub fn redact_args(args: &[String]) -> Vec<String> {
             out.push(a.clone());
         }
     }
-    let _ = red;
     out
 }
 
@@ -616,8 +747,8 @@ pub fn redact_path_for_export(path: &str, homes: &[String], usernames: &[String]
 }
 
 fn replace_ci(hay: &str, needle: &str, rep: &str) -> String {
-    let h = hay.to_lowercase();
-    let n = needle.to_lowercase();
+    let (h, offsets) = fold_with_offsets(hay);
+    let (n, _) = fold_with_offsets(needle);
     if n.is_empty() {
         return hay.to_string();
     }
@@ -625,12 +756,47 @@ fn replace_ci(hay: &str, needle: &str, rep: &str) -> String {
     let mut i = 0;
     while let Some(pos) = h[i..].find(&n) {
         let abs = i + pos;
-        result.push_str(&hay[i..abs]);
-        result.push_str(rep);
-        i = abs + n.len();
+        let end = abs + n.len();
+        if let (Some(start), Some(stop), Some(previous)) =
+            (offsets.get(&abs), offsets.get(&end), offsets.get(&i))
+        {
+            result.push_str(&hay[*previous..*start]);
+            result.push_str(rep);
+            i = end;
+            let _ = stop;
+        } else {
+            let next = h[abs..].chars().next().map(char::len_utf8).unwrap_or(1);
+            let boundary = abs + next;
+            if let (Some(previous), Some(stop)) = (offsets.get(&i), offsets.get(&boundary)) {
+                result.push_str(&hay[*previous..*stop]);
+                i = boundary;
+            } else {
+                return hay.to_string();
+            }
+        }
     }
-    result.push_str(&hay[i..]);
+    result.push_str(&hay[*offsets.get(&i).unwrap_or(&hay.len())..]);
     result
+}
+
+fn fold_with_offsets(text: &str) -> (String, BTreeMap<usize, usize>) {
+    let mut folded = String::new();
+    let mut offsets = BTreeMap::new();
+    for (i, c) in text.char_indices() {
+        offsets.insert(folded.len(), i);
+        if c == '\\' {
+            folded.push('/');
+        } else {
+            folded.extend(c.to_lowercase());
+        }
+    }
+    offsets.insert(folded.len(), text.len());
+    (folded, offsets)
+}
+
+fn is_secret_flag(flag: &str) -> bool {
+    flag.starts_with('-')
+        && (is_secret_name(flag) || matches!(flag, "-t" | "-p" | "-k" | "-u" | "-H"))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -645,7 +811,7 @@ pub fn build_approval(
     policy_trust_digest: &str,
     ttl_seconds: i64,
 ) -> ExecutionApproval {
-    let stdin_d = digest_strings(&[request.stdin.clone().unwrap_or_default()]);
+    let stdin_d = digest_optional(request.stdin.as_deref());
     ExecutionApproval {
         approval_id: approval_id.to_string(),
         agent_id,
@@ -654,7 +820,7 @@ pub fn build_approval(
         executable_sha256: executable_hash.to_string(),
         canonical_executable: canonical_executable.to_string(),
         args_digest: digest_strings(&request.args),
-        cwd_digest: digest_strings(&[request.cwd.clone().unwrap_or_default()]),
+        cwd_digest: digest_optional(request.cwd.as_deref()),
         stdin_digest: stdin_d,
         env_digest: env_dig.to_string(),
         policy_trust_digest: policy_trust_digest.to_string(),
@@ -726,9 +892,13 @@ mod tests {
 
     #[test]
     fn short_flag_secret_redacted() {
-        let args = vec!["-t".into(), "SECRETV".into(), "ok".into()];
+        let args = vec!["-t".into(), "opaque123".into(), "ok".into()];
         let r = redact_args(&args);
         assert_eq!(r[1], "<redacted>");
+        assert!(
+            !redact_text("-t opaque123 Authorization: Bearer opaque456 token: opaque789")
+                .contains("opaque")
+        );
     }
 
     #[test]
@@ -756,6 +926,228 @@ mod tests {
         let out = utf8_lossy_cap(s.as_bytes(), 7, &mut t);
         assert!(t);
         assert!(out.len() <= 7);
+    }
+
+    #[test]
+    fn invalid_utf8_final_bytes_are_capped() {
+        let mut t = false;
+        assert!(utf8_lossy_cap(&[255, 255, 255], 3, &mut t).len() <= 3);
+    }
+
+    #[test]
+    fn unicode_path_redaction_does_not_slice_case_expansion() {
+        assert_eq!(
+            redact_path_for_export("İ/Users/张三/x", &["/Users/张三".into()], &[]),
+            "İ~/x"
+        );
+    }
+
+    #[test]
+    fn normal_parent_exit_closes_owned_descendant_pipes() {
+        let python = if cfg!(windows) {
+            r"C:\Users\hp\AppData\Local\Programs\Python\Python313\python.exe"
+        } else {
+            "python3"
+        };
+        let req = ExecutionRequest {
+            instance_id: toolhub_core::InstanceId::new("fixture").unwrap(), executable:python.into(),
+            args:vec!["-c".into(),"import subprocess,sys; subprocess.Popen([sys.executable,'-c','import time; time.sleep(2)']); print('parent',flush=True)".into()],
+            cwd:None, env_overrides:BTreeMap::new(), timeout_ms:300, max_output_bytes:1024, stdin:None,agent_id:None,
+        };
+        let started = Instant::now();
+        let r = execute(
+            &req,
+            &PolicyEngine::default(),
+            &[],
+            &PolicyContext::default(),
+            true,
+        );
+        assert_eq!(r.status, ExecutionStatus::Success);
+        assert!(
+            started.elapsed() < Duration::from_millis(1200),
+            "inherited pipes delayed return {:?}",
+            started.elapsed()
+        );
+    }
+
+    fn fixture_request(script: &str, timeout: u64, cap: u64) -> ExecutionRequest {
+        ExecutionRequest {
+            instance_id: toolhub_core::InstanceId::new("owned.fixture").unwrap(),
+            executable: if cfg!(windows) {
+                r"C:\Users\hp\AppData\Local\Programs\Python\Python313\python.exe".into()
+            } else {
+                "python3".into()
+            },
+            args: vec!["-c".into(), script.into()],
+            cwd: None,
+            env_overrides: BTreeMap::new(),
+            timeout_ms: timeout,
+            max_output_bytes: cap,
+            stdin: None,
+            agent_id: None,
+        }
+    }
+
+    #[test]
+    fn cancellation_finishes_owned_child_and_reports_cancelled() {
+        let token = Arc::new(AtomicBool::new(false));
+        let other = token.clone();
+        let trigger = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(100));
+            other.store(true, Ordering::Release);
+        });
+        let start = Instant::now();
+        let result = execute_with_cancel(
+            &fixture_request("import time; time.sleep(2)", 3000, 1024),
+            &PolicyEngine::default(),
+            &[],
+            &PolicyContext::default(),
+            true,
+            token,
+        );
+        trigger.join().unwrap();
+        assert_eq!(result.status, ExecutionStatus::Cancelled);
+        assert_eq!(result.error_code.as_deref(), Some("cancelled"));
+        assert!(start.elapsed() < Duration::from_millis(900));
+    }
+
+    #[test]
+    fn output_budget_counts_json_escaping_and_decoded_utf8() {
+        let result=execute(&fixture_request("import sys; sys.stdout.buffer.write(bytes([255])*100+b'\\x00'*100); sys.stderr.write('\\\\'*100)",3000,64),&PolicyEngine::default(),&[],&PolicyContext::default(),true);
+        assert_eq!(result.status, ExecutionStatus::Success);
+        let cost = serde_json::to_vec(&result.stdout).unwrap().len()
+            + serde_json::to_vec(&result.stderr).unwrap().len()
+            - 4;
+        assert!(cost <= 64, "serialized output {cost}");
+        assert!(result.truncated);
+    }
+
+    #[test]
+    fn finite_failure_preserves_exit_code() {
+        let result = execute(
+            &fixture_request("import sys; sys.exit(7)", 3000, 64),
+            &PolicyEngine::default(),
+            &[],
+            &PolicyContext::default(),
+            true,
+        );
+        assert_eq!(result.status, ExecutionStatus::Failed);
+        assert_eq!(result.exit_code, Some(7));
+        assert_eq!(result.error_code.as_deref(), Some("child_failed"));
+    }
+
+    #[test]
+    fn pinned_known_fixture_executes_same_identity() {
+        let request = fixture_request("print('pinned-fixture')", 3000, 128);
+        let pin = ExecutablePin::open(std::path::Path::new(&request.executable)).unwrap();
+        assert_eq!(pin.hash().unwrap(), hash_file(&request.executable).unwrap());
+        let result = execute_with_pin(
+            &request,
+            &PolicyEngine::default(),
+            &[],
+            &PolicyContext::default(),
+            true,
+            &pin,
+            Arc::new(AtomicBool::new(false)),
+        );
+        assert_eq!(result.status, ExecutionStatus::Success);
+        assert!(result.stdout.contains("pinned-fixture"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_executable_pin_denies_owned_fixture_write_and_replace() {
+        let path = std::env::temp_dir().join(format!(
+            "toolhub-pin-owned-{}-{}.bin",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        std::fs::write(&path, "owned bytes").unwrap();
+        let pin = ExecutablePin::open(&path).unwrap();
+        assert!(std::fs::OpenOptions::new().write(true).open(&path).is_err());
+        assert!(std::fs::rename(&path, path.with_extension("replaced")).is_err());
+        drop(pin);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn approval_rejects_missing_identity_legacy_digest_and_changed_optional_stdin() {
+        let mut request = fixture_request("pass", 3000, 64);
+        let agent = toolhub_core::AgentId::new("caller.fixture").unwrap();
+        request.agent_id = Some(agent.clone());
+        let env = digest_map(&BTreeMap::new());
+        let policy = digest_strings(&["context".into()]);
+        let approval = build_approval(
+            "a",
+            agent,
+            "session",
+            &request,
+            "hash",
+            &request.executable,
+            &env,
+            &policy,
+            300,
+        );
+        let validate = |a: &ExecutionApproval, r: &ExecutionRequest| {
+            validate_approval(
+                a,
+                r,
+                "hash",
+                &r.executable,
+                &r.args,
+                r.cwd.as_deref(),
+                r.stdin.as_deref(),
+                &env,
+                &policy,
+                chrono::Utc::now(),
+            )
+        };
+        assert!(validate(&approval, &request).is_ok());
+        request.stdin = Some(String::new());
+        assert!(validate(&approval, &request).is_err());
+        request.stdin = None;
+        request.agent_id = None;
+        assert!(validate(&approval, &request).is_err());
+        request.agent_id = Some(approval.agent_id.clone());
+        let mut legacy = approval;
+        legacy.args_digest = legacy.args_digest.trim_start_matches("v2:").into();
+        assert!(validate(&legacy, &request).is_err());
+    }
+
+    #[test]
+    fn owned_descendant_is_terminated_on_normal_exit_and_timeout() {
+        for parent in ["", "; time.sleep(2)"] {
+            let marker = std::env::temp_dir().join(format!(
+                "toolhub-owned-job-{}-{}.txt",
+                std::process::id(),
+                chrono::Utc::now().timestamp_nanos_opt().unwrap()
+            ));
+            let child = format!(
+                "import time,pathlib; time.sleep(0.8); pathlib.Path({}).write_text('alive')",
+                serde_json::to_string(&marker.to_string_lossy()).unwrap()
+            );
+            let script = format!(
+                "import subprocess,sys,time; subprocess.Popen([sys.executable,'-c',{}]){parent}",
+                serde_json::to_string(&child).unwrap()
+            );
+            let result = execute(
+                &fixture_request(&script, 300, 1024),
+                &PolicyEngine::default(),
+                &[],
+                &PolicyContext::default(),
+                true,
+            );
+            assert_eq!(
+                result.status,
+                if parent.is_empty() {
+                    ExecutionStatus::Success
+                } else {
+                    ExecutionStatus::TimedOut
+                }
+            );
+            std::thread::sleep(Duration::from_millis(950));
+            assert!(!marker.exists(), "owned descendant survived job close");
+        }
     }
 
     #[test]

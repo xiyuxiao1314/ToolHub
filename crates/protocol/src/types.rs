@@ -14,20 +14,36 @@ pub struct StatusResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchHit {
+    pub id: String,
     pub definition_id: String,
     pub name: String,
-    pub instance_count: usize,
-    pub capabilities: Vec<String>,
+    pub version: Option<String>,
+    pub path: String,
+    pub canonical_path: Option<String>,
+    pub environment_id: Option<String>,
     pub trust: String,
+    pub status: String,
+    pub arch: String,
+    pub platform: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResolveResult {
     pub capability: String,
-    pub canonical_capability: String,
+    pub canonical: String,
     pub selected: Option<ResolvedInstance>,
     pub alternatives: Vec<ResolvedInstance>,
     pub explanation: String,
+    pub error: Option<String>,
+    pub eligibility_error: Option<String>,
+    pub rejected: Vec<RejectedCandidate>,
+    pub fallback_allowed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RejectedCandidate {
+    pub candidate: ResolvedInstance,
+    pub reasons: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,16 +55,23 @@ pub struct ResolvedInstance {
     pub path: String,
     pub environment: Option<String>,
     pub trust: String,
-    pub score: f64,
+    pub arch: String,
+    pub cwd_match: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecuteParams {
     pub capability: Option<String>,
     pub instance_id: Option<String>,
+    #[serde(default)]
     pub args: Vec<String>,
     pub cwd: Option<String>,
     pub approval_id: Option<String>,
+    pub session_id: Option<String>,
+    pub execution_id: Option<String>,
+    pub timeout_ms: Option<u64>,
+    pub max_output_bytes: Option<u64>,
+    pub stdin: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

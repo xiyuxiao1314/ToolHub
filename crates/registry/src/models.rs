@@ -12,6 +12,29 @@ pub struct InstanceRow {
     pub environment_id: Option<String>,
     pub trust: String,
     pub status: String,
+    pub arch: String,
+    pub platform: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ScanInstanceInput {
+    pub instance: UpsertInstanceInput,
+    pub evidence: Vec<toolhub_core::Evidence>,
+    pub interfaces: Vec<ScanInterfaceInput>,
+    pub provider: String,
+    pub root: String,
+}
+#[derive(Debug, Clone)]
+pub struct ScanInterfaceInput {
+    pub kind: String,
+    pub executable: Option<String>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReconcileScope {
+    pub provider: String,
+    pub root: String,
+    pub complete: bool,
+    pub recursive: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

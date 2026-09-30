@@ -1,1 +1,1 @@
-{}
+{"main":{"identifier":"main","description":"Local ToolHub window can call only its RPC and version bridges.","local":true,"windows":["main"],"permissions":["allow-rpc","allow-app-versions"]}}

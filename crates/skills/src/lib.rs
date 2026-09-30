@@ -2,7 +2,7 @@
 
 use toolhub_core::{SkillManifest, SkillRequirement};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct SkillAvailability {
     pub skill: SkillManifest,
     pub requires: Vec<SkillRequirement>,
@@ -19,7 +19,9 @@ pub fn resolve_availability(
     let mut all_ok = true;
     for req in &skill.requires {
         let cap = req.capability.as_str();
-        let found = providers.iter().find(|(c, _)| c == cap || c.ends_with(cap));
+        let found = providers.iter().find(|(c, version)| {
+            c == cap && version_matches(req.version.as_deref(), version.as_deref())
+        });
         let satisfied = match found {
             Some((_, ver)) => match (&req.version, ver) {
                 (Some(constraint), Some(v)) => toolhub_core::VersionConstraint::parse(constraint)
@@ -51,7 +53,9 @@ pub fn resolve_availability(
     let mut optional = vec![];
     for req in &skill.optional {
         let cap = req.capability.as_str();
-        let found = providers.iter().find(|(c, _)| c == cap);
+        let found = providers.iter().find(|(c, version)| {
+            c == cap && version_matches(req.version.as_deref(), version.as_deref())
+        });
         optional.push(SkillRequirement {
             requirement: req.clone(),
             satisfied: found.is_some(),
@@ -84,6 +88,12 @@ pub fn load_skill_dir(dir: &std::path::Path) -> Result<SkillManifest, String> {
     let v: serde_json::Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
     let m = SkillManifest::parse_yaml_like(&v).map_err(|e| e.to_string())?;
     m.assert_safe_paths().map_err(|e| e.to_string())?;
+    for path in [&m.instruction_file, &m.mcp_config, &m.package_path]
+        .into_iter()
+        .flatten()
+    {
+        SkillManifest::resolve_package_path(dir, path).map_err(|e| e.to_string())?;
+    }
     // Registration must not execute hooks/installers — we only read files.
     if dir.join("install.sh").exists() || dir.join("hooks").exists() {
         return Err("skill package contains installer/hook payload; refusing to register".into());
@@ -91,10 +101,86 @@ pub fn load_skill_dir(dir: &std::path::Path) -> Result<SkillManifest, String> {
     Ok(m)
 }
 
+fn version_matches(constraint: Option<&str>, version: Option<&str>) -> bool {
+    match constraint {
+        None => true,
+        Some(c) => toolhub_core::VersionConstraint::parse(c)
+            .map(|c| version.is_some_and(|v| c.matches(v)))
+            .unwrap_or(false),
+    }
+}
+
+/// Skills use the same eligibility and ranking as direct capability requests.
+pub fn resolve_availability_with_resolver(
+    skill: &SkillManifest,
+    registry: &toolhub_core::CapabilityRegistry,
+    providers: &std::collections::BTreeMap<String, Vec<toolhub_resolver::CandidateInstance>>,
+    prefs: &toolhub_resolver::ResolvePrefs,
+) -> SkillAvailability {
+    let resolve_requirement = |req: &toolhub_core::CapabilityRequirement| {
+        let canonical = registry
+            .canonical_of(req.capability.as_str())
+            .unwrap_or(req.capability.as_str());
+        let outcome = toolhub_resolver::resolve(
+            registry,
+            req,
+            providers.get(canonical).cloned().unwrap_or_default(),
+            prefs,
+        );
+        SkillRequirement {
+            requirement: req.clone(),
+            satisfied: outcome.selected.is_some(),
+            provider: outcome.selected.map(|c| c.instance_id),
+            note: if outcome.error.is_some() {
+                Some(outcome.explanation)
+            } else {
+                None
+            },
+        }
+    };
+    let requires: Vec<_> = skill.requires.iter().map(resolve_requirement).collect();
+    let optional = skill.optional.iter().map(resolve_requirement).collect();
+    let status = if requires.iter().all(|r| r.satisfied) {
+        toolhub_core::SkillStatus::Available
+    } else {
+        toolhub_core::SkillStatus::MissingCapabilities
+    };
+    SkillAvailability {
+        skill: skill.clone(),
+        requires,
+        optional,
+        status,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use toolhub_core::{CapabilityId, CapabilityRequirement};
+
+    #[test]
+    fn optional_requirement_checks_version_and_exact_capability() {
+        let mut skill = SkillManifest::validate_json(
+            &serde_json::json!({"schema":"toolhub.skill/v1","id":"x.y","name":"X"}),
+        )
+        .unwrap();
+        skill.optional.push(CapabilityRequirement {
+            capability: CapabilityId::new("language.python.execute").unwrap(),
+            version: Some(">=999".into()),
+            optional: true,
+        });
+        let result = resolve_availability(
+            &skill,
+            &[("language.python.execute".into(), Some("3.13".into()))],
+        );
+        assert!(!result.optional[0].satisfied);
+        skill.requires = skill.optional.clone();
+        let result = resolve_availability(
+            &skill,
+            &[("bogus.language.python.execute".into(), Some("999".into()))],
+        );
+        assert!(!result.requires[0].satisfied);
+    }
 
     #[test]
     fn missing_dependency_is_useful() {

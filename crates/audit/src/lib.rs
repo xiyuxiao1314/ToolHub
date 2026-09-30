@@ -34,15 +34,18 @@ impl AuditRecord {
         status: &str,
         approval_id: Option<&str>,
     ) -> Self {
-        let cwd_redacted = cwd.map(toolhub_executor::redact_text);
+        let cwd_redacted = cwd.map(|s| redact_path_for_export(&toolhub_executor::redact_text(s)));
         Self {
             id: uuid_like(),
             ts: chrono::Utc::now(),
             agent_id: agent_id.map(|s| s.to_string()),
             instance_id: instance_id.map(|s| s.to_string()),
             capability: capability.map(|s| s.to_string()),
-            executable: executable.to_string(),
-            args_redacted: toolhub_executor::redact_args(args),
+            executable: redact_path_for_export(&toolhub_executor::redact_text(executable)),
+            args_redacted: toolhub_executor::redact_args(args)
+                .iter()
+                .map(|a| redact_path_for_export(&toolhub_executor::redact_text(a)))
+                .collect(),
             cwd_redacted,
             duration_ms,
             exit_code,
@@ -101,5 +104,28 @@ mod tests {
         );
         assert!(!a.stdout_stored);
         assert_eq!(a.args_redacted.len(), 2);
+    }
+
+    #[test]
+    fn audit_redacts_private_paths_in_executable_cwd_and_arguments() {
+        let home = std::env::var("USERPROFILE")
+            .or_else(|_| std::env::var("HOME"))
+            .unwrap();
+        let private = format!("{home}/private-fixture/x.exe");
+        let record = AuditRecord::from_execution(
+            None,
+            None,
+            None,
+            &private,
+            &[private.clone(), "-t".into(), "opaque-value".into()],
+            Some(&private),
+            0,
+            None,
+            "denied",
+            None,
+        );
+        let json = serde_json::to_string(&record).unwrap();
+        assert!(!json.contains(&home.replace('\\', "\\\\")));
+        assert!(!json.contains("opaque-value"));
     }
 }

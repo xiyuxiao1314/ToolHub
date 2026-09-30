@@ -7,6 +7,9 @@ fn toolhubd_bin() -> String {
     std::env::var("TOOLHUBD_BIN").unwrap_or_else(|_| {
         let mut p = std::env::current_exe().unwrap();
         p.pop();
+        if p.ends_with("deps") {
+            p.pop();
+        }
         p.push(if cfg!(windows) {
             "toolhubd.exe"
         } else {
@@ -22,8 +25,6 @@ fn daemon_ping_status_roundtrip() {
     let db = dir.path().join("r.sqlite");
     let mut child = Command::new(toolhubd_bin())
         .env("TOOLHUB_REGISTRY", &db)
-        .env("TOOLHUB_PRINCIPAL", "local.admin")
-        .env("TOOLHUB_ADMIN", "1")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -92,8 +93,6 @@ fn two_clients_share_registry_via_stdio_daemon() {
     let call = |method: &str, params: &str| -> String {
         let mut child = Command::new(toolhubd_bin())
             .env("TOOLHUB_REGISTRY", &db)
-            .env("TOOLHUB_PRINCIPAL", "local.admin")
-            .env("TOOLHUB_ADMIN", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -130,7 +129,6 @@ fn approve_requires_admin() {
     let db = dir.path().join("admin.sqlite");
     let mut child = Command::new(toolhubd_bin())
         .env("TOOLHUB_REGISTRY", &db)
-        .env("TOOLHUB_PRINCIPAL", "pipe.conn.anon")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -141,7 +139,7 @@ fn approve_requires_admin() {
     let mut reader = BufReader::new(stdout);
     writeln!(
         stdin,
-        r#"{{"jsonrpc":"2.0","id":1,"method":"execute.approve","params":{{"instance_id":"x","args":[]}}}}"#
+        r#"{{"jsonrpc":"2.0","id":1,"method":"execute.approve","params":{{"request_id":"x"}}}}"#
     )
     .unwrap();
     stdin.flush().unwrap();

@@ -1,9 +1,12 @@
-//! Local IPC framing for ToolHub Protocol JSON-RPC over stdio / named pipes / unix sockets.
-//! No default public listener.
-
+//! Authenticated local IPC and shared daemon client.
+use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
-
+use std::path::{Path, PathBuf};
 use toolhub_protocol::{JsonRpcRequest, JsonRpcResponse, ProtocolError};
+mod client;
+mod platform;
+pub use client::RpcClient;
+pub use platform::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum IpcError {
@@ -16,10 +19,8 @@ pub enum IpcError {
     #[error("{0}")]
     Message(String),
 }
-
 pub type IpcResult<T> = Result<T, IpcError>;
 
-/// Length-prefixed JSON frames: 4-byte BE length + UTF-8 JSON.
 pub fn write_frame(w: &mut impl Write, value: &impl serde::Serialize) -> IpcResult<()> {
     let bytes = serde_json::to_vec(value)?;
     if bytes.len() > toolhub_protocol::limits::MAX_REQUEST_BYTES {
@@ -30,18 +31,14 @@ pub fn write_frame(w: &mut impl Write, value: &impl serde::Serialize) -> IpcResu
     w.flush()?;
     Ok(())
 }
-
 pub fn read_frame(r: &mut impl Read) -> IpcResult<Vec<u8>> {
     let mut len = [0u8; 4];
     match r.read_exact(&mut len) {
         Ok(()) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-            return Err(IpcError::Closed);
-        }
+        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Err(IpcError::Closed),
         Err(e) => return Err(e.into()),
     }
     let n = u32::from_be_bytes(len) as usize;
-    // R2-B07: enforce size bound before allocation
     if n > toolhub_protocol::limits::MAX_REQUEST_BYTES {
         return Err(IpcError::Message("payload_too_large".into()));
     }
@@ -49,131 +46,131 @@ pub fn read_frame(r: &mut impl Read) -> IpcResult<Vec<u8>> {
     r.read_exact(&mut buf)?;
     Ok(buf)
 }
-
 pub fn read_request(r: &mut impl Read) -> IpcResult<JsonRpcRequest> {
-    let buf = read_frame(r)?;
-    Ok(serde_json::from_slice(&buf)?)
+    Ok(serde_json::from_slice(&read_frame(r)?)?)
 }
-
 pub fn read_response(r: &mut impl Read) -> IpcResult<JsonRpcResponse> {
-    let buf = read_frame(r)?;
-    Ok(serde_json::from_slice(&buf)?)
+    Ok(serde_json::from_slice(&read_frame(r)?)?)
 }
 
-/// Peer authentication is transport-based; agent-name strings are not credentials.
+/// Every server transport shares the encoded response cap, including JSON escaping overhead.
+pub fn serialize_response(response:&JsonRpcResponse)->IpcResult<Vec<u8>> {
+    let bytes=serde_json::to_vec(response)?;
+    if bytes.len()<=toolhub_protocol::limits::MAX_REQUEST_BYTES {return Ok(bytes);}
+    Ok(serde_json::to_vec(&error_response(response.id.clone(),&ProtocolError::new(toolhub_protocol::ErrorCode::PayloadTooLarge,"encoded response exceeds byte limit")))?)
+}
+pub fn write_response_frame(writer:&mut impl Write,response:&JsonRpcResponse)->IpcResult<()> {
+    let bytes=serialize_response(response)?;
+    writer.write_all(&(bytes.len() as u32).to_be_bytes())?;writer.write_all(&bytes)?;writer.flush()?;Ok(())
+}
+
+/// Reads one line without allocating beyond the wire limit. Oversized lines are drained.
+pub fn read_bounded_line(r: &mut impl std::io::BufRead) -> IpcResult<Option<Vec<u8>>> {
+    let mut line = Vec::new();
+    let mut exceeded = false;
+    loop {
+        let available = r.fill_buf()?;
+        if available.is_empty() {
+            if line.is_empty() && !exceeded {
+                return Ok(None);
+            }
+            break;
+        }
+        let end = available
+            .iter()
+            .position(|b| *b == b'\n')
+            .map(|i| i + 1)
+            .unwrap_or(available.len());
+        if !exceeded && line.len() + end <= toolhub_protocol::limits::MAX_REQUEST_BYTES {
+            line.extend_from_slice(&available[..end]);
+        } else {
+            exceeded = true;
+        }
+        let finished = available[end - 1] == b'\n';
+        r.consume(end);
+        if finished {
+            break;
+        }
+    }
+    if exceeded {
+        return Err(IpcError::Message("payload_too_large".into()));
+    }
+    Ok(Some(line))
+}
+
 #[derive(Debug, Clone)]
 pub struct PeerIdentity {
-    pub transport: TransportKind,
-    pub peer_ok: bool,
-    pub note: String,
+    pub principal: String,
+    pub image: PathBuf,
 }
-
-#[derive(Debug, Clone, Copy)]
-pub enum TransportKind {
-    Stdio,
-    NamedPipe,
-    UnixSocket,
-}
-
 impl PeerIdentity {
-    pub fn local_stdio() -> Self {
-        Self {
-            transport: TransportKind::Stdio,
-            peer_ok: true,
-            note: "stdin/stdout inherits caller process boundary".into(),
-        }
+    pub fn local_stdio() -> IpcResult<Self> {
+        Ok(Self {
+            principal: current_principal()?,
+            image: std::env::current_exe()?,
+        })
+    }
+    pub fn caller_principal(&self) -> IpcResult<String> {
+        let image = self.image.canonicalize()?;
+        Ok(format!(
+            "{}:image:{}:{}",
+            self.principal,
+            hex::encode(Sha256::digest(image.to_string_lossy().as_bytes())),
+            hex::encode(image_hash(&image)?)
+        ))
     }
 }
 
-pub fn daemon_socket_name() -> String {
-    if cfg!(windows) {
-        r"\\.\pipe\toolhubd".to_string()
-    } else {
-        "/tmp/toolhubd.sock".to_string()
+/// Only the authenticated same-user process at the pinned canonical path and digest is a controller.
+#[derive(Clone)]
+pub struct ControllerImage {
+    path: PathBuf,
+    digest: [u8; 32],
+}
+impl ControllerImage {
+    pub fn pin(path: &Path) -> IpcResult<Self> {
+        Ok(Self {
+            path: path.canonicalize()?,
+            digest: image_hash(path)?,
+        })
+    }
+    pub fn verify(&self, peer: &PeerIdentity) -> IpcResult<bool> {
+        Ok(peer.principal == current_principal()?
+            && peer.image.canonicalize()? == self.path
+            && image_hash(&peer.image)? == self.digest
+            && image_hash(&self.path)? == self.digest)
     }
 }
-
-/// F11: user-scoped named pipe endpoint (Windows). Rejects default public listeners.
-#[cfg(windows)]
-pub fn user_scoped_pipe_name() -> String {
-    let user = std::env::var("USERNAME").unwrap_or_else(|_| "user".into());
-    format!(r"\\.\pipe\toolhubd-{user}")
-}
-
-/// F11/R2-B02: create a named pipe instance and wait for one client (ConnectNamedPipe).
-#[cfg(windows)]
-pub fn accept_named_pipe(name: &str) -> IpcResult<std::fs::File> {
-    use std::os::windows::io::FromRawHandle;
-    use windows_sys::Win32::Foundation::{FALSE, INVALID_HANDLE_VALUE};
-    use windows_sys::Win32::System::Pipes::{
-        ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe,
-    };
-
-    const PIPE_ACCESS_DUPLEX: u32 = 0x3;
-    const PIPE_TYPE_BYTE: u32 = 0x0;
-    const PIPE_READMODE_BYTE: u32 = 0x0;
-    const PIPE_WAIT: u32 = 0x0;
-    const PIPE_UNLIMITED_INSTANCES: u32 = 255;
-
-    let wide: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
-    unsafe {
-        let handle = CreateNamedPipeW(
-            wide.as_ptr(),
-            PIPE_ACCESS_DUPLEX,
-            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
-            PIPE_UNLIMITED_INSTANCES,
-            65536,
-            65536,
-            0,
-            std::ptr::null_mut(),
-        );
-        if handle == INVALID_HANDLE_VALUE {
-            return Err(IpcError::Message("create_named_pipe failed".into()));
+pub(crate) fn image_hash(path: &Path) -> IpcResult<[u8; 32]> {
+    let mut file = std::fs::File::open(path)?;
+    let mut hash = Sha256::new();
+    let mut buf = [0u8; 65536];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
         }
-        // Block until a client connects.
-        let ok = ConnectNamedPipe(handle, std::ptr::null_mut());
-        // ERROR_PIPE_CONNECTED (535) means client already connected.
-        let err = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
-        if ok == FALSE && err != 535 {
-            let _ = DisconnectNamedPipe(handle);
-            return Err(IpcError::Message(format!("ConnectNamedPipe failed: {err}")));
-        }
-        Ok(std::fs::File::from_raw_handle(handle as *mut _))
+        hash.update(&buf[..n]);
     }
+    Ok(hash.finalize().into())
 }
-
-/// Backward-compatible name used by older call sites.
-#[cfg(windows)]
-pub fn create_named_pipe(name: &str) -> IpcResult<std::fs::File> {
-    accept_named_pipe(name)
+pub(crate) fn namespace() -> String {
+    let registry = std::env::var_os("TOOLHUB_REGISTRY").map(PathBuf::from);
+    let key = registry
+        .map(|p| {
+            if p.is_absolute() {
+                p
+            } else {
+                std::env::current_dir().unwrap_or_default().join(p)
+            }
+            .to_string_lossy()
+            .into_owned()
+        })
+        .unwrap_or_else(|| "default".into());
+    #[cfg(windows)]
+    let key = key.replace('/', "\\").to_lowercase();
+    hex::encode(Sha256::digest(key.as_bytes()))[..16].to_string()
 }
-
-/// F11: connect to an existing named pipe as a client.
-#[cfg(windows)]
-pub fn connect_named_pipe(name: &str) -> IpcResult<std::fs::File> {
-    use std::os::windows::io::FromRawHandle;
-    use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
-    use windows_sys::Win32::Storage::FileSystem::{
-        CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_READ, FILE_GENERIC_WRITE, OPEN_EXISTING,
-    };
-    let wide: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
-    unsafe {
-        let handle = CreateFileW(
-            wide.as_ptr(),
-            FILE_GENERIC_READ | FILE_GENERIC_WRITE,
-            0,
-            std::ptr::null(),
-            OPEN_EXISTING,
-            FILE_ATTRIBUTE_NORMAL,
-            std::ptr::null_mut(),
-        );
-        if handle == INVALID_HANDLE_VALUE {
-            return Err(IpcError::Message("connect_named_pipe failed".into()));
-        }
-        Ok(std::fs::File::from_raw_handle(handle as *mut _))
-    }
-}
-
 pub fn error_response(id: Option<serde_json::Value>, err: &ProtocolError) -> JsonRpcResponse {
     JsonRpcResponse {
         jsonrpc: "2.0".into(),
@@ -182,25 +179,9 @@ pub fn error_response(id: Option<serde_json::Value>, err: &ProtocolError) -> Jso
         error: Some(toolhub_protocol::JsonRpcErrorObject {
             code: err.code.rpc_code(),
             message: err.message.clone(),
-            data: Some(serde_json::json!({
-                "error_code": err.code.as_str(),
-                "fallback_allowed": err.fallback_allowed,
-            })),
+            data: Some(
+                serde_json::json!({"error_code":err.code.as_str(),"fallback_allowed":err.fallback_allowed}),
+            ),
         }),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn frame_roundtrip() {
-        let mut buf = Vec::new();
-        let req = JsonRpcRequest::new(1, "ping", serde_json::json!({}));
-        write_frame(&mut buf, &req).unwrap();
-        let mut cur = std::io::Cursor::new(buf);
-        let back = read_request(&mut cur).unwrap();
-        assert_eq!(back.method, "ping");
     }
 }

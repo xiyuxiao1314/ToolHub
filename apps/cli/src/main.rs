@@ -1,7 +1,7 @@
 //! toolhub CLI — daemon client with structured --json output.
 
-use std::io::{BufRead, BufReader, Write};
-use std::process::{Command, Stdio};
+use std::io::{BufReader, Write};
+use toolhub_ipc::RpcClient as DaemonClient;
 
 use clap::{Parser, Subcommand};
 use serde_json::{json, Value};
@@ -24,11 +24,25 @@ enum Commands {
     Scan {
         #[arg(long, default_value = "quick")]
         mode: String,
+        #[arg(long)]
+        roots: Vec<String>,
+        #[arg(long)]
+        scan_id: Option<String>,
+    },
+    ScanStatus {
+        scan_id: String,
+    },
+    ScanCancel {
+        scan_id: String,
     },
     /// Search tools
-    Search { query: String },
+    Search {
+        query: String,
+    },
     /// Inspect a tool instance
-    Inspect { id: String },
+    Inspect {
+        id: String,
+    },
     /// List environments
     Env {
         #[command(subcommand)]
@@ -41,6 +55,8 @@ enum Commands {
         capability: String,
         #[arg(long)]
         version: Option<String>,
+        #[arg(long)]
+        preferred_environment: Option<String>,
     },
     /// Execute a tool under policy
     Exec {
@@ -49,12 +65,45 @@ enum Commands {
         args: Vec<String>,
         #[arg(long)]
         approval_id: Option<String>,
+        #[arg(long)]
+        session_id: Option<String>,
+        #[arg(long)]
+        execution_id: Option<String>,
+        #[arg(long)]
+        cwd: Option<String>,
     },
     /// Approve a pending execution
     Approve {
+        request_id: String,
+    },
+    /// Submit an execution for review by the desktop controller
+    RequestApproval {
         instance_id: String,
+        #[arg(long)]
+        session_id: Option<String>,
+        #[arg(long)]
+        cwd: Option<String>,
         #[arg(last = true)]
         args: Vec<String>,
+    },
+    /// Import a declarative machine report
+    Import {
+        path: std::path::PathBuf,
+    },
+    /// Recent audit activity
+    Activity,
+    /// Typed SDK bridge; parameters are a bounded JSON object on stdin
+    Rpc {
+        method: String,
+    },
+    /// Persisted preferences
+    Settings {
+        #[command(subcommand)]
+        cmd: SettingsCmd,
+    },
+    /// Cancel an owned execution by operation ID
+    Cancel {
+        execution_id: String,
     },
     /// Skill queries
     Skill {
@@ -99,6 +148,8 @@ enum EnvCmd {
 enum SkillCmd {
     List,
     Inspect { id: String },
+    Register { path: std::path::PathBuf },
+    Resolve { id: String },
 }
 
 #[derive(Subcommand)]
@@ -114,11 +165,32 @@ enum DiscoveryCmd {
     Revoke {
         id: String,
     },
+    Classify {
+        session_id: String,
+        path: std::path::PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
 enum AgentCmd {
     List,
+    Launch {
+        agent_id: String,
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+    Status {
+        operation_id: String,
+    },
+    Cancel {
+        operation_id: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum SettingsCmd {
+    Get,
+    Set { path: std::path::PathBuf },
 }
 
 #[derive(Subcommand)]
@@ -167,71 +239,159 @@ fn main() {
 }
 
 fn run(cli: &Cli) -> anyhow::Result<()> {
-    let mut client = DaemonClient::connect()?;
+    let mut client = DaemonClient::connect_or_start(&daemon_bin())?;
 
     let result = match &cli.command {
-        Commands::Status => client.call("status", json!({}))?,
-        Commands::Scan { mode } => client.call("scan.start", json!({"mode": mode}))?,
-        Commands::Search { query } => client.call("registry.search", json!({"query": query}))?,
-        Commands::Inspect { id } => client.call("registry.inspect_instance", json!({"id": id}))?,
-        Commands::Env { cmd: EnvCmd::List } => client.call("environment.list", json!({}))?,
-        Commands::Duplicates => client.call("environment.duplicates", json!({}))?,
+        Commands::Status => call(&mut client, "status", json!({}))?,
+        Commands::Scan {
+            mode,
+            roots,
+            scan_id,
+        } => call(
+            &mut client,
+            "scan.start",
+            json!({"mode": mode,"roots":if roots.is_empty(){None}else{Some(roots)},"scan_session_id":scan_id}),
+        )?,
+        Commands::ScanStatus { scan_id } => {
+            call(&mut client, "scan.status", json!({"scan_session_id":scan_id}))?
+        }
+        Commands::ScanCancel { scan_id } => {
+            call(&mut client, "scan.cancel", json!({"scan_session_id":scan_id}))?
+        }
+        Commands::Search { query } => {
+            call(&mut client, "registry.search", json!({"query": query}))?
+        }
+        Commands::Inspect { id } => {
+            call(&mut client, "registry.inspect_instance", json!({"id": id}))?
+        }
+        Commands::Env { cmd: EnvCmd::List } => call(&mut client, "environment.list", json!({}))?,
+        Commands::Duplicates => call(&mut client, "environment.duplicates", json!({}))?,
         Commands::Resolve {
             capability,
             version,
-        } => client.call(
+            preferred_environment,
+        } => call(
+            &mut client,
             "resolve.capability",
-            json!({"capability": capability, "version": version}),
+            json!({"capability": capability, "version": version, "preferred_environment": preferred_environment}),
         )?,
         Commands::Exec {
             instance_id,
             args,
             approval_id,
-        } => client.call(
+            session_id,
+            execution_id,
+            cwd,
+        } => call(
+            &mut client,
             "execute.tool",
-            json!({"instance_id": instance_id, "args": args, "approval_id": approval_id}),
+            json!({"instance_id": instance_id, "args": args, "approval_id": approval_id, "session_id": session_id, "execution_id": execution_id, "cwd": cwd}),
         )?,
-        Commands::Approve { instance_id, args } => client.call(
+        Commands::Approve { request_id } => call(
+            &mut client,
             "execute.approve",
-            json!({"instance_id": instance_id, "args": args}),
+            json!({"request_id": request_id}),
         )?,
+        Commands::RequestApproval {
+            instance_id,
+            args,
+            session_id,
+            cwd,
+        } => call(
+            &mut client,
+            "execute.approval_request",
+            json!({"instance_id":instance_id,"args":args,"session_id":session_id,"cwd":cwd}),
+        )?,
+        Commands::Cancel { execution_id } => call(
+            &mut client,
+            "execute.cancel",
+            json!({"execution_id":execution_id}),
+        )?,
+        Commands::Import { path } => call(
+            &mut client,
+            "import.report",
+            json!({"report":read_json(path)?}),
+        )?,
+        Commands::Activity => call(&mut client, "activity.list", json!({}))?,
+        Commands::Rpc { method } => {
+            let mut reader = BufReader::new(std::io::stdin());
+            let bytes = toolhub_ipc::read_bounded_line(&mut reader)?
+                .ok_or_else(|| anyhow::anyhow!("invalid_params: JSON input required"))?;
+            let params: Value = serde_json::from_slice(&bytes)?;
+            call(&mut client, method, params)?
+        }
+        Commands::Settings { cmd } => match cmd {
+            SettingsCmd::Get => call(&mut client, "settings.get", json!({}))?,
+            SettingsCmd::Set { path } => call(&mut client, "settings.set", read_json(path)?)?,
+        },
         Commands::Skill { cmd } => match cmd {
-            SkillCmd::List => client.call("skill.list", json!({}))?,
-            SkillCmd::Inspect { id } => client.call("skill.inspect", json!({"id": id}))?,
+            SkillCmd::List => call(&mut client, "skill.list", json!({}))?,
+            SkillCmd::Inspect { id } => call(&mut client, "skill.inspect", json!({"id": id}))?,
+            SkillCmd::Register { path } => {
+                call(&mut client, "skill.register", json!({"path":path}))?
+            }
+            SkillCmd::Resolve { id } => call(&mut client, "skill.resolve", json!({"id":id}))?,
         },
         Commands::Discovery { cmd } => match cmd {
-            DiscoveryCmd::Start { agent_id } => client.call(
+            DiscoveryCmd::Start { agent_id } => call(
+                &mut client,
                 "discovery.start",
                 json!({"agent_id": agent_id.clone().unwrap_or_else(|| "local.agent".into())}),
             )?,
-            DiscoveryCmd::List => client.call("discovery.list", json!({}))?,
-            DiscoveryCmd::Inspect { id } => client.call("discovery.inspect", json!({"id": id}))?,
+            DiscoveryCmd::List => call(&mut client, "discovery.list", json!({}))?,
+            DiscoveryCmd::Inspect { id } => {
+                call(&mut client, "discovery.inspect", json!({"id": id}))?
+            }
             DiscoveryCmd::Revoke { id } => {
-                client.call("discovery.revoke", json!({"session_id": id}))?
+                call(&mut client, "discovery.revoke", json!({"session_id": id}))?
+            }
+            DiscoveryCmd::Classify { session_id, path } => {
+                let mut value = read_json(path)?;
+                value
+                    .as_object_mut()
+                    .ok_or_else(|| anyhow::anyhow!("classification must be object"))?
+                    .insert("session_id".into(), json!(session_id));
+                call(&mut client, "discovery.classify", value)?
             }
         },
-        Commands::Agent {
-            cmd: AgentCmd::List,
-        } => client.call("agent.list", json!({}))?,
+        Commands::Agent { cmd } => match cmd {
+            AgentCmd::List => call(&mut client, "agent.list", json!({}))?,
+            AgentCmd::Launch { agent_id, args } => call(
+                &mut client,
+                "agent.launch",
+                json!({"agent_id":agent_id,"args":args}),
+            )?,
+            AgentCmd::Status { operation_id } => call(
+                &mut client,
+                "agent.status",
+                json!({"operation_id":operation_id}),
+            )?,
+            AgentCmd::Cancel { operation_id } => call(
+                &mut client,
+                "agent.cancel",
+                json!({"operation_id":operation_id}),
+            )?,
+        },
         Commands::Policy { cmd } => match cmd {
-            PolicyCmd::Get => client.call("policy.get", json!({}))?,
+            PolicyCmd::Get => call(&mut client, "policy.get", json!({}))?,
             PolicyCmd::Set {
                 scope,
                 subject,
                 action,
-            } => client.call(
+            } => call(
+                &mut client,
                 "policy.set",
                 json!({"scope": scope, "subject": subject, "action": action}),
             )?,
         },
         Commands::Export { format } => {
-            let v = client.call("export.report", json!({"format": format}))?;
+            let v = call(&mut client, "export.report", json!({"format": format}))?;
             println!("{}", serde_json::to_string_pretty(&v)?);
             return Ok(());
         }
         Commands::Doctor => {
-            let st = client.call("status", json!({}))?;
-            let agents = client.call("agent.list", json!({})).unwrap_or(json!([]));
+            let st = call(&mut client, "status", json!({}))?;
+            let agents = call(&mut client, "agent.list", json!({})).unwrap_or(json!([]));
             let out = json!({
                 "daemon": st,
                 "agents": agents,
@@ -296,104 +456,6 @@ fn run(cli: &Cli) -> anyhow::Result<()> {
     Ok(())
 }
 
-enum Transport {
-    SharedFile {
-        file: std::fs::File,
-        reader: BufReader<std::fs::File>,
-    },
-    Child {
-        child: std::process::Child,
-        stdin: std::process::ChildStdin,
-        reader: BufReader<std::process::ChildStdout>,
-    },
-}
-
-struct DaemonClient {
-    transport: Transport,
-    next_id: u64,
-}
-
-impl DaemonClient {
-    fn connect() -> anyhow::Result<Self> {
-        // R2-B02: prefer shared named-pipe service when present.
-        #[cfg(windows)]
-        {
-            if let Ok(file) = toolhub_ipc::connect_named_pipe(&toolhub_ipc::user_scoped_pipe_name())
-            {
-                let reader = BufReader::new(file.try_clone()?);
-                return Ok(Self {
-                    transport: Transport::SharedFile { file, reader },
-                    next_id: 1,
-                });
-            }
-        }
-        // Fallback: private stdio daemon (durable registry still shared by file).
-        let mut child = Command::new(daemon_bin())
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
-            .spawn()?;
-        let stdin = child.stdin.take().expect("stdin");
-        let stdout = child.stdout.take().expect("stdout");
-        Ok(Self {
-            transport: Transport::Child {
-                child,
-                stdin,
-                reader: BufReader::new(stdout),
-            },
-            next_id: 1,
-        })
-    }
-
-    fn call(&mut self, method: &str, params: Value) -> anyhow::Result<Value> {
-        let id = self.next_id;
-        self.next_id += 1;
-        let req = json!({"jsonrpc":"2.0","id":id,"method":method,"params":params});
-        let resp: Value = match &mut self.transport {
-            Transport::SharedFile { file, reader } => {
-                toolhub_ipc::write_frame(file, &req)?;
-                let framed = toolhub_ipc::read_response(reader)?;
-                serde_json::to_value(&framed)?
-            }
-            Transport::Child { stdin, reader, .. } => {
-                writeln!(stdin, "{}", serde_json::to_string(&req)?)?;
-                stdin.flush()?;
-                let mut line = String::new();
-                let n = reader.read_line(&mut line)?;
-                if n == 0 {
-                    anyhow::bail!("daemon closed connection");
-                }
-                serde_json::from_str(&line)?
-            }
-        };
-        if let Some(err) = resp.get("error") {
-            let code = err
-                .get("data")
-                .and_then(|d| d.get("error_code"))
-                .and_then(|c| c.as_str())
-                .unwrap_or("internal_error")
-                .to_string();
-            let msg = err
-                .get("message")
-                .and_then(|m| m.as_str())
-                .unwrap_or("error")
-                .to_string();
-            // F17: structured error without killing reusable clients (MCP).
-            return Err(anyhow::anyhow!("{code}: {msg}"));
-        }
-        Ok(resp.get("result").cloned().unwrap_or(Value::Null))
-    }
-}
-
-impl Drop for DaemonClient {
-    fn drop(&mut self) {
-        if let Transport::Child { child, .. } = &mut self.transport {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
-    }
-}
-
 fn daemon_bin() -> std::path::PathBuf {
     if let Ok(p) = std::env::var("TOOLHUBD_BIN") {
         return std::path::PathBuf::from(p);
@@ -426,137 +488,59 @@ fn exit_code_for(code: &str) -> i32 {
     }
 }
 
+fn read_json(path: &std::path::Path) -> anyhow::Result<Value> {
+    let file = std::fs::File::open(path)?;
+    if file.metadata()?.len() > toolhub_protocol::limits::MAX_REQUEST_BYTES as u64 {
+        anyhow::bail!("payload_too_large");
+    }
+    Ok(serde_json::from_reader(file)?)
+}
+
+fn call(
+    client: &mut DaemonClient,
+    method: &str,
+    mut params: Value,
+) -> toolhub_ipc::IpcResult<Value> {
+    // CLI optional flags are omitted from the wire when absent.
+    if let Some(object) = params.as_object_mut() {
+        object.retain(|_, value| !value.is_null());
+    }
+    client.call(method, params)
+}
 fn mcp_serve(client: &mut DaemonClient) -> anyhow::Result<()> {
-    // Bounded meta-tools over stdio JSON-RPC (MCP-compatible subset).
     let stdin = std::io::stdin();
+    let mut reader = BufReader::new(stdin.lock());
     let mut stdout = std::io::stdout();
-    for line in stdin.lock().lines() {
-        let line = line?;
-        if line.trim().is_empty() {
-            continue;
-        }
-        let req: Value = serde_json::from_str(&line)?;
-        let id = req.get("id").cloned();
-        let method = req.get("method").and_then(|m| m.as_str()).unwrap_or("");
-        let params = req.get("params").cloned().unwrap_or(json!({}));
-
-        // F13: notifications (no id) require no response
-        if id.is_none() {
-            continue;
-        }
-
-        let (result, is_error) = match method {
-            "initialize" => (
-                json!({
-                    "protocolVersion": params.get("protocolVersion").and_then(|v| v.as_str()).unwrap_or("2024-11-05"),
-                    "capabilities": {"tools": {"listChanged": false}},
-                    "serverInfo": {"name": "toolhub", "version": "0.1.0"}
-                }),
-                false,
-            ),
-            "notifications/initialized" | "initialized" | "notifications/cancelled" => {
-                continue;
-            }
-            "tools/list" => (
-                json!({
-                    "tools": [
-                        {"name":"search_tools","description":"Search installed tools by query","inputSchema":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}},
-                        {"name":"resolve_capability","description":"Resolve a capability","inputSchema":{"type":"object","properties":{"capability":{"type":"string"}},"required":["capability"]}},
-                        {"name":"inspect_tool","description":"Inspect one tool","inputSchema":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}},
-                        {"name":"list_environments","description":"List environments","inputSchema":{"type":"object","properties":{}}},
-                        {"name":"execute_tool","description":"Execute under policy","inputSchema":{"type":"object","properties":{"instance_id":{"type":"string"},"args":{"type":"array","items":{"type":"string"}},"approval_id":{"type":"string"}},"required":["instance_id"]}},
-                        {"name":"search_skills","description":"Search skills","inputSchema":{"type":"object","properties":{"query":{"type":"string"}}}},
-                        {"name":"inspect_skill","description":"Inspect skill","inputSchema":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}}
-                    ]
-                }),
-                false,
-            ),
-            "tools/call" => {
-                let name = params.get("name").and_then(|n| n.as_str()).unwrap_or("");
-                let args = params.get("arguments").cloned().unwrap_or(json!({}));
-                let call_result = (|| -> Result<Value, String> {
-                    Ok(match name {
-                        "search_tools" => {
-                            let q = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
-                            client
-                                .call("registry.search", json!({"query": q}))
-                                .map_err(|e| e.to_string())?
-                        }
-                        "resolve_capability" => {
-                            let c = args
-                                .get("capability")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("");
-                            client
-                                .call("resolve.capability", json!({"capability": c}))
-                                .map_err(|e| e.to_string())?
-                        }
-                        "inspect_tool" => {
-                            let id = args.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                            client
-                                .call("registry.inspect_instance", json!({"id": id}))
-                                .map_err(|e| e.to_string())?
-                        }
-                        "list_environments" => client
-                            .call("environment.list", json!({}))
-                            .map_err(|e| e.to_string())?,
-                        "execute_tool" => {
-                            let id = args
-                                .get("instance_id")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("");
-                            let a = args.get("args").cloned().unwrap_or(json!([]));
-                            let approval = args.get("approval_id").cloned();
-                            client
-                                .call(
-                                    "execute.tool",
-                                    json!({"instance_id": id, "args": a, "approval_id": approval}),
-                                )
-                                .map_err(|e| e.to_string())?
-                        }
-                        "search_skills" => client
-                            .call("skill.list", json!({}))
-                            .map_err(|e| e.to_string())?,
-                        "inspect_skill" => {
-                            let id = args.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                            client
-                                .call("skill.inspect", json!({"id": id}))
-                                .map_err(|e| e.to_string())?
-                        }
-                        other => return Err(format!("unknown tool {other}")),
-                    })
-                })();
-                match call_result {
-                    Ok(v) => (
-                        json!({"content":[{"type":"text","text": v.to_string()}], "isError": false}),
-                        false,
-                    ),
-                    Err(msg) => (
-                        json!({"content":[{"type":"text","text": msg}], "isError": true}),
-                        true,
-                    ),
+    let mut server = toolhub_mcp::Server::default();
+    loop {
+        let response = match toolhub_ipc::read_bounded_line(&mut reader) {
+            Ok(Some(bytes)) => {
+                if bytes.iter().all(|b| b.is_ascii_whitespace()) {
+                    continue;
+                }
+                match toolhub_protocol::parse_request(&bytes) {
+                    Ok(req) => server.handle(&req, |method, params| {
+                        client.call(method, params).map_err(|e| e.to_string())
+                    }),
+                    Err(error) => Some(toolhub_ipc::error_response(None, &error)),
                 }
             }
-            other => (
-                json!({"error": format!("unsupported method {other}")}),
-                true,
-            ),
+            Ok(None) => break,
+            Err(toolhub_ipc::IpcError::Message(_)) => Some(toolhub_ipc::error_response(
+                None,
+                &toolhub_protocol::ProtocolError::new(
+                    toolhub_protocol::ErrorCode::PayloadTooLarge,
+                    "request too large",
+                ),
+            )),
+            Err(error) => return Err(error.into()),
         };
-        let resp = if is_error {
-            // R2-B07: error.message must be a string
-            let msg = result
-                .get("content")
-                .and_then(|c| c.get(0))
-                .and_then(|t| t.get("text"))
-                .and_then(|t| t.as_str())
-                .unwrap_or("tool call failed")
-                .to_string();
-            json!({"jsonrpc":"2.0","id":id,"error":{"code":-32000,"message": msg}})
-        } else {
-            json!({"jsonrpc":"2.0","id":id,"result":result})
-        };
-        writeln!(stdout, "{}", serde_json::to_string(&resp)?)?;
-        stdout.flush()?;
+        if let Some(response) = response {
+            stdout.write_all(&toolhub_ipc::serialize_response(&response)?)?;
+            stdout.write_all(b"\n")?;
+            stdout.flush()?;
+        }
     }
     Ok(())
 }
+

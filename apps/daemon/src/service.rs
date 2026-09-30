@@ -2,13 +2,22 @@
 
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicBool, AtomicU64};
+use std::sync::Arc;
+use rusqlite::OptionalExtension;
+#[path = "workflows.rs"] mod workflows;
+#[path = "execution_jobs.rs"] mod execution_jobs;
+pub use execution_jobs::PreparedExecution;
+#[path="scan_jobs.rs"] mod scan_jobs;
+pub use scan_jobs::PreparedScan;
+use workflows::{json_err,sql_err};
+#[path = "connected_flows.rs"] mod connected_flows;
 
 use serde_json::{json, Value};
 
 use toolhub_agent_bridge::{discovery_task_prompt, DiscoverySession};
 use toolhub_core::{AgentId, ExecutionRequest, InstanceId};
-use toolhub_ipc::{error_response, PeerIdentity};
+use toolhub_ipc::error_response;
 use toolhub_policy::{PolicyAction, PolicyContext, PolicyEngine};
 use toolhub_protocol::{ErrorCode, JsonRpcRequest, JsonRpcResponse, Method, ProtocolError};
 use toolhub_registry::{Registry, UpsertInstanceInput};
@@ -24,8 +33,15 @@ pub struct DaemonService {
     /// Per-connection principal override (named pipe / unix socket peers).
     pub connection_principal: Option<String>,
     /// R3-F04: running operation ids -> owner principal.
-    pub running_ops: Vec<(String, String)>,
-    pub cancelled_ops: std::collections::BTreeSet<String>,
+    pub controller_verified: bool,
+    pub running_scans: BTreeMap<String, (String, Arc<AtomicBool>)>,
+    pub running_jobs: BTreeMap<String, (String, Arc<AtomicBool>)>,
+    pub subscriptions: BTreeMap<String, (String, u64)>,
+    pub pending_approvals: BTreeMap<String, execution_jobs::PendingApproval>,
+    pub resources: toolhub_recognizer::resources::ResourceStore,
+    pub agents: toolhub_agent_bridge::adapters::AgentRuntime,
+    pub credentials: toolhub_agent_bridge::temp_credentials::TempProviderStore,
+    pub verified_updates: BTreeMap<String,toolhub_agent_bridge::update::UpdatePackage>,
     #[allow(dead_code)]
     pub seq: AtomicU64,
     pub registry_path: String,
@@ -42,7 +58,7 @@ impl DaemonService {
         for (alias, canonical) in toolhub_core::capability::CORE_ALIASES {
             registry.ensure_capability(alias, "", true, Some(canonical))?;
         }
-        let sessions = load_sessions(&mut registry).unwrap_or_default();
+        let sessions = load_sessions(&mut registry).map_err(anyhow::Error::msg)?;
         let mut policy = PolicyEngine::with_defaults();
         // F03: load persisted rules on startup
         if let Ok(stored) = registry.list_policy() {
@@ -67,57 +83,54 @@ impl DaemonService {
                 });
             }
         }
-        let approvals = load_approvals(&mut registry).unwrap_or_default();
+        let approvals = load_approvals(&mut registry).map_err(anyhow::Error::msg)?;
+        registry.db.conn.execute_batch("CREATE TABLE IF NOT EXISTS execution_requests(id TEXT PRIMARY KEY,owner TEXT NOT NULL,session_id TEXT NOT NULL,params_json TEXT NOT NULL,expires_at TEXT NOT NULL,status TEXT NOT NULL); CREATE TABLE IF NOT EXISTS discovery_disclosures(session_id TEXT NOT NULL,candidate_id TEXT NOT NULL,PRIMARY KEY(session_id,candidate_id)); CREATE TABLE IF NOT EXISTS event_log(seq INTEGER PRIMARY KEY AUTOINCREMENT,ts TEXT NOT NULL,kind TEXT NOT NULL,summary TEXT NOT NULL,data_json TEXT NOT NULL);")?;
+        let environments=registry.load_environment_graph()?;
+        let mut env_graph=toolhub_environment::EnvironmentGraph::new();
+        for environment in environments {env_graph.insert(environment);}
+        let resource_dir=path.parent().unwrap_or(Path::new(".")).join("toolhub-resources");
+        let resources=toolhub_recognizer::resources::ResourceStore::open(&resource_dir)?;
         Ok(Self {
             registry,
             policy,
             sessions,
             approvals,
-            env_graph: toolhub_environment::EnvironmentGraph::new(),
+            env_graph,
             last_scan: None,
             connection_principal: None,
-            running_ops: vec![],
-            cancelled_ops: std::collections::BTreeSet::new(),
+            controller_verified: false,
+            running_jobs: BTreeMap::new(),
+            running_scans: BTreeMap::new(),
+            subscriptions: BTreeMap::new(),
+            pending_approvals: BTreeMap::new(),
+            resources,
+            agents: toolhub_agent_bridge::adapters::AgentRuntime::new(),
+            credentials: toolhub_agent_bridge::temp_credentials::TempProviderStore::new(),
+            verified_updates: BTreeMap::new(),
             seq: AtomicU64::new(1),
             registry_path: path.to_string_lossy().to_string(),
         })
     }
 
-    /// F02/R2-B01: principal from transport; caller labels cannot choose it.
-    /// F02/R2-B01: principal from transport; caller labels cannot choose it.
     pub fn peer_principal(&self) -> String {
-        self.connection_principal.clone().unwrap_or_else(|| {
-            std::env::var("TOOLHUB_PRINCIPAL")
-                .ok()
-                .filter(|s| !s.trim().is_empty())
-                .unwrap_or_else(|| "local.stdio".to_string())
-        })
+        self.connection_principal.clone().unwrap_or_else(|| "local.stdio".into())
     }
-
-    /// R2-B01: admin only for local stdio spawn with TOOLHUB_ADMIN, or explicit local.admin.*
-    /// principal. Pipe/socket connection principals are never admin via daemon env.
-    pub fn is_admin(&self) -> bool {
-        let p = self.peer_principal();
-        if p.starts_with("pipe.") || p.starts_with("sock.") {
-            return false;
-        }
-        p.starts_with("local.admin") || std::env::var("TOOLHUB_ADMIN").ok().as_deref() == Some("1")
+    pub fn is_admin(&self) -> bool {self.controller_verified}
+    pub fn handle_authenticated(&mut self, req: &JsonRpcRequest, principal: &str, controller: bool) -> JsonRpcResponse {
+        let previous=self.connection_principal.replace(principal.into());
+        let previous_controller=std::mem::replace(&mut self.controller_verified,controller);
+        let result=self.handle(req);
+        self.connection_principal=previous;
+        self.controller_verified=previous_controller;
+        result
     }
-
-    pub fn handle_with_principal(
-        &mut self,
-        req: &JsonRpcRequest,
-        principal: Option<String>,
-    ) -> JsonRpcResponse {
-        let prev = self.connection_principal.clone();
-        self.connection_principal = principal;
-        let resp = self.handle(req);
-        self.connection_principal = prev;
-        resp
+    pub fn handle_with_principal(&mut self, req:&JsonRpcRequest, principal:Option<String>)->JsonRpcResponse {
+        self.handle_authenticated(req,principal.as_deref().unwrap_or("local.stdio"),false)
     }
 
     pub fn handle(&mut self, req: &JsonRpcRequest) -> JsonRpcResponse {
-        let _peer = PeerIdentity::local_stdio();
+        if !req.params.is_object() {return error_response(req.id.clone(),&ProtocolError::new(ErrorCode::InvalidParams,"named object params required"));}
+        if let Err(error)=self.refresh_authority(){return error_response(req.id.clone(),&error);}
         // F12: validate JSON-RPC envelope
         if req.jsonrpc != "2.0" {
             return error_response(
@@ -128,13 +141,17 @@ impl DaemonService {
         if let Some(id) = &req.id {
             if !id.is_string() && !id.is_number() && !id.is_null() {
                 return error_response(
-                    req.id.clone(),
+                    Some(Value::Null),
                     &ProtocolError::new(
                         ErrorCode::InvalidRequest,
                         "id must be string, number, or null",
                     ),
                 );
             }
+        }
+        if let Err(error)=toolhub_protocol::validate_method_params(req){return error_response(req.id.clone(),&error);}
+        if req.method=="protocol.negotiate" || workflows::is_extended(&req.method) {
+            return match self.dispatch_extended(&req.method,&req.params) {Ok(result)=>JsonRpcResponse{jsonrpc:"2.0".into(),id:req.id.clone(),result:Some(result),error:None},Err(error)=>error_response(req.id.clone(),&error)};
         }
         let id = req.id.clone();
         match Method::from_name(&req.method) {
@@ -152,7 +169,12 @@ impl DaemonService {
                     result: Some(value),
                     error: None,
                 },
-                Err(e) => error_response(id, &e),
+                Err(e) => {
+                    if req.method.starts_with("execute.") {
+                        if let Err(audit_error)=self.record_denial(&req.params,&e) { return error_response(id,&audit_error); }
+                    }
+                    error_response(id, &e)
+                },
             },
         }
     }
@@ -172,48 +194,9 @@ impl DaemonService {
                     "last_scan": self.last_scan,
                 }))
             }
-            Method::ScanStart => {
-                let mode_str = params
-                    .get("mode")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("quick")
-                    .to_string();
-                let mode = if mode_str == "full" {
-                    toolhub_scanner::ScanMode::Full
-                } else {
-                    toolhub_scanner::ScanMode::Quick
-                };
-                let sid = self.registry.begin_scan(&mode_str).map_err(db_err)?;
-                let report = toolhub_scanner::run_scan(mode, None);
-                self.ingest_scan(&report, &mode_str);
-                let cov = json!({
-                    "roots_ok": report.coverage.roots_ok.len(),
-                    "roots_failed": report.coverage.roots_failed.len(),
-                    "candidates": report.candidates.len(),
-                });
-                let errs = json!(report.coverage.roots_failed);
-                let _ = self.registry.finish_scan(
-                    &sid,
-                    if report.coverage.roots_failed.is_empty() {
-                        "completed"
-                    } else {
-                        "partial"
-                    },
-                    &cov.to_string(),
-                    &errs.to_string(),
-                );
-                Ok(json!({
-                    "scan_session_id": sid,
-                    "mode": mode_str,
-                    "candidates": report.candidates.len(),
-                    "roots_ok": report.coverage.roots_ok.len(),
-                    "roots_failed": report.coverage.roots_failed,
-                    "recognized": self.registry.count_instances().map_err(db_err)?,
-                    "unknown_candidates": self.registry.count_candidates().map_err(db_err)?,
-                    "evidence": self.registry.count_evidence().map_err(db_err)?,
-                }))
-            }
+            Method::ScanStart => self.synchronous_scan(params),
             Method::ScanStatus => Ok(json!({
+                "running": self.running_scans.keys().collect::<Vec<_>>(),
                 "last_scan": self.last_scan,
                 "tools": self.registry.count_instances().map_err(db_err)?,
                 "candidates": self.registry.count_candidates().map_err(db_err)?,
@@ -234,7 +217,7 @@ impl DaemonService {
                         let caps = self
                             .registry
                             .capabilities_for_definition(&row.definition_id)
-                            .unwrap_or_default();
+                            .map_err(db_err)?;
                         Ok(json!({
                             "instance": row,
                             "capabilities": caps,
@@ -247,7 +230,7 @@ impl DaemonService {
                 }
             }
             Method::ListEnvironments => {
-                let envs = self.registry.list_environments().map_err(db_err)?;
+                let envs = self.registry.load_environment_graph().map_err(db_err)?;
                 Ok(json!(envs))
             }
             Method::ListDuplicates => {
@@ -261,7 +244,7 @@ impl DaemonService {
                     .ok_or_else(|| {
                         ProtocolError::new(ErrorCode::InvalidParams, "capability required")
                     })?;
-                let reg = toolhub_core::CapabilityRegistry::with_core_taxonomy();
+                let reg = self.resources.capabilities();
                 let canonical = reg
                     .canonical_of(cap)
                     .ok_or_else(|| {
@@ -282,7 +265,7 @@ impl DaemonService {
                         path: r.path,
                         environment: r.environment_id,
                         trust: parse_trust(&r.trust),
-                        arch: std::env::consts::ARCH.to_string(),
+                        arch: r.arch,
                         cwd_match: false,
                     })
                     .collect();
@@ -295,358 +278,18 @@ impl DaemonService {
                     optional: false,
                 };
                 // R2-B06: wire preferences from request
-                let prefs = ResolvePrefs {
-                    cwd: params
-                        .get("cwd")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string()),
-                    prefer_environment: params
-                        .get("environment")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string()),
-                    min_version: params
-                        .get("version")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string()),
-                    require_trust: params
-                        .get("trust")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string()),
-                    require_arch: params
-                        .get("arch")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string()),
-                };
+                let prefs=self.resolver_preferences(params)?;
                 let out = toolhub_resolver::resolve(&reg, &req, cands, &prefs);
                 Ok(json!(out))
             }
             Method::ExecuteTool => {
-                let instance_id = params
-                    .get("instance_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| {
-                        ProtocolError::new(ErrorCode::InvalidParams, "instance_id required")
-                    })?;
-                let args: Vec<String> = params
-                    .get("args")
-                    .and_then(|v| v.as_array())
-                    .map(|a| {
-                        a.iter()
-                            .filter_map(|x| x.as_str().map(|s| s.to_string()))
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                let approval_id = params
-                    .get("approval_id")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-
-                let row = self
-                    .registry
-                    .get_instance(instance_id)
-                    .map_err(db_err)?
-                    .ok_or_else(|| ProtocolError::new(ErrorCode::NotFound, "instance not found"))?;
-
-                // F03: blocked/missing availability prevents launch regardless of trust.
-                if row.status == "blocked" || row.status == "missing" {
-                    return Err(ProtocolError::denied(format!(
-                        "instance status {} does not permit execution",
-                        row.status
-                    )));
-                }
-                let trust = parse_trust(&row.trust);
-                if trust == "blocked" || trust == "unknown" {
-                    return Err(ProtocolError::denied(format!(
-                        "trust level {trust} does not permit execution without elevated approval"
-                    )));
-                }
-
-                let principal = self.peer_principal();
-                let _agent_for_policy = params
-                    .get("agent_id")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| principal.clone());
-                // F02: caller labels cannot choose security principal for approval binding.
-                let agent_id = AgentId::new(principal.clone())
-                    .or_else(|_| AgentId::new("local.stdio"))
-                    .map_err(|e| ProtocolError::new(ErrorCode::InvalidParams, e.to_string()))?;
-
-                let req = ExecutionRequest {
-                    instance_id: InstanceId::new(instance_id)
-                        .map_err(|e| ProtocolError::new(ErrorCode::InvalidParams, e.to_string()))?,
-                    executable: row.path.clone(),
-                    args: args.clone(),
-                    cwd: params
-                        .get("cwd")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string()),
-                    env_overrides: BTreeMap::new(),
-                    timeout_ms: params
-                        .get("timeout_ms")
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(30_000),
-                    max_output_bytes: toolhub_protocol::limits::MAX_OUTPUT_BYTES,
-                    stdin: params
-                        .get("stdin")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string()),
-                    agent_id: Some(agent_id.clone()),
-                };
-
-                let env_s = toolhub_executor::sanitize_env(&req.env_overrides, &[]);
-                let env_dig = toolhub_executor::env_digest(&env_s);
-                let tool_name = Path::new(&row.path)
-                    .file_stem()
-                    .map(|s| s.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                let ctx = PolicyContext {
-                    tool: Some(tool_name),
-                    agent: Some(principal.clone()),
-                    directory: req.cwd.clone(),
-                    environment: row.environment_id.clone(),
-                    ..Default::default()
-                };
-                let decision = self.policy.decide(&ctx);
-                let pt_dig = toolhub_executor::policy_trust_digest(
-                    match decision.action {
-                        PolicyAction::Allow => "allow",
-                        PolicyAction::Ask => "ask",
-                        PolicyAction::Deny => "deny",
-                    },
-                    &trust,
-                    &row.status,
-                    instance_id,
-                );
-
-                if decision.action == PolicyAction::Deny {
-                    return Err(ProtocolError::denied(decision.explanation));
-                }
-
-                // F01: authoritative approval validation before launch.
-                let mut approval_validated = false;
-                if decision.action == PolicyAction::Ask {
-                    let aid = approval_id.as_deref().ok_or_else(|| {
-                        ProtocolError::new(ErrorCode::Denied, "approval_required")
-                    })?;
-                    let approval = self.approvals.get(aid).ok_or_else(|| {
-                        ProtocolError::new(ErrorCode::ApprovalInvalid, "unknown approval")
-                    })?;
-                    let hash = toolhub_executor::hash_file(&row.path).map_err(|e| {
-                        ProtocolError::new(ErrorCode::InternalError, format!("hash failed: {e}"))
-                    })?;
-                    let canon = row
-                        .canonical_path
-                        .clone()
-                        .unwrap_or_else(|| row.path.clone());
-                    toolhub_executor::validate_approval(
-                        approval,
-                        &req,
-                        &hash,
-                        &canon,
-                        &req.args,
-                        req.cwd.as_deref(),
-                        req.stdin.as_deref(),
-                        &env_dig,
-                        &pt_dig,
-                        chrono::Utc::now(),
-                    )
-                    .map_err(|st| match st {
-                        toolhub_core::ExecutionStatus::Expired => ProtocolError::new(
-                            ErrorCode::Expired,
-                            "approval expired, consumed, or revoked",
-                        ),
-                        _ => ProtocolError::new(
-                            ErrorCode::ApprovalInvalid,
-                            "approval does not bind this request",
-                        ),
-                    })?;
-                    // atomic consume
-                    if !self.registry.consume_approval(aid).map_err(db_err)? {
-                        return Err(ProtocolError::new(
-                            ErrorCode::ApprovalInvalid,
-                            "approval already consumed",
-                        ));
-                    }
-                    if let Some(a) = self.approvals.get_mut(aid) {
-                        a.consume();
-                    }
-                    approval_validated = true;
-                }
-
-                let result =
-                    toolhub_executor::execute(&req, &self.policy, &[], &ctx, approval_validated);
-
-                let audit = toolhub_audit::AuditRecord::from_execution(
-                    Some(&principal),
-                    Some(instance_id),
-                    None,
-                    &req.executable,
-                    &req.args,
-                    req.cwd.as_deref(),
-                    result.duration_ms,
-                    result.exit_code,
-                    result.status.as_str(),
-                    approval_id.as_deref(),
-                );
-                let _ = self.registry.insert_execution_record(
-                    &audit.id,
-                    audit.agent_id.as_deref(),
-                    audit.instance_id.as_deref(),
-                    audit.capability.as_deref(),
-                    &audit.executable,
-                    &audit
-                        .args_redacted
-                        .iter()
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(" "),
-                    audit.cwd_redacted.as_deref().unwrap_or(""),
-                    audit.duration_ms,
-                    audit.exit_code,
-                    &audit.status,
-                    audit.approval_id.as_deref(),
-                );
-                // Response includes stdout for the caller; audit does not persist it.
-                Ok(json!({
-                    "status": result.status.as_str(),
-                    "exit_code": result.exit_code,
-                    "stdout": result.stdout,
-                    "stderr": result.stderr,
-                    "duration_ms": result.duration_ms,
-                    "truncated": result.truncated,
-                    "error_code": result.error_code,
-                    "fallback_allowed": result.fallback_allowed,
-                }))
+                let job=self.prepare_job(params,&self.peer_principal(),self.is_admin(),None)?;
+                let result=job.run();
+                self.finish_job(job,result)
             }
-            Method::ExecuteCancel => {
-                // R3-F04: ownership-checked operation cancel; nonexistent is truthful.
-                let id = params
-                    .get("execution_id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-                let principal = self.peer_principal();
-                let owned = self
-                    .running_ops
-                    .iter()
-                    .any(|(oid, owner)| oid == id && (owner == &principal || self.is_admin()));
-                if id.is_empty() || !owned {
-                    return Ok(json!({
-                        "cancelled": false,
-                        "execution_id": id,
-                        "error": "not_found_or_not_owned"
-                    }));
-                }
-                self.cancelled_ops.insert(id.to_string());
-                self.registry
-                    .record_activity("cancel", &format!("cancel {id}"), Some(&principal))
-                    .map_err(db_err)?;
-                Ok(json!({"cancelled": true, "execution_id": id}))
-            }
-            Method::ApproveExecution => {
-                // R2-B01: only a trusted approver channel may mint execution approvals.
-                if !self.is_admin() {
-                    return Err(ProtocolError::denied(
-                        "execute.approve requires trusted approver (TOOLHUB_ADMIN=1 or local.admin)",
-                    ));
-                }
-                let instance_id = params
-                    .get("instance_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| {
-                        ProtocolError::new(ErrorCode::InvalidParams, "instance_id required")
-                    })?;
-                let args: Vec<String> = params
-                    .get("args")
-                    .and_then(|v| v.as_array())
-                    .map(|a| {
-                        a.iter()
-                            .filter_map(|x| x.as_str().map(|s| s.to_string()))
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                let row = self
-                    .registry
-                    .get_instance(instance_id)
-                    .map_err(db_err)?
-                    .ok_or_else(|| ProtocolError::new(ErrorCode::NotFound, "instance not found"))?;
-                let hash = toolhub_executor::hash_file(&row.path).unwrap_or_default();
-                let env = toolhub_executor::sanitize_env(&BTreeMap::new(), &[]);
-                let trust_now = parse_trust(&row.trust);
-                let pt_dig = toolhub_executor::policy_trust_digest(
-                    "ask",
-                    &trust_now,
-                    &row.status,
-                    instance_id,
-                );
-                let approval = toolhub_executor::build_approval(
-                    &uuid::Uuid::new_v4().to_string(),
-                    AgentId::new(self.peer_principal())
-                        .unwrap_or_else(|_| AgentId::new("local.stdio").unwrap()),
-                    "cli-session",
-                    &ExecutionRequest {
-                        instance_id: InstanceId::new(instance_id).unwrap(),
-                        executable: row.path.clone(),
-                        args: args.clone(),
-                        cwd: params
-                            .get("cwd")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string()),
-                        env_overrides: BTreeMap::new(),
-                        timeout_ms: 30_000,
-                        max_output_bytes: 1024 * 256,
-                        stdin: params
-                            .get("stdin")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string()),
-                        agent_id: Some(
-                            AgentId::new(self.peer_principal())
-                                .unwrap_or_else(|_| AgentId::new("local.stdio").unwrap()),
-                        ),
-                    },
-                    &hash,
-                    row.canonical_path.as_deref().unwrap_or(&row.path),
-                    &toolhub_executor::env_digest(&env),
-                    &pt_dig,
-                    300,
-                );
-                let aid = approval.approval_id.clone();
-                let principal = self.peer_principal();
-                let _ = self.registry.save_approval(
-                    &aid,
-                    &principal,
-                    "cli-session",
-                    instance_id,
-                    &hash,
-                    row.canonical_path.as_deref().unwrap_or(&row.path),
-                    &format!("{}|{}", approval.args_digest, approval.stdin_digest),
-                    &approval.cwd_digest,
-                    &format!("{}|{}", approval.env_digest, approval.policy_trust_digest),
-                    &approval.expires_at.to_rfc3339(),
-                );
-                self.approvals.insert(aid.clone(), approval);
-                Ok(json!({"approval_id": aid, "expires_in_seconds": 300}))
-            }
-            Method::RevokeApproval => {
-                let aid = params
-                    .get("approval_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| {
-                        ProtocolError::new(ErrorCode::InvalidParams, "approval_id required")
-                    })?;
-                let principal = self.peer_principal();
-                let admin = self.is_admin();
-                if let Some(a) = self.approvals.get_mut(aid) {
-                    if a.agent_id.as_str() != principal && !admin {
-                        return Err(ProtocolError::denied(
-                            "execute.revoke requires owner or admin principal",
-                        ));
-                    }
-                    a.revoke();
-                }
-                let _ = self.registry.revoke_approval(aid);
-                Ok(json!({"revoked": true}))
-            }
+            Method::ExecuteCancel => self.cancel_execution(params),
+            Method::ApproveExecution => self.approve_pending(params),
+            Method::RevokeApproval => self.revoke_approval(params),
             Method::SkillList => {
                 // F15: optional declarative registration via params
                 if let Some(manifest) = params.get("register") {
@@ -704,51 +347,7 @@ impl DaemonService {
                     .collect();
                 Ok(json!(skills))
             }
-            Method::SkillInspect | Method::SkillResolve => {
-                let id = params.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                let rows = self.registry.list_skills().map_err(db_err)?;
-                if let Some((_, name, schema, manifest)) =
-                    rows.into_iter().find(|(sid, _, _, _)| sid == id)
-                {
-                    let m: Value = serde_json::from_str(&manifest).unwrap_or(json!({}));
-                    // F15: resolve requirements against registry capability providers
-                    let mut requires = vec![];
-                    if let Some(reqs) = m.get("requires").and_then(|v| v.as_array()) {
-                        for r in reqs {
-                            let cap = r.get("capability").and_then(|v| v.as_str()).unwrap_or("");
-                            let canon = toolhub_core::CapabilityRegistry::with_core_taxonomy()
-                                .canonical_of(cap)
-                                .unwrap_or(cap)
-                                .to_string();
-                            let providers = self
-                                .registry
-                                .instances_for_capability(&canon)
-                                .map_err(db_err)?;
-                            requires.push(json!({
-                                "capability": cap,
-                                "canonical": canon,
-                                "satisfied": !providers.is_empty(),
-                                "providers": providers.len(),
-                            }));
-                        }
-                    }
-                    let status = if requires.iter().all(|r| r["satisfied"] == json!(true)) {
-                        "available"
-                    } else {
-                        "missing_capabilities"
-                    };
-                    Ok(json!({
-                        "id": id,
-                        "name": name,
-                        "schema": schema,
-                        "status": status,
-                        "requires": requires,
-                        "manifest": m
-                    }))
-                } else {
-                    Ok(json!({"id": id, "status": "malformed", "note": "skill not registered"}))
-                }
-            }
+            Method::SkillInspect | Method::SkillResolve => self.resolve_skill(params),
             Method::DiscoveryStart => {
                 // R2-B08: session is bound to the authenticated peer principal.
                 let principal = self.peer_principal();
@@ -769,12 +368,15 @@ impl DaemonService {
                     });
                 let session = DiscoverySession::issue(agent_id, 30, &scopes)
                     .map_err(|e| ProtocolError::new(ErrorCode::InvalidParams, e))?;
-                let _ = self.registry.save_discovery_session(
+                self.registry.save_discovery_session(
                     &session.id,
                     agent_id,
                     &session.expires_at.to_rfc3339(),
-                    &serde_json::to_string(&session.scopes).unwrap_or_else(|_| "[]".into()),
-                );
+                    &serde_json::to_string(&session.scopes).map_err(json_err)?,
+                ).map_err(db_err)?;
+                let available=self.registry.list_candidates().map_err(db_err)?;
+                let ids=if let Some(requested)=params.get("candidate_ids") {let ids=requested.as_array().ok_or_else(||ProtocolError::new(ErrorCode::InvalidParams,"candidate_ids must be array"))?.iter().map(|v|v.as_str().map(str::to_owned).ok_or_else(||ProtocolError::new(ErrorCode::InvalidParams,"candidate id must be string"))).collect::<Result<Vec<_>,_>>()?;if ids.iter().any(|id|!available.iter().any(|c|&c.id==id)){return Err(ProtocolError::new(ErrorCode::NotFound,"candidate not found"));}ids}else{available.iter().map(|c|c.id.clone()).collect()};
+                self.registry.disclose_candidates(&session.id,&ids).map_err(db_err)?;
                 let prompt = discovery_task_prompt(agent_id, &session.id);
                 self.sessions.push(session.clone());
                 Ok(json!({
@@ -827,11 +429,12 @@ impl DaemonService {
                         "discovery session expired or revoked",
                     ));
                 }
-                if !s.allows("candidate.inspect") && !s.allows("metadata.read") {
+                if !s.allows("candidate.inspect") && !s.allows("metadata.read") && !s.allows("candidate.list") {
                     return Err(ProtocolError::denied("scope not permitted"));
                 }
                 // Return candidate list only (metadata), never execute.
-                let cands = self.registry.list_candidates().map_err(db_err)?;
+                let mut cands=Vec::new();
+                for candidate in self.registry.list_candidates().map_err(db_err)? {if self.registry.db.conn.query_row("SELECT 1 FROM discovery_disclosures WHERE session_id=?1 AND candidate_id=?2",rusqlite::params![id,candidate.id],|row|row.get::<_,u8>(0)).optional().map_err(sql_err)?.is_some(){cands.push(candidate);}}
                 Ok(json!({"session_id": id, "candidates": cands}))
             }
             Method::DiscoveryClassify => {
@@ -891,6 +494,8 @@ impl DaemonService {
                         "candidate not found",
                     ));
                 }
+                let disclosed=self.registry.db.conn.query_row("SELECT 1 FROM discovery_disclosures WHERE session_id=?1 AND candidate_id=?2",rusqlite::params![id,cand],|row|row.get::<_,u8>(0)).optional().map_err(sql_err)?;
+                if disclosed.is_none(){return Err(ProtocolError::denied("candidate not disclosed to this session"));}
                 self.registry
                     .store_classification(id, cand, label, conf)
                     .map_err(db_err)?;
@@ -923,7 +528,9 @@ impl DaemonService {
                 if !owned {
                     return Err(ProtocolError::new(ErrorCode::NotFound, "session not found"));
                 }
-                let _ = self.registry.revoke_discovery_session(id);
+                self.registry.revoke_discovery_session(id).map_err(db_err)?;
+                self.credentials.revoke_discovery(&principal,id);
+                self.agents.cancel_discovery(&principal,id);
                 Ok(json!({"revoked": true}))
             }
             Method::AgentList => {
@@ -963,65 +570,7 @@ impl DaemonService {
                     "stored": rules,
                 }))
             }
-            Method::PolicySet => {
-                let scope = params
-                    .get("scope")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("tool");
-                let subject = params
-                    .get("subject")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| {
-                        ProtocolError::new(ErrorCode::InvalidParams, "subject required")
-                    })?;
-                let action = params
-                    .get("action")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("ask");
-                let act = match action {
-                    "allow" => PolicyAction::Allow,
-                    "deny" => PolicyAction::Deny,
-                    _ => PolicyAction::Ask,
-                };
-                let scope_enum = match scope {
-                    "command" => toolhub_policy::PolicyScope::Command,
-                    "capability" => toolhub_policy::PolicyScope::Capability,
-                    "agent" => toolhub_policy::PolicyScope::Agent,
-                    "directory" => toolhub_policy::PolicyScope::Directory,
-                    "environment" => toolhub_policy::PolicyScope::Environment,
-                    _ => toolhub_policy::PolicyScope::Tool,
-                };
-                // R3-F01: ANY authority weakening requires controller.
-                // Compare old effective action; Deny->Ask, Deny->Allow, Ask->Allow are weakening.
-                let prev_rules = self.policy.rules.clone();
-                let prev_action = prev_rules
-                    .iter()
-                    .find(|r| {
-                        format!("{:?}", r.scope).eq_ignore_ascii_case(scope)
-                            && r.subject == subject
-                    })
-                    .map(|r| r.action);
-                let weakening = matches!(
-                    (prev_action, act),
-                    (Some(PolicyAction::Deny), PolicyAction::Ask)
-                        | (Some(PolicyAction::Deny), PolicyAction::Allow)
-                        | (Some(PolicyAction::Ask), PolicyAction::Allow)
-                );
-                if (weakening || act == PolicyAction::Allow) && !self.is_admin() {
-                    return Err(ProtocolError::denied(
-                        "policy authority change requires controller (TOOLHUB_ADMIN=1 or local.admin)",
-                    ));
-                }
-                self.registry
-                    .set_policy(scope, subject, action)
-                    .map_err(db_err)?;
-                self.policy.set(toolhub_policy::PolicyRule {
-                    scope: scope_enum,
-                    subject: subject.to_string(),
-                    action: act,
-                });
-                Ok(json!({"ok": true}))
-            }
+            Method::PolicySet => self.set_policy(params),
             Method::ActivityList => {
                 let rows = self.registry.list_activity(100).map_err(db_err)?;
                 let items: Vec<Value> = rows
@@ -1031,153 +580,33 @@ impl DaemonService {
                 Ok(json!(items))
             }
             Method::ExportReport => {
-                // R2-B10: optional validated report import (foreign paths stay untrusted)
-                if let Some(import) = params.get("import") {
-                    let schema = import.get("schema").and_then(|v| v.as_str()).unwrap_or("");
-                    if schema != "toolhub.report/v1" {
-                        return Err(ProtocolError::new(
-                            ErrorCode::InvalidParams,
-                            "unsupported report schema",
-                        ));
-                    }
-                    let mut imported = 0;
-                    if let Some(tools) = import.get("tools").and_then(|v| v.as_array()) {
-                        for t in tools.iter().take(500) {
-                            let name = t.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                            if name.is_empty() {
-                                continue;
-                            }
-                            // Foreign paths are recorded as unavailable/untrusted only.
-                            let path = t.get("path").and_then(|v| v.as_str()).unwrap_or("");
-                            if path.is_empty() {
-                                continue;
-                            }
-                            let id = format!("import-{}", toolhub_core::path_fingerprint(path));
-                            let input = UpsertInstanceInput {
-                                id,
-                                definition_id: format!("imported.{}", name.replace(' ', "_").to_lowercase()),
-                                definition_name: name.to_string(),
-                                version: t
-                                    .get("version")
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string()),
-                                platform: t
-                                    .get("platform")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("unknown")
-                                    .to_string(),
-                                arch: t
-                                    .get("arch")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("unknown")
-                                    .to_string(),
-                                path: path.to_string(),
-                                canonical_path: None,
-                                environment_id: None,
-                                origin_json: "{\"unknown\":{}}".into(),
-                                owner_json: "{\"kind\":\"unknown\",\"certainty\":\"unknown\",\"evidence\":[]}".into(),
-                                trust_json: "{\"level\":\"unknown\"}".into(),
-                                status: "missing".into(),
-                                capabilities: vec![],
-                            };
-                            if self.registry.upsert_instance(&input).is_ok() {
-                                imported += 1;
-                            }
-                        }
-                    }
-                    return Ok(
-                        json!({"imported": imported, "note": "foreign paths remain unavailable/untrusted"}),
-                    );
-                }
-                let instances = self.registry.list_instances().map_err(db_err)?;
-                let tools: Vec<_> = instances
-                    .into_iter()
-                    .map(|r| {
-                        json!({
-                            "name": r.name,
-                            "version": r.version,
-                            "trust": parse_trust(&r.trust),
-                            "path": toolhub_audit::redact_path_for_export(&r.path),
-                        })
-                    })
-                    .collect();
-                Ok(json!({
-                    "schema": "toolhub.report/v1",
-                    "generated_at": chrono::Utc::now(),
-                    "tools": tools,
-                    "redaction": ["home_path", "username", "secrets", "sensitive_args"],
-                }))
+                if let Some(report)=params.get("import") {self.import_report(report)} else {self.export_report()}
             }
+            _ => Err(ProtocolError::new(ErrorCode::MethodNotFound,"method not implemented")),
         }
     }
 
-    fn ingest_scan(&mut self, report: &toolhub_scanner::ScanReport, mode: &str) {
-        let mut seen = Vec::new();
+    fn ingest_scan(&mut self, report:&toolhub_scanner::ScanReport,_mode:&str)->Result<(),ProtocolError> {
+        let mut instances=Vec::new(); let mut candidates=Vec::new();
         for cand in &report.candidates {
-            let rec = toolhub_recognizer::recognize(cand);
-            if rec.recognized {
-                if let (Some(def), Some(inst)) = (rec.definition.as_ref(), rec.instance.as_ref()) {
-                    let env_id = self.env_graph.ensure_detected(&inst.path);
-                    self.env_graph.place(inst.id.clone(), env_id.clone());
-                    let owner = toolhub_environment::attribute_owner(&inst.path);
-                    let input = UpsertInstanceInput {
-                        id: inst.id.as_str().to_string(),
-                        definition_id: def.id.as_str().to_string(),
-                        definition_name: def.name.clone(),
-                        version: inst.version.clone(),
-                        platform: inst.platform.clone(),
-                        arch: inst.arch.clone(),
-                        path: inst.path.clone(),
-                        canonical_path: inst.canonical_path.clone(),
-                        environment_id: Some(env_id.as_str().to_string()),
-                        origin_json: serde_json::to_string(&inst.origin)
-                            .unwrap_or_else(|_| "{}".into()),
-                        owner_json: serde_json::to_string(&owner).unwrap_or_else(|_| "{}".into()),
-                        trust_json: serde_json::to_string(&inst.trust)
-                            .unwrap_or_else(|_| "{}".into()),
-                        status: "available".into(),
-                        capabilities: def
-                            .capabilities
-                            .iter()
-                            .map(|c| c.as_str().to_string())
-                            .collect(),
-                    };
-                    if let Ok(stored_id) = self.registry.upsert_instance(&input) {
-                        seen.push(stored_id);
-                    }
-                    let _ = self.registry.db.conn.execute(
-                        "INSERT INTO environments(id, name, kind, root_path, parent_id, origin_json, owner_json, labels_json)
-                         VALUES (?1, ?2, ?3, NULL, NULL, '{}', '{}', '[]')
-                         ON CONFLICT(id) DO NOTHING",
-                        rusqlite::params![env_id.as_str(), env_id.as_str(), "detected"],
-                    );
-                    let _ = self.registry.upsert_interface(
-                        &format!("if-{}", inst.id.as_str()),
-                        inst.id.as_str(),
-                        "cli",
-                        Some(inst.path.as_str()),
-                    );
-                }
-            } else {
-                let _ = self
-                    .registry
-                    .upsert_candidate(&toolhub_registry::CandidateRow {
-                        id: cand.id.clone(),
-                        path: cand.path.clone(),
-                        recognized: false,
-                        file_name: cand.file_name.clone(),
-                    });
-            }
+            let rec=toolhub_recognizer::recognize_with_resources(cand,&self.resources);
+            if let (Some(def),Some(inst))=(rec.definition.as_ref(),rec.instance.as_ref()) {
+                let env_id=self.env_graph.ensure_detected(&inst.path);
+                let owner=toolhub_environment::attribute_owner(&inst.path);
+                let scope=report.coverage.scopes.iter().find(|scope|toolhub_core::normalize_path(&inst.path).starts_with(&toolhub_core::normalize_path(&scope.root)));
+                instances.push(toolhub_registry::ScanInstanceInput{
+                    instance:UpsertInstanceInput{id:inst.id.as_str().into(),definition_id:def.id.as_str().into(),definition_name:def.name.clone(),version:inst.version.clone(),platform:inst.platform.clone(),arch:inst.arch.clone(),path:inst.path.clone(),canonical_path:inst.canonical_path.clone(),environment_id:Some(env_id.as_str().into()),origin_json:serde_json::to_string(&inst.origin).map_err(json_err)?,owner_json:serde_json::to_string(&owner).map_err(json_err)?,trust_json:serde_json::to_string(&inst.trust).map_err(json_err)?,status:"available".into(),capabilities:def.capabilities.iter().map(|cap|cap.as_str().into()).collect()},
+                    evidence:rec.evidence.clone(),interfaces:vec![toolhub_registry::ScanInterfaceInput{kind:"cli".into(),executable:Some(inst.path.clone())}],provider:cand.metadata.get("scanner_scope").and_then(|s|s.get("provider")).and_then(Value::as_str).map(str::to_owned).unwrap_or_else(||scope.map(|scope|scope.provider.clone()).unwrap_or_else(||"unknown".into())),root:cand.metadata.get("scanner_scope").and_then(|s|s.get("root")).and_then(Value::as_str).map(str::to_owned).unwrap_or_else(||scope.map(|scope|scope.root.clone()).unwrap_or_default())
+                });
+            } else {candidates.push(cand.clone());}
         }
-        // R3-F05: only a complete Full scan may reconcile Missing.
-        if mode == "full" && report.coverage.roots_failed.is_empty() {
-            let _ = self.registry.mark_missing_except(&seen);
-        }
-        self.last_scan = Some(chrono::Utc::now());
-        let _ = self
-            .registry
-            .record_activity("scan", "native scan completed", None);
+        let scopes=report.coverage.scopes.iter().map(|scope|toolhub_registry::ReconcileScope{provider:scope.provider.clone(),root:scope.root.clone(),complete:scope.complete&&!report.cancelled,recursive:scope.recursive}).collect::<Vec<_>>();
+        self.registry.ingest_scan(&self.env_graph.environments,&instances,&candidates,&scopes).map_err(db_err)?;
+        self.last_scan=Some(chrono::Utc::now());
+        self.event("scan","native scan ingested",json!({"candidates":report.candidates.len()}))?;
+        Ok(())
     }
+
 }
 
 fn load_approvals(
@@ -1362,7 +791,7 @@ mod tests {
                 }),
             )
         };
-        assert!(svc.handle(&request(1, "deny")).error.is_none());
+        assert!(svc.handle_authenticated(&request(1, "deny"),"fixture.controller",true).error.is_none());
         svc.registry
             .db
             .conn
@@ -1371,7 +800,7 @@ mod tests {
              BEGIN SELECT RAISE(ABORT, 'fixture write failure'); END;",
             )
             .unwrap();
-        assert!(svc.handle(&request(2, "ask")).error.is_some());
+        assert!(svc.handle_authenticated(&request(2, "ask"),"fixture.controller",true).error.is_some());
         let context = PolicyContext {
             tool: Some("fixture".into()),
             ..Default::default()
@@ -1380,5 +809,44 @@ mod tests {
         drop(svc);
         let svc = DaemonService::open(&dir.path().join("policy.sqlite")).unwrap();
         assert_eq!(svc.policy.decide(&context).action, PolicyAction::Deny);
+    }
+}
+
+#[cfg(test)]
+mod final_regressions {
+    use super::*;
+    fn service() -> (tempfile::TempDir, DaemonService) {
+        let dir = tempfile::tempdir().unwrap();
+        let svc = DaemonService::open(&dir.path().join("private.sqlite")).unwrap();
+        (dir, svc)
+    }
+    #[test]
+    fn principal_label_cannot_grant_controller_role() {
+        let (_dir, mut svc) = service();
+        svc.connection_principal = Some("local.admin.spoof".into());
+        assert!(!svc.is_admin(), "unverified label grants controller role");
+    }
+    #[test]
+    fn scalar_params_are_rejected() {
+        let (_dir, mut svc) = service();
+        let resp = svc.handle(&JsonRpcRequest::new(1,"registry.search",json!(7)));
+        assert!(resp.error.is_some(), "scalar params silently accepted");
+    }
+    #[test]
+    fn malformed_report_is_rejected_atomically() {
+        let (_dir, mut svc) = service();
+        let report=json!({"schema":"toolhub.report/v1","tools":[{"name":"valid","path":"foreign"},true]});
+        let resp=svc.handle(&JsonRpcRequest::new(1,"export.report",json!({"import":report})));
+        assert!(resp.error.is_some(), "malformed import reported success");
+        assert_eq!(svc.registry.count_instances().unwrap(),0,"partial import escaped validation");
+    }
+    #[test]
+    fn persisted_revocation_is_observed_by_open_service() {
+        let (_dir, mut svc) = service();
+        let start=svc.handle(&JsonRpcRequest::new(1,"discovery.start",json!({"scopes":["candidate.inspect"]})));
+        let id=start.result.unwrap()["session_id"].as_str().unwrap().to_string();
+        svc.registry.revoke_discovery_session(&id).unwrap();
+        let resp=svc.handle(&JsonRpcRequest::new(2,"discovery.inspect",json!({"id":id})));
+        assert!(resp.error.is_some(), "open process used stale session cache");
     }
 }

@@ -6,7 +6,10 @@ pub struct RegistryDb {
     pub conn: Connection,
 }
 
-const MIGRATIONS: &[(i64, &str)] = &[(1, include_str!("migrations/001_init.sql"))];
+const MIGRATIONS: &[(i64, &str)] = &[
+    (1, include_str!("migrations/001_init.sql")),
+    (2, include_str!("migrations/002_scan_integrity.sql")),
+];
 
 pub fn open_path(path: &std::path::Path) -> RegistryResult<RegistryDb> {
     if let Some(parent) = path.parent() {
@@ -79,7 +82,7 @@ mod tests {
     #[test]
     fn migrates_from_empty() {
         let db = open_memory().unwrap();
-        assert_eq!(db.schema_version().unwrap(), 1);
+        assert_eq!(db.schema_version().unwrap(), 2);
     }
 
     #[test]
@@ -88,9 +91,9 @@ mod tests {
         let path = dir.path().join("t.db");
         {
             let db = open_path(&path).unwrap();
-            assert_eq!(db.schema_version().unwrap(), 1);
+            assert_eq!(db.schema_version().unwrap(), 2);
         }
         let db2 = open_path(&path).unwrap();
-        assert_eq!(db2.schema_version().unwrap(), 1);
+        assert_eq!(db2.schema_version().unwrap(), 2);
     }
 }

@@ -26,7 +26,10 @@ impl ScannerProvider for PathProvider {
     fn scan_root(&self, root: &str) -> Result<Vec<ScanCandidate>, std::io::Error> {
         let dir = std::path::Path::new(root);
         if !dir.is_dir() {
-            return Ok(vec![]);
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "PATH root is not a readable directory",
+            ));
         }
         let mut out = vec![];
         for entry in std::fs::read_dir(dir)? {
@@ -103,8 +106,10 @@ fn scan_glob(pattern: &str) -> Result<Vec<ScanCandidate>, std::io::Error> {
     let (parent, leaf) = pattern.rsplit_once(['/', '\\']).unwrap_or((".", pattern));
     let prefix = leaf.trim_end_matches('*');
     let mut out = vec![];
-    if let Ok(rd) = std::fs::read_dir(parent) {
-        for entry in rd.flatten() {
+    {
+        let rd = std::fs::read_dir(parent)?;
+        for entry in rd {
+            let entry = entry?;
             let name = entry.file_name().to_string_lossy().to_string();
             if name.starts_with(prefix) {
                 let p = entry.path();
@@ -234,6 +239,8 @@ impl WindowsRegistryProvider {
                     if let Ok(app) = key.open_subkey(&name) {
                         let display: String = app.get_value("DisplayName").unwrap_or_default();
                         let loc: String = app.get_value("InstallLocation").unwrap_or_default();
+                        let version: String = app.get_value("DisplayVersion").unwrap_or_default();
+                        let publisher: String = app.get_value("Publisher").unwrap_or_default();
                         if !display.is_empty() {
                             let mut c = ScanCandidate::from_path(if loc.is_empty() {
                                 format!("registry://uninstall/{name}")
@@ -243,7 +250,9 @@ impl WindowsRegistryProvider {
                             c.metadata = serde_json::json!({
                                 "source": "registry_uninstall",
                                 "display_name": display,
-                                "install_location": loc
+                                "install_location": loc,
+                                "display_version": version,
+                                "publisher": publisher
                             });
                             out.push(c);
                         }
@@ -321,6 +330,8 @@ impl ScannerProvider for MacApplicationsProvider {
             "/usr/local/bin".into(),
             "/opt/homebrew/bin".into(),
             "/usr/bin".into(),
+            "/Applications/Xcode.app/Contents/Developer/usr/bin".into(),
+            "/Library/Developer/CommandLineTools/usr/bin".into(),
         ]
         .into_iter()
         .filter(|p| std::path::Path::new(p).exists())
@@ -340,6 +351,17 @@ impl ScannerProvider for MacApplicationsProvider {
                     let mut c = ScanCandidate::from_path(path.to_string_lossy().to_string());
                     c.metadata = serde_json::json!({"bundle": true});
                     out.push(c);
+                    let binaries = path.join("Contents/MacOS");
+                    if binaries.is_dir() {
+                        for executable in std::fs::read_dir(&binaries)?.take(256) {
+                            let executable = executable?.path();
+                            if executable.is_file() && is_executable(&executable) {
+                                let mut candidate = candidate_from_file(&executable);
+                                candidate.metadata = serde_json::json!({"source":"application_bundle","bundle_path":path,"info_plist_present":path.join("Contents/Info.plist").is_file()});
+                                out.push(candidate);
+                            }
+                        }
+                    }
                 }
             }
             return Ok(out);
@@ -351,5 +373,113 @@ impl ScannerProvider for MacApplicationsProvider {
             }
         }
         Ok(out)
+    }
+}
+
+/// Metadata directory providers are bounded filesystem observations, not package-manager commands.
+#[derive(Default)]
+pub struct NativeDeveloperProvider;
+impl ScannerProvider for NativeDeveloperProvider {
+    fn name(&self) -> &'static str {
+        "developer_metadata_dirs"
+    }
+    fn full_only(&self) -> bool {
+        true
+    }
+    fn roots(&self) -> Vec<String> {
+        let mut roots = vec![];
+        if let Some(home) = dirs::home_dir() {
+            for relative in [
+                ".cargo/bin",
+                ".rustup/toolchains",
+                ".nvm/versions",
+                ".pyenv/versions",
+                ".local/share/uv/python",
+                "AppData/Local/Microsoft/WinGet/Packages",
+                "scoop/apps",
+                "miniconda3/envs",
+                "anaconda3/envs",
+            ] {
+                let path = home.join(relative);
+                if path.is_dir() {
+                    roots.push(path.to_string_lossy().into_owned());
+                }
+            }
+        }
+        for key in ["ProgramFiles", "ProgramFiles(x86)"] {
+            if let Some(base) = std::env::var_os(key) {
+                for relative in ["Microsoft Visual Studio", "Windows Kits"] {
+                    let path = std::path::Path::new(&base).join(relative);
+                    if path.is_dir() {
+                        roots.push(path.to_string_lossy().into_owned());
+                    }
+                }
+            }
+        }
+        roots
+    }
+    fn scan_root(&self, root: &str) -> Result<Vec<ScanCandidate>, std::io::Error> {
+        let mut out = vec![];
+        for entry in walkdir::WalkDir::new(root)
+            .follow_links(false)
+            .max_depth(6)
+            .into_iter()
+            .take(4096)
+        {
+            let entry = entry.map_err(std::io::Error::other)?;
+            if entry.file_type().is_file() && is_executable(entry.path()) {
+                let mut candidate = candidate_from_file(entry.path());
+                candidate.metadata["source"] = serde_json::json!("developer_metadata_directory");
+                out.push(candidate);
+            }
+        }
+        Ok(out)
+    }
+}
+
+#[derive(Default)]
+pub struct WslMetadataProvider;
+impl ScannerProvider for WslMetadataProvider {
+    fn name(&self) -> &'static str {
+        "wsl_distribution_metadata"
+    }
+    fn full_only(&self) -> bool {
+        true
+    }
+    fn roots(&self) -> Vec<String> {
+        if cfg!(windows) {
+            vec!["registry:wsl_distributions".into()]
+        } else {
+            vec![]
+        }
+    }
+    fn scan_root(&self, _root: &str) -> Result<Vec<ScanCandidate>, std::io::Error> {
+        #[cfg(windows)]
+        {
+            use winreg::{enums::HKEY_CURRENT_USER, RegKey};
+            let key = match RegKey::predef(HKEY_CURRENT_USER)
+                .open_subkey(r"SOFTWARE\Microsoft\Windows\CurrentVersion\Lxss")
+            {
+                Ok(key) => key,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
+                Err(e) => return Err(e),
+            };
+            let mut out = vec![];
+            for name in key.enum_keys().take(256) {
+                let name = name?;
+                let distribution = key.open_subkey(&name)?;
+                let display: String = distribution.get_value("DistributionName")?;
+                let base: String = distribution.get_value("BasePath")?;
+                let version: u32 = distribution.get_value("Version").unwrap_or(0);
+                let mut candidate = ScanCandidate::from_path(base);
+                candidate.metadata = serde_json::json!({"source":"wsl_distribution_registry","distribution":display,"wsl_version":version,"execution_interface":"not inferred from distribution metadata"});
+                out.push(candidate);
+            }
+            return Ok(out);
+        }
+        #[cfg(not(windows))]
+        {
+            Ok(vec![])
+        }
     }
 }

@@ -117,25 +117,28 @@ impl ExecutionStatus {
 pub fn digest_strings(items: &[String]) -> String {
     use sha2::{Digest, Sha256};
     let mut h = Sha256::new();
-    // R3-F03: length-prefixed so distinct argv vectors cannot collide.
+    h.update(b"toolhub.digest.strings/v2");
+    h.update((items.len() as u64).to_le_bytes());
     for i in items {
         let b = i.as_bytes();
         h.update((b.len() as u64).to_le_bytes());
         h.update(b);
     }
-    hex::encode(h.finalize())
+    format!("v2:{}", hex::encode(h.finalize()))
 }
 
 pub fn digest_map(map: &std::collections::BTreeMap<String, String>) -> String {
     use sha2::{Digest, Sha256};
     let mut h = Sha256::new();
+    h.update(b"toolhub.digest.map/v2");
+    h.update((map.len() as u64).to_le_bytes());
     for (k, v) in map {
-        h.update(k.as_bytes());
-        h.update([0x1e]);
-        h.update(v.as_bytes());
-        h.update([0x1f]);
+        for item in [k, v] {
+            h.update((item.len() as u64).to_le_bytes());
+            h.update(item.as_bytes());
+        }
     }
-    hex::encode(h.finalize())
+    format!("v2:{}", hex::encode(h.finalize()))
 }
 
 pub fn hash_bytes(data: &[u8]) -> String {
@@ -148,6 +151,16 @@ pub fn hash_bytes(data: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn map_digest_is_unambiguous_and_versioned() {
+        let first = std::collections::BTreeMap::from([("a".into(), "b\u{1f}c\u{1e}d".into())]);
+        let second =
+            std::collections::BTreeMap::from([("a".into(), "b".into()), ("c".into(), "d".into())]);
+        assert_ne!(digest_map(&first), digest_map(&second));
+        assert!(digest_map(&first).starts_with("v2:"));
+        assert!(digest_strings(&[]).starts_with("v2:"));
+    }
 
     #[test]
     fn approval_consumed_once() {
