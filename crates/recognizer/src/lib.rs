@@ -312,13 +312,31 @@ fn looks_like_executable(path: &str) -> bool {
     if meta.len() < 1024 {
         return false;
     }
-    // Windows PE MZ header; Unix ELF/shebang+size.
+    // Windows PE MZ + PE\\0\\0; Unix ELF only. R3-F06: junk MZ is not product identity.
     if let Ok(mut f) = std::fs::File::open(path) {
-        use std::io::Read;
+        use std::io::{Read, Seek, SeekFrom};
         let mut magic = [0u8; 4];
         if f.read_exact(&mut magic).is_ok() {
             if cfg!(windows) {
-                return magic[0] == b'M' && magic[1] == b'Z';
+                if magic[0] != b'M' || magic[1] != b'Z' {
+                    return false;
+                }
+                if f.seek(SeekFrom::Start(0x3c)).is_ok() {
+                    let mut off = [0u8; 4];
+                    if f.read_exact(&mut off).is_ok() {
+                        let pe_off = u32::from_le_bytes(off) as u64;
+                        if pe_off < 0x40 || pe_off + 4 > meta.len() {
+                            return false;
+                        }
+                        let mut pe = [0u8; 4];
+                        if f.seek(SeekFrom::Start(pe_off)).is_ok()
+                            && f.read_exact(&mut pe).is_ok()
+                        {
+                            return &pe == b"PE\0\0";
+                        }
+                    }
+                }
+                return false;
             }
             return magic == [0x7f, b'E', b'L', b'F'];
         }

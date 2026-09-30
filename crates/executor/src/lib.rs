@@ -146,6 +146,14 @@ pub fn validate_approval(
     if approval.session_id.is_empty() {
         return Err(ExecutionStatus::Denied);
     }
+    // R3-F03: fail closed on missing digests (legacy approvals invalidated).
+    if approval.executable_sha256.is_empty()
+        || approval.args_digest.is_empty()
+        || approval.env_digest.is_empty()
+        || approval.policy_trust_digest.is_empty()
+    {
+        return Err(ExecutionStatus::Denied);
+    }
     if request.agent_id.is_some() && request.agent_id.as_ref() != Some(&approval.agent_id) {
         return Err(ExecutionStatus::Denied);
     }

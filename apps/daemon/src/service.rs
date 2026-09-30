@@ -180,7 +180,7 @@ impl DaemonService {
                 };
                 let sid = self.registry.begin_scan(&mode_str).map_err(db_err)?;
                 let report = toolhub_scanner::run_scan(mode, None);
-                self.ingest_scan(&report);
+                self.ingest_scan(&report, &mode_str);
                 let cov = json!({
                     "roots_ok": report.coverage.roots_ok.len(),
                     "roots_failed": report.coverage.roots_failed.len(),
@@ -963,10 +963,25 @@ impl DaemonService {
                     "environment" => toolhub_policy::PolicyScope::Environment,
                     _ => toolhub_policy::PolicyScope::Tool,
                 };
-                // F01/F02: granting Allow is privileged; Ask/Deny are safer defaults.
-                if act == PolicyAction::Allow && !self.is_admin() {
+                // R3-F01: ANY authority weakening requires controller.
+                // Compare old effective action; Deny->Ask, Deny->Allow, Ask->Allow are weakening.
+                let prev_rules = self.policy.rules.clone();
+                let prev_action = prev_rules
+                    .iter()
+                    .find(|r| {
+                        format!("{:?}", r.scope).eq_ignore_ascii_case(scope)
+                            && r.subject == subject
+                    })
+                    .map(|r| r.action);
+                let weakening = match (prev_action, act) {
+                    (Some(PolicyAction::Deny), PolicyAction::Ask)
+                    | (Some(PolicyAction::Deny), PolicyAction::Allow)
+                    | (Some(PolicyAction::Ask), PolicyAction::Allow) => true,
+                    _ => false,
+                };
+                if (weakening || act == PolicyAction::Allow) && !self.is_admin() {
                     return Err(ProtocolError::denied(
-                        "policy.set allow requires admin principal (TOOLHUB_ADMIN=1 or local.admin)",
+                        "policy authority change requires controller (TOOLHUB_ADMIN=1 or local.admin)",
                     ));
                 }
                 self.registry
@@ -1067,7 +1082,7 @@ impl DaemonService {
         }
     }
 
-    fn ingest_scan(&mut self, report: &toolhub_scanner::ScanReport) {
+    fn ingest_scan(&mut self, report: &toolhub_scanner::ScanReport, mode: &str) {
         let mut seen = Vec::new();
         for cand in &report.candidates {
             let rec = toolhub_recognizer::recognize(cand);
@@ -1125,7 +1140,8 @@ impl DaemonService {
                     });
             }
         }
-        if report.coverage.roots_failed.is_empty() {
+        // R3-F05: only a complete Full scan may reconcile Missing.
+        if mode == "full" && report.coverage.roots_failed.is_empty() {
             let _ = self.registry.mark_missing_except(&seen);
         }
         self.last_scan = Some(chrono::Utc::now());

@@ -117,9 +117,11 @@ impl ExecutionStatus {
 pub fn digest_strings(items: &[String]) -> String {
     use sha2::{Digest, Sha256};
     let mut h = Sha256::new();
+    // R3-F03: length-prefixed so distinct argv vectors cannot collide.
     for i in items {
-        h.update(i.as_bytes());
-        h.update([0x1f]);
+        let b = i.as_bytes();
+        h.update((b.len() as u64).to_le_bytes());
+        h.update(b);
     }
     hex::encode(h.finalize())
 }
