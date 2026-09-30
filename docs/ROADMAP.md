@@ -7,7 +7,7 @@ The owner requests large consolidated targets and at most four formal Codex prod
 | B01 | Domain/protocol/SQLite, native scanners and recognition, environments/ownership, resolver/security/execution/audit, daemon/IPC/CLI/MCP, sessions/adapters and skills | R1 consolidated review -> MiMo repair -> R2 verification and bounded Codex corrections |
 | B02 | Nine-page real-data desktop, connected-agent/temporary-provider flows, scanner extension/resource/update lifecycle, SDK/docs, platform QA and local release candidates | R3 consolidated review -> MiMo repair -> R4 verification and bounded Codex corrections |
 
-Formal rounds used: **1 of 4**. R1 reviewed `46a06aa` and returned changes_required; [review ledger](reviews/REVIEW_LEDGER.md) records the exact revision, evidence and next handoff. The onboarding assessment and planning work do not consume formal implementation-review rounds.
+Formal rounds used: **2 of 4**. R1 (`46a06aa`) and R2 (`7a1ba39`, correction `6df2166`) both returned changes_required. B01 remains unaccepted; [review ledger](reviews/REVIEW_LEDGER.md) records evidence. The [combined batch proposal](tasks/B02-CARRYOVER-PROPOSAL.md) awaits owner decision before R3/R4 work. The onboarding assessment and planning work do not consume formal implementation-review rounds.
 
 The original development stages now guide MiMo's internal dependencies rather than eight separate external deliveries:
 
@@ -22,6 +22,6 @@ The original development stages now guide MiMo's internal dependencies rather th
 
 MiMo internally locks contracts, delegates bounded independent work, integrates, tests, reviews and repairs before a single handoff. UI can prepare against stabilized contracts when assigned, but all shipped clients share the daemon registry and policy.
 
-B01 is dispatched by `docs/tasks/MIMO-B01-CORE.md`; B02 is planned and awaits dispatch against the reviewed B01 revision. Real access/toolchain blockers and departures from product boundaries are escalated; routine implementation decisions stay with MiMo.
+B01 is dispatched by `docs/tasks/MIMO-B01-CORE.md`; B02 is planned but undispatched. Because B01 remains blocked after R2, the owner decides whether to combine its unresolved work with B02 and allocate R3/R4 to the integrated product. Real access/toolchain blockers and departures from product boundaries are escalated; routine implementation decisions stay with MiMo.
 
 Unavailable host/signing checks and unfinished targets are recorded honestly. Four formal reviews do not authorize accepting blocking defects or claiming unverified platform delivery.
