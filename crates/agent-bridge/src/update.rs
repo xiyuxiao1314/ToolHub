@@ -66,9 +66,17 @@ pub fn apply_update(
         let bak = dest.with_extension("bak");
         std::fs::rename(dest, &bak)?;
     }
-    // Payload is copied as the new artifact; no silent publish.
-    std::fs::copy(&pkg.payload_path, dest)?;
-    Ok(())
+    // R3-F13: restore previous artifact if copy fails.
+    match std::fs::copy(&pkg.payload_path, dest) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            let bak = dest.with_extension("bak");
+            if bak.exists() {
+                let _ = std::fs::rename(&bak, dest);
+            }
+            Err(UpdateError::Io(e))
+        }
+    }
 }
 
 #[cfg(test)]

@@ -23,6 +23,9 @@ pub struct DaemonService {
     pub last_scan: Option<chrono::DateTime<chrono::Utc>>,
     /// Per-connection principal override (named pipe / unix socket peers).
     pub connection_principal: Option<String>,
+    /// R3-F04: running operation ids -> owner principal.
+    pub running_ops: Vec<(String, String)>,
+    pub cancelled_ops: std::collections::BTreeSet<String>,
     #[allow(dead_code)]
     pub seq: AtomicU64,
     pub registry_path: String,
@@ -73,6 +76,8 @@ impl DaemonService {
             env_graph: toolhub_environment::EnvironmentGraph::new(),
             last_scan: None,
             connection_principal: None,
+            running_ops: vec![],
+            cancelled_ops: std::collections::BTreeSet::new(),
             seq: AtomicU64::new(1),
             registry_path: path.to_string_lossy().to_string(),
         })
@@ -515,22 +520,28 @@ impl DaemonService {
                 }))
             }
             Method::ExecuteCancel => {
-                // R2-B03/P2: cooperative cancel of in-flight work is tracked by id.
+                // R3-F04: ownership-checked operation cancel; nonexistent is truthful.
                 let id = params
                     .get("execution_id")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
-                // Best-effort: mark cancelled; running children are killed by timeout/taskkill.
+                let principal = self.peer_principal();
+                let owned = self
+                    .running_ops
+                    .iter()
+                    .any(|(oid, owner)| oid == id && (owner == &principal || self.is_admin()));
+                if id.is_empty() || !owned {
+                    return Ok(json!({
+                        "cancelled": false,
+                        "execution_id": id,
+                        "error": "not_found_or_not_owned"
+                    }));
+                }
+                self.cancelled_ops.insert(id.to_string());
                 self.registry
-                    .record_activity(
-                        "cancel",
-                        &format!("cancel requested for {id}"),
-                        Some(&self.peer_principal()),
-                    )
+                    .record_activity("cancel", &format!("cancel {id}"), Some(&principal))
                     .map_err(db_err)?;
-                Ok(
-                    json!({"cancelled": true, "execution_id": id, "note": "in-flight children bounded by timeout/kill"}),
-                )
+                Ok(json!({"cancelled": true, "execution_id": id}))
             }
             Method::ApproveExecution => {
                 // R2-B01: only a trusted approver channel may mint execution approvals.
@@ -1091,6 +1102,7 @@ impl DaemonService {
                     })
                     .collect();
                 Ok(json!({
+                    "schema": "toolhub.report/v1",
                     "generated_at": chrono::Utc::now(),
                     "tools": tools,
                     "redaction": ["home_path", "username", "secrets", "sensitive_args"],
