@@ -456,12 +456,6 @@ pub fn execute(
     }
 }
 
-fn stdout_t_finished(stdout: &[u8], stderr: &[u8]) -> bool {
-    // Heuristic: both channels drained enough — caller also uses timeout.
-    let _ = (stdout, stderr);
-    false
-}
-
 /// UTF-8-safe truncation that never panics on multibyte boundaries.
 fn utf8_lossy_cap(bytes: &[u8], max: usize, truncated: &mut bool) -> String {
     let slice = if bytes.len() > max {
