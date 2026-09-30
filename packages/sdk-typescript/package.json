@@ -1,0 +1,9 @@
+{
+  "name": "@toolhub/client",
+  "version": "0.2.0",
+  "description": "Minimal ToolHub TypeScript client (JSON-RPC over local daemon).",
+  "type": "module",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "license": "MIT"
+}

@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod adapters;
 pub mod temp_credentials;
+pub mod update;
 
 pub use adapters::{
     detect_all, AgentAdapter, DetectedAgent, GenericCliAdapter, GenericMcpAdapter, KNOWN_AGENTS,
