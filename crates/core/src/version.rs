@@ -77,7 +77,7 @@ impl VersionConstraint {
         let b = normalize_ver(&self.version);
         let cmp = compare_ver(&a, &b);
         match self.op {
-            VersionReqOp::Eq => cmp == std::cmp::Ordering::Equal,
+            VersionReqOp::Eq => cmp == std::cmp::Ordering::Equal && a_prerelease == b_prerelease,
             VersionReqOp::Gte => cmp != std::cmp::Ordering::Less,
             VersionReqOp::Gt => cmp == std::cmp::Ordering::Greater,
             VersionReqOp::Lte => cmp != std::cmp::Ordering::Greater,

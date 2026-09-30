@@ -75,6 +75,7 @@ pub fn resolve(
         candidates.retain(|c| rank(&c.trust) >= min);
     }
 
+    // R3-F07: invalid constraints must reject the whole resolve (not silently ignore).
     if let Some(min) = prefs
         .min_version
         .as_deref()

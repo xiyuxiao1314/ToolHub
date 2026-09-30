@@ -639,14 +639,15 @@ impl DaemonService {
             Method::SkillList => {
                 // F15: optional declarative registration via params
                 if let Some(manifest) = params.get("register") {
-                    let id = manifest.get("id").and_then(|v| v.as_str()).ok_or_else(|| {
-                        ProtocolError::new(ErrorCode::InvalidParams, "id required")
-                    })?;
-                    let name = manifest.get("name").and_then(|v| v.as_str()).unwrap_or(id);
-                    let schema = manifest
-                        .get("schema")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("toolhub.skill/v1");
+                    // R3-F09: one authoritative model at the public boundary.
+                    let parsed = toolhub_core::SkillManifest::parse_yaml_like(manifest)
+                        .map_err(|e| ProtocolError::new(ErrorCode::InvalidParams, e.to_string()))?;
+                    parsed
+                        .assert_safe_paths()
+                        .map_err(|e| ProtocolError::new(ErrorCode::InvalidParams, e.to_string()))?;
+                    let id = parsed.id.as_str().to_string();
+                    let name = parsed.name.clone();
+                    let schema = parsed.schema.clone();
                     if schema != "toolhub.skill/v1" {
                         return Err(ProtocolError::new(
                             ErrorCode::InvalidParams,
@@ -679,7 +680,7 @@ impl DaemonService {
                         .unwrap_or("instruction");
                     let json_s = serde_json::to_string(manifest).unwrap_or_else(|_| "{}".into());
                     self.registry
-                        .upsert_skill(id, name, schema, kind, &json_s, None)
+                        .upsert_skill(&id, &name, &schema, kind, &json_s, None)
                         .map_err(db_err)?;
                 }
                 let rows = self.registry.list_skills().map_err(db_err)?;
@@ -858,11 +859,27 @@ impl DaemonService {
                     .ok_or_else(|| {
                         ProtocolError::new(ErrorCode::InvalidParams, "label required")
                     })?;
+                // R3-F08: strict finite confidence in [0,1]; no silent clamp/default.
                 let conf = params
                     .get("confidence")
                     .and_then(|v| v.as_f64())
-                    .unwrap_or(0.5)
-                    .clamp(0.0, 1.0);
+                    .ok_or_else(|| {
+                        ProtocolError::new(ErrorCode::InvalidParams, "confidence required")
+                    })?;
+                if !(0.0..=1.0).contains(&conf) || !conf.is_finite() {
+                    return Err(ProtocolError::new(
+                        ErrorCode::InvalidParams,
+                        "confidence must be finite in [0,1]",
+                    ));
+                }
+                // R3-F08: candidate must exist
+                let cands = self.registry.list_candidates().map_err(db_err)?;
+                if !cands.iter().any(|c| c.id == cand) {
+                    return Err(ProtocolError::new(
+                        ErrorCode::NotFound,
+                        "candidate not found",
+                    ));
+                }
                 self.registry
                     .store_classification(id, cand, label, conf)
                     .map_err(db_err)?;
