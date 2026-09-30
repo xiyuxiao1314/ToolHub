@@ -41,6 +41,7 @@ pub fn read_frame(r: &mut impl Read) -> IpcResult<Vec<u8>> {
         Err(e) => return Err(e.into()),
     }
     let n = u32::from_be_bytes(len) as usize;
+    // R2-B07: enforce size bound before allocation
     if n > toolhub_protocol::limits::MAX_REQUEST_BYTES {
         return Err(IpcError::Message("payload_too_large".into()));
     }

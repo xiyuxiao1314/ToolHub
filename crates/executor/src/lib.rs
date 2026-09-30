@@ -331,8 +331,16 @@ pub fn execute(
             Ok(None) => {
                 if Instant::now() >= deadline {
                     let _ = child.kill();
-                    // best-effort: kill process tree on Windows via taskkill is skipped
-                    // to avoid extra OS commands; child kill is the primary bound.
+                    // R2-B03: kill descendant process tree on Windows.
+                    #[cfg(windows)]
+                    {
+                        let pid = child.id();
+                        let _ = std::process::Command::new("taskkill")
+                            .args(["/PID", &pid.to_string(), "/T", "/F"])
+                            .stdout(std::process::Stdio::null())
+                            .stderr(std::process::Stdio::null())
+                            .status();
+                    }
                     let _ = child.wait();
                     break Err(ExecutionStatus::TimedOut);
                 }
