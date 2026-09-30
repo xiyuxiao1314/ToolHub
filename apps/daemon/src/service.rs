@@ -592,8 +592,9 @@ impl DaemonService {
                         ProtocolError::new(ErrorCode::InvalidParams, "approval_id required")
                     })?;
                 let principal = self.peer_principal();
+                let admin = self.is_admin();
                 if let Some(a) = self.approvals.get_mut(aid) {
-                    if a.agent_id.as_str() != principal && !self.is_admin() {
+                    if a.agent_id.as_str() != principal && !admin {
                         return Err(ProtocolError::denied(
                             "execute.revoke requires owner or admin principal",
                         ));
