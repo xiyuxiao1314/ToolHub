@@ -973,12 +973,12 @@ impl DaemonService {
                             && r.subject == subject
                     })
                     .map(|r| r.action);
-                let weakening = match (prev_action, act) {
+                let weakening = matches!(
+                    (prev_action, act),
                     (Some(PolicyAction::Deny), PolicyAction::Ask)
-                    | (Some(PolicyAction::Deny), PolicyAction::Allow)
-                    | (Some(PolicyAction::Ask), PolicyAction::Allow) => true,
-                    _ => false,
-                };
+                        | (Some(PolicyAction::Deny), PolicyAction::Allow)
+                        | (Some(PolicyAction::Ask), PolicyAction::Allow)
+                );
                 if (weakening || act == PolicyAction::Allow) && !self.is_admin() {
                     return Err(ProtocolError::denied(
                         "policy authority change requires controller (TOOLHUB_ADMIN=1 or local.admin)",
