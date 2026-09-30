@@ -505,7 +505,6 @@ impl DaemonService {
             }
             Method::ApproveExecution => {
                 // R2-B01: only a trusted approver channel may mint execution approvals.
-                let principal = self.peer_principal();
                 if !self.is_admin() {
                     return Err(ProtocolError::denied(
                         "execute.approve requires trusted approver (TOOLHUB_ADMIN=1 or local.admin)",
@@ -932,13 +931,10 @@ impl DaemonService {
                     _ => toolhub_policy::PolicyScope::Tool,
                 };
                 // F01/F02: granting Allow is privileged; Ask/Deny are safer defaults.
-                if act == PolicyAction::Allow {
-                    let principal = self.peer_principal();
-                    if !self.is_admin() {
-                        return Err(ProtocolError::denied(
-                            "policy.set allow requires admin principal (TOOLHUB_ADMIN=1 or local.admin)",
-                        ));
-                    }
+                if act == PolicyAction::Allow && !self.is_admin() {
+                    return Err(ProtocolError::denied(
+                        "policy.set allow requires admin principal (TOOLHUB_ADMIN=1 or local.admin)",
+                    ));
                 }
                 self.registry
                     .set_policy(scope, subject, action)
