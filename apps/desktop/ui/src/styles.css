@@ -329,6 +329,12 @@ code {
   cursor: pointer;
   text-align: left;
   width: 100%;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.tool-item > div {
+  min-width: 0;
 }
 
 .tool-item:hover {
@@ -356,11 +362,17 @@ code {
   font-size: 16px;
   font-weight: 700;
   margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tool-desc {
   color: var(--muted);
   margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tags {
@@ -410,7 +422,9 @@ code {
 
 .tool-meta {
   text-align: right;
-  min-width: 110px;
+  min-width: 96px;
+  max-width: 120px;
+  flex-shrink: 0;
 }
 
 .tool-meta .ver {

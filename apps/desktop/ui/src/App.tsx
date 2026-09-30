@@ -580,7 +580,8 @@ export default function App() {
                         style={{ flex: 1, minWidth: 0 }}
                         value={addToolPath}
                         onChange={(e) => setAddToolPath(e.target.value)}
-                        placeholder="例如 D:\code\Git\cmd"
+                        placeholder="填写工具绝对路径或目录"
+                        data-testid="add-tool-path"
                       />
                       <button className="btn btn-primary" onClick={() => void addToolByPath()} disabled={busy}>
                         扫描路径
@@ -843,7 +844,13 @@ export default function App() {
                 <h1>环境</h1>
                 <p>查看本机工具所在环境，理解来源、重复安装与调用关系。</p>
               </div>
-              <button className="btn" onClick={() => void load()}>
+              <button
+                className="btn"
+                onClick={() => {
+                  notify('正在刷新环境列表…')
+                  void load().then(() => notify('环境已刷新'))
+                }}
+              >
                 刷新
               </button>
             </div>
@@ -862,7 +869,11 @@ export default function App() {
                         </div>
                       </div>
                       <div className="tool-meta">
-                        <div className="muted">{String(asRecord(e.owner).kind ?? '未知')}</div>
+                        <div className="muted">
+                          {TRUST_LABEL[String(asRecord(e.owner).kind)] ??
+                            TRUST_LABEL[String(asRecord(e.owner).certainty)] ??
+                            '未知'}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -965,7 +976,13 @@ export default function App() {
                 <h1>任务</h1>
                 <p>查看智能体通过 ToolHub 发起的任务、执行状态与结果记录。</p>
               </div>
-              <button className="btn" onClick={() => void load()}>
+              <button
+                className="btn"
+                onClick={() => {
+                  notify('正在刷新任务列表…')
+                  void load().then(() => notify('任务已刷新'))
+                }}
+              >
                 刷新
               </button>
             </div>

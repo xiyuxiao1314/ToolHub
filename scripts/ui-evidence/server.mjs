@@ -76,6 +76,31 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ app: '0.2.0', core: '0.2.0', protocol: '1.0' }));
         return;
       }
+      if (method === 'default_export_path_string') {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(path.join(process.env.TEMP || '.', 'toolhub-export.json')));
+        return;
+      }
+      if (method === 'save_text_file') {
+        const p = String(params?.path || '');
+        fs.writeFileSync(p, String(params?.contents || ''));
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(p));
+        return;
+      }
+      if (method === 'read_text_file') {
+        const p = String(params?.path || '');
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(fs.readFileSync(p, 'utf8')));
+        return;
+      }
+      if (method === 'open_terminal' || method === 'reveal_path') {
+        const p = String(params?.path || '');
+        if (!fs.existsSync(p)) throw new Error('path not found: ' + p);
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(p));
+        return;
+      }
       const result = await rpc(method, params ?? {});
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(result.result ?? result));

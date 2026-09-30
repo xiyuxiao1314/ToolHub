@@ -118,10 +118,14 @@ fn reveal_path(path: String) -> Result<String, String> {
     if raw.is_empty() {
         return Err("path required".into());
     }
+    if !Path::new(raw).exists() {
+        return Err(format!("path not found: {raw}"));
+    }
     #[cfg(windows)]
     {
+        // explorer.exe returns exit code 1 even on success when selecting a file.
         std::process::Command::new("explorer.exe")
-            .arg(raw)
+            .arg(format!("/select,\"{raw}\""))
             .spawn()
             .map_err(|e| e.to_string())?;
     }
