@@ -41,7 +41,7 @@ B01 formal review allocation: **R1 + R2**. MiMo returns a single internally revi
 
 ## B02 — Complete desktop product and delivery lifecycle
 
-**Planning status:** reserved second milestone. Its goals are visible now so B01 contracts support them. Start B02 implementation after its dispatch against the resulting B01 review revision; this plan does not instruct MiMo to start a second branch concurrently.
+**Current status (2026-09-30):** the owner approved combining all unaccepted B01 work with every B02 target. [The integrated MiMo task](../../tasks/MIMO-B02-INTEGRATED-PRODUCT.md) is dispatched after B01 R2 returned changes_required. This original target list remains authoritative; R3/R4 are reserved for the integrated product delivery and repair, not yet used.
 
 ### Product and UI targets
 

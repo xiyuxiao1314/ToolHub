@@ -1,10 +1,10 @@
 # Proposed final integrated product batch — owner decision required
 
-Status: **proposal only; not dispatched**. Formal R1/R2 are complete (2 of 4 used), and B01 remains unaccepted at reviewed7a/corrected6df. This proposal preserves the complete product scope and four-round ceiling; it does not silently forgive remaining core defects.
+Status: **owner approved 2026-09-30; dispatched as [MIMO-B02-INTEGRATED-PRODUCT.md](MIMO-B02-INTEGRATED-PRODUCT.md)**. This file preserves the review-allocation decision rationale. Formal R1/R2 are complete (2 of 4 used), and B01 remains unaccepted at reviewed7a/corrected6df. This proposal preserves the complete product scope and four-round ceiling; it does not silently forgive remaining core defects.
 
 ## Recommended arrangement
 
-Combine the unresolved original B01-01 through B01-18 acceptance work, prioritized by R2-B01 through R2-B10, with **all original B02-01 through B02-22 goals** from `docs/superpowers/plans/2026-09-29-toolhub-two-batch-plan.md`. MiMo receives one complete large dispatch after owner authorization, manages internal subagents/dependencies/integration/security review, and submits one complete product delivery.
+Combine the unresolved original B01-01 through B01-18 acceptance work, prioritized by R2-B01 through R2-B10, with **all original B02-01 through B02-22 goals** from `docs/superpowers/plans/2026-09-29-toolhub-two-batch-plan.md`. MiMo received one complete large dispatch after owner authorization, manages internal subagents/dependencies/integration/security review, and submits one complete product delivery.
 
 Formal R3 examines the integrated core plus desktop/product against exact revision and real evidence. MiMo performs one consolidated repair. Formal R4 verifies repairs and permits bounded Codex corrections. No formal fifth round starts automatically, and remaining blockers after R4 remain unaccepted. This reallocates the remaining reviews explicitly; it is not a relabeling of another B01 review as the finished R2.
 
@@ -26,4 +26,4 @@ The full product package must work without AI credentials for native functions. 
 
 Keep B01 as a core-only repair milestone first. Because its two allocated formal reviews are already used and substantive blockers remain, the owner must explicitly determine how any later verification shares/replaces R3/R4 before a further formal review. Codex does not independently increase the four-round limit.
 
-Owner choice is about milestone/review allocation. No per-module design confirmation is proposed; MiMo keeps internal execution autonomy after dispatch.
+The owner chose the integrated arrangement above. The core-only alternative was not selected. No per-module design confirmation is required; MiMo keeps internal execution autonomy within the dispatched brief.

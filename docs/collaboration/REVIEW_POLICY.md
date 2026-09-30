@@ -9,9 +9,9 @@ The owner requests large consolidated goals, MiMo-managed implementation and sub
 | Milestone | Delivery | Formal Codex rounds |
 | --- | --- | --- |
 | B01 | Runnable core: native discovery through registry, resolution, authorized execution and audit, with CLI/MCP/skills/agent-session integration | R1 consolidated review; MiMo repair; R2 verification and bounded Codex corrections |
-| B02 | Complete desktop product, AI-assisted flows, extension/data lifecycle, platform QA and local release candidates | R3 consolidated review; MiMo repair; R4 verification and bounded Codex corrections |
+| B02 integrated | All unaccepted original B01 core targets/findings plus complete desktop product, AI-assisted flows, extension/data lifecycle, platform QA and local release candidates | R3 one consolidated integrated-product review; MiMo repair; R4 verification and bounded Codex corrections |
 
-The budget starts with the first implemented B01 delivery. MIMO-000 onboarding assessment, task planning, workbench synchronization, and routine status reads are not formal product reviews. Formal rounds used: **2 of 4**. R1 reviewed `46a06aa` and R2 reviewed `7a1ba39`; both returned changes_required. R2 included bounded corrections at `6df2166` but B01 remains unaccepted. The [review ledger](../reviews/REVIEW_LEDGER.md) records exact revisions, evidence and the proposed owner decision. R3/R4 await the owner's resulting allocation. Record subsequent review results once, with exact revision IDs and evidence.
+The budget starts with the first implemented B01 delivery. MIMO-000 onboarding assessment, task planning, workbench synchronization, and routine status reads are not formal product reviews. Formal rounds used: **2 of 4**. R1 reviewed `46a06aa` and R2 reviewed `7a1ba39`; both returned changes_required. R2 included bounded corrections at `6df2166` but B01 remains unaccepted. The [review ledger](../reviews/REVIEW_LEDGER.md) records exact revisions, evidence and the proposed owner decision. The owner approved the combined unresolved-B01 + full-B02 batch on 2026-09-30; R3/R4 are allocated to its integrated delivery and one repair. They remain unused until reviews actually occur. [Dispatched task](../tasks/MIMO-B02-INTEGRATED-PRODUCT.md). Record subsequent review results once, with exact revision IDs and evidence.
 
 ## Inside a large batch
 
