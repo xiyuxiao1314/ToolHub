@@ -249,7 +249,7 @@ impl DaemonService {
                         path: r.path,
                         environment: r.environment_id,
                         trust: parse_trust(&r.trust),
-                        arch: "x86_64".into(),
+                        arch: std::env::consts::ARCH.to_string(),
                         cwd_match: false,
                     })
                     .collect();
@@ -261,7 +261,30 @@ impl DaemonService {
                         .map(|s| s.to_string()),
                     optional: false,
                 };
-                let out = toolhub_resolver::resolve(&reg, &req, cands, &ResolvePrefs::default());
+                // R2-B06: wire preferences from request
+                let prefs = ResolvePrefs {
+                    cwd: params
+                        .get("cwd")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                    prefer_environment: params
+                        .get("environment")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                    min_version: params
+                        .get("version")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                    require_trust: params
+                        .get("trust")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                    require_arch: params
+                        .get("arch")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                };
+                let out = toolhub_resolver::resolve(&reg, &req, cands, &prefs);
                 Ok(json!(out))
             }
             Method::ExecuteTool => {
@@ -565,12 +588,25 @@ impl DaemonService {
                             "unsupported skill schema",
                         ));
                     }
-                    // reject hook/installer payloads
-                    if manifest.get("hooks").is_some() || manifest.get("install").is_some() {
+                    // R2-B09: reject hook/installer payloads and unsafe paths
+                    if manifest.get("hooks").is_some()
+                        || manifest.get("install").is_some()
+                        || manifest.get("postinstall").is_some()
+                    {
                         return Err(ProtocolError::new(
                             ErrorCode::Denied,
                             "skill hooks/installers are not permitted",
                         ));
+                    }
+                    for key in ["instruction_file", "mcp_config", "package_path"] {
+                        if let Some(p) = manifest.get(key).and_then(|v| v.as_str()) {
+                            if p.contains("..") || p.starts_with('/') || p.contains(':') {
+                                return Err(ProtocolError::new(
+                                    ErrorCode::InvalidParams,
+                                    format!("unsafe skill path: {p}"),
+                                ));
+                            }
+                        }
                     }
                     let kind = manifest
                         .get("kind")
@@ -637,10 +673,9 @@ impl DaemonService {
                 }
             }
             Method::DiscoveryStart => {
-                let agent_id = params
-                    .get("agent_id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("local.agent");
+                // R2-B08: session is bound to the authenticated peer principal.
+                let principal = self.peer_principal();
+                let agent_id = principal.as_str();
                 let scopes: Vec<String> = params
                     .get("scopes")
                     .and_then(|v| v.as_array())
@@ -675,9 +710,11 @@ impl DaemonService {
             }
             Method::DiscoveryList => {
                 let now = chrono::Utc::now();
+                let principal = self.peer_principal();
                 let list: Vec<_> = self
                     .sessions
                     .iter()
+                    .filter(|s| s.agent_id == principal)
                     .map(|s| {
                         json!({
                             "session_id": s.id,
@@ -697,10 +734,16 @@ impl DaemonService {
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| ProtocolError::new(ErrorCode::InvalidParams, "id required"))?;
                 let now = chrono::Utc::now();
+                let principal = self.peer_principal();
                 let s =
                     self.sessions.iter().find(|s| s.id == id).ok_or_else(|| {
                         ProtocolError::new(ErrorCode::NotFound, "session not found")
                     })?;
+                if s.agent_id != principal {
+                    return Err(ProtocolError::denied(
+                        "session belongs to another principal",
+                    ));
+                }
                 if !s.is_usable(now) {
                     return Err(ProtocolError::new(
                         ErrorCode::Expired,
@@ -720,9 +763,15 @@ impl DaemonService {
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
                 let now = chrono::Utc::now();
+                let principal = self.peer_principal();
                 let s = self.sessions.iter().find(|s| s.id == id).ok_or_else(|| {
                     ProtocolError::new(ErrorCode::SessionInvalid, "session not found")
                 })?;
+                if s.agent_id != principal {
+                    return Err(ProtocolError::denied(
+                        "session belongs to another principal",
+                    ));
+                }
                 if !s.is_usable(now) {
                     return Err(ProtocolError::new(ErrorCode::Expired, "session expired"));
                 }
@@ -765,10 +814,21 @@ impl DaemonService {
                     .get("session_id")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
+                let principal = self.peer_principal();
+                let mut owned = false;
                 for s in &mut self.sessions {
                     if s.id == id {
+                        if s.agent_id != principal {
+                            return Err(ProtocolError::denied(
+                                "session belongs to another principal",
+                            ));
+                        }
                         s.revoke();
+                        owned = true;
                     }
+                }
+                if !owned {
+                    return Err(ProtocolError::new(ErrorCode::NotFound, "session not found"));
                 }
                 let _ = self.registry.revoke_discovery_session(id);
                 Ok(json!({"revoked": true}))

@@ -60,6 +60,33 @@ impl Registry {
             )
             .optional()?;
         let id = existing.unwrap_or_else(|| input.id.clone());
+        // R2-B04: preserve blocked/user-corrected trust across rescans.
+        let prev_trust: Option<String> = tx
+            .query_row(
+                "SELECT trust_json FROM tool_instances WHERE id = ?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .optional()?;
+        let trust_json = match prev_trust {
+            Some(prev) => {
+                let prev_level = serde_json::from_str::<serde_json::Value>(&prev)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("level")
+                            .and_then(|l| l.as_str())
+                            .map(|s| s.to_string())
+                    });
+                if prev_level.as_deref() == Some("blocked")
+                    || prev_level.as_deref() == Some("user_trusted")
+                {
+                    prev
+                } else {
+                    input.trust_json.clone()
+                }
+            }
+            None => input.trust_json.clone(),
+        };
         tx.execute(
             "INSERT INTO tool_instances(
                 id, definition_id, version, platform, arch, path, canonical_path,
@@ -85,7 +112,7 @@ impl Registry {
                 input.environment_id,
                 input.origin_json,
                 input.owner_json,
-                input.trust_json,
+                trust_json,
                 input.status,
                 now
             ],

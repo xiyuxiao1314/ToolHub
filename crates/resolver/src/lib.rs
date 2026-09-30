@@ -32,6 +32,7 @@ pub struct ResolvePrefs {
     pub prefer_environment: Option<String>,
     pub min_version: Option<String>,
     pub require_trust: Option<String>,
+    pub require_arch: Option<String>,
 }
 
 /// Deterministic scoring: project env > version > trust > path stability.
@@ -56,8 +57,11 @@ pub fn resolve(
         }
     };
 
-    // F10: eligibility before ranking
+    // F10/R2-B06: eligibility before ranking
     candidates.retain(|c| c.trust != "blocked" && c.trust != "unknown");
+    if let Some(want_arch) = prefs.require_arch.as_deref() {
+        candidates.retain(|c| c.arch.eq_ignore_ascii_case(want_arch));
+    }
     if let Some(want_trust) = prefs.require_trust.as_deref() {
         let rank = |t: &str| match t {
             "verified" => 4,

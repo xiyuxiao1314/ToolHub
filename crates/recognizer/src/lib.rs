@@ -172,7 +172,7 @@ pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
             evidence.push(
                 Evidence::native(
                     EvidenceSource::PathPattern,
-                    0.9,
+                    0.75,
                     format!("path/name pattern matched {}", rule.name),
                 )
                 .unwrap(),
@@ -182,7 +182,7 @@ pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
             evidence.push(
                 Evidence::native(
                     EvidenceSource::PathPattern,
-                    0.7,
+                    0.55,
                     format!("file name matched {}", rule.name),
                 )
                 .unwrap(),
@@ -218,16 +218,28 @@ pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
         None
     };
 
-    // F07: filename/path alone is a weak hypothesis — not Known execution trust.
-    let corroborated = evidence.iter().any(|e| e.confidence >= 0.85);
+    // F07/R2-B05: path/name alone is a weak hypothesis.
+    // Known trust requires corroborating executable metadata (MZ/size), not a renamed text file.
+    let binary_ok = looks_like_executable(&candidate.path);
+    if binary_ok {
+        evidence.push(
+            Evidence::native(
+                EvidenceSource::ExecutableMetadata,
+                0.85,
+                "executable metadata corroborates recognition",
+            )
+            .unwrap(),
+        );
+    }
+    let corroborated = binary_ok && evidence.iter().any(|e| e.confidence >= 0.75);
     let confidence = if !corroborated {
-        0.45
+        0.4
     } else if ambiguity.is_some() {
-        0.65
+        0.6
     } else {
         0.85
     };
-    let confidence = validate_confidence(confidence).unwrap_or(0.4);
+    let confidence = validate_confidence(confidence).unwrap_or(0.35);
     let trust = if corroborated {
         TrustRecord::known(evidence.clone())
     } else {
@@ -284,6 +296,32 @@ pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
         confidence,
         ambiguity,
     }
+}
+
+/// R2-B05: require real executable metadata before Known trust (not a renamed text file).
+fn looks_like_executable(path: &str) -> bool {
+    let Ok(meta) = std::fs::metadata(path) else {
+        return false;
+    };
+    if !meta.is_file() {
+        return false;
+    }
+    // Tiny files are almost certainly not real tool binaries.
+    if meta.len() < 1024 {
+        return false;
+    }
+    // Windows PE MZ header; Unix ELF/shebang+size.
+    if let Ok(mut f) = std::fs::File::open(path) {
+        use std::io::Read;
+        let mut magic = [0u8; 4];
+        if f.read_exact(&mut magic).is_ok() {
+            if cfg!(windows) {
+                return magic[0] == b'M' && magic[1] == b'Z';
+            }
+            return magic == [0x7f, b'E', b'L', b'F'] || magic[0] == b'#';
+        }
+    }
+    false
 }
 
 /// F06: stable instance identity from normalized path (not per-discovery UUID).
@@ -393,6 +431,22 @@ mod tests {
         ));
         assert!(r.recognized);
         assert_eq!(r.definition.unwrap().id.as_str(), "org.python.python");
+    }
+
+    #[test]
+    fn renamed_text_python_is_not_known() {
+        let dir = std::env::temp_dir().join("toolhub-r2b05");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("python.exe");
+        std::fs::write(&path, b"this is not a real binary").unwrap();
+        let r = recognize(&cand(&path.to_string_lossy()));
+        // May match the rule by basename, but trust must remain unknown (no MZ).
+        if r.recognized {
+            let inst = r.instance.unwrap();
+            let level = inst.trust.level;
+            assert_ne!(level, toolhub_core::TrustLevel::Known);
+            assert_ne!(level, toolhub_core::TrustLevel::Verified);
+        }
     }
 
     #[test]

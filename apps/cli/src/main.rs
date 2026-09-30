@@ -278,6 +278,21 @@ fn run(cli: &Cli) -> anyhow::Result<()> {
     } else {
         println!("{}", serde_json::to_string_pretty(&result)?);
     }
+    // R2-B10: propagate semantic child failure as CLI exit code.
+    if let Some(status) = result.get("status").and_then(|s| s.as_str()) {
+        match status {
+            "success" => {}
+            "failed" | "timed_out" | "cancelled" => {
+                if let Some(code) = result.get("exit_code").and_then(|c| c.as_i64()) {
+                    std::process::exit((code as i32).clamp(1, 125));
+                }
+                std::process::exit(1);
+            }
+            "denied" | "expired" | "invalid_request" => std::process::exit(4),
+            "unavailable" => std::process::exit(6),
+            _ => {}
+        }
+    }
     Ok(())
 }
 
@@ -303,8 +318,7 @@ impl DaemonClient {
         // R2-B02: prefer shared named-pipe service when present.
         #[cfg(windows)]
         {
-            if let Ok(file) =
-                toolhub_ipc::connect_named_pipe(&toolhub_ipc::user_scoped_pipe_name())
+            if let Ok(file) = toolhub_ipc::connect_named_pipe(&toolhub_ipc::user_scoped_pipe_name())
             {
                 let reader = BufReader::new(file.try_clone()?);
                 return Ok(Self {

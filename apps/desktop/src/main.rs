@@ -71,10 +71,7 @@ impl DaemonHandle {
     }
 }
 
-fn handle_client(
-    mut stream: TcpStream,
-    daemon: Arc<Mutex<DaemonHandle>>,
-) -> std::io::Result<()> {
+fn handle_client(mut stream: TcpStream, daemon: Arc<Mutex<DaemonHandle>>) -> std::io::Result<()> {
     let mut buf = vec![0u8; 65536];
     let n = stream.read(&mut buf)?;
     let req = String::from_utf8_lossy(&buf[..n]).to_string();

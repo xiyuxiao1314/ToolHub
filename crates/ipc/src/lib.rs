@@ -104,7 +104,9 @@ pub fn user_scoped_pipe_name() -> String {
 pub fn accept_named_pipe(name: &str) -> IpcResult<std::fs::File> {
     use std::os::windows::io::FromRawHandle;
     use windows_sys::Win32::Foundation::{FALSE, INVALID_HANDLE_VALUE};
-    use windows_sys::Win32::System::Pipes::{ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe};
+    use windows_sys::Win32::System::Pipes::{
+        ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe,
+    };
 
     const PIPE_ACCESS_DUPLEX: u32 = 0x3;
     const PIPE_TYPE_BYTE: u32 = 0x0;
@@ -133,9 +135,7 @@ pub fn accept_named_pipe(name: &str) -> IpcResult<std::fs::File> {
         let err = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
         if ok == FALSE && err != 535 {
             let _ = DisconnectNamedPipe(handle);
-            return Err(IpcError::Message(format!(
-                "ConnectNamedPipe failed: {err}"
-            )));
+            return Err(IpcError::Message(format!("ConnectNamedPipe failed: {err}")));
         }
         Ok(std::fs::File::from_raw_handle(handle as *mut _))
     }
