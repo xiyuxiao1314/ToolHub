@@ -89,7 +89,7 @@ fn two_clients_share_registry_via_stdio_daemon() {
     let dir = tempfile::tempdir().unwrap();
     let db = dir.path().join("shared.sqlite");
 
-    let mut call = |method: &str, params: &str| -> String {
+    let call = |method: &str, params: &str| -> String {
         let mut child = Command::new(toolhubd_bin())
             .env("TOOLHUB_REGISTRY", &db)
             .env("TOOLHUB_PRINCIPAL", "local.admin")
