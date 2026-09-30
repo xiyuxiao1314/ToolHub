@@ -247,6 +247,9 @@ impl WindowsRegistryProvider {
                             } else {
                                 loc.clone()
                             });
+                            if !version.is_empty() {
+                                c.version_hint = Some(version.clone());
+                            }
                             c.metadata = serde_json::json!({
                                 "source": "registry_uninstall",
                                 "display_name": display,

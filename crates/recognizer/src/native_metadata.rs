@@ -32,11 +32,86 @@ pub fn read(path: &Path) -> NativeMetadata {
         return NativeMetadata::default();
     };
     let mut bytes = vec![];
-    if file.take(16 * 1024 * 1024).read_to_end(&mut bytes).is_err() {
+    // Full read keeps version resources reachable on large tools (node.exe is ~90MB).
+    if std::io::Read::take(file, 96 * 1024 * 1024)
+        .read_to_end(&mut bytes)
+        .is_err()
+    {
         return NativeMetadata::default();
     }
-    measure(&bytes)
+    let mut m = measure(&bytes);
+    if m.version.is_none() {
+        m.version = scan_version_fallback(&bytes);
+    }
+    m
 }
+/// Some PE files store version strings outside the parser's walk; scan UTF-16 keys.
+fn scan_version_fallback(b: &[u8]) -> Option<String> {
+    for key in [
+        "FileVersion",
+        "ProductVersion",
+    ] {
+        let wide: Vec<u8> = key.encode_utf16().flat_map(|c| c.to_le_bytes()).collect();
+        if let Some(idx) = find_subslice(b, &wide) {
+            let start = idx + wide.len();
+            let chunk = b.get(start..start.saturating_add(80))?;
+            let mut i = 0;
+            while i + 1 < chunk.len() && chunk[i] == 0 && chunk[i + 1] == 0 {
+                i += 2;
+            }
+            let mut units = vec![];
+            let mut j = i;
+            while j + 1 < chunk.len() {
+                let u = u16::from_le_bytes([chunk[j], chunk[j + 1]]);
+                if u == 0 {
+                    break;
+                }
+                units.push(u);
+                j += 2;
+            }
+            let text = String::from_utf16_lossy(&units);
+            if !text.is_empty() {
+                return Some(normalize_pe_version(&text));
+            }
+        }
+    }
+    None
+}
+
+fn find_subslice(hay: &[u8], needle: &[u8]) -> Option<usize> {
+    hay.windows(needle.len()).position(|w| w == needle)
+}
+
+/// Keep a comparable numeric core from strings like `2.47.1.windows.1`.
+fn normalize_pe_version(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if toolhub_core::VersionConstraint::parse(&format!("={trimmed}")).is_ok() {
+        return trimmed.to_string();
+    }
+    // Leading `1.98.1 (build)` or `2.47.1.windows.1` -> `1.98.1` / `2.47.1`.
+    let mut buf = String::new();
+    for c in trimmed.chars() {
+        if c.is_ascii_digit() {
+            buf.push(c);
+        } else if c == '.' && !buf.is_empty() && !buf.ends_with('.') {
+            buf.push(c);
+        } else {
+            break;
+        }
+    }
+    let parts: Vec<&str> = buf
+        .trim_end_matches('.')
+        .split('.')
+        .filter(|s| !s.is_empty())
+        .take(3)
+        .collect();
+    if parts.is_empty() {
+        trimmed.to_string()
+    } else {
+        parts.join(".")
+    }
+}
+
 pub fn measure(b: &[u8]) -> NativeMetadata {
     let mut m = NativeMetadata::default();
     if b.starts_with(b"MZ") {
@@ -56,7 +131,10 @@ pub fn measure(b: &[u8]) -> NativeMetadata {
                 .get("FileVersion")
                 .or_else(|| strings.get("ProductVersion"))
                 .cloned()
-                .filter(|v| toolhub_core::VersionConstraint::parse(&format!("={v}")).is_ok());
+                .map(|v| normalize_pe_version(&v));
+        }
+        if m.version.is_none() {
+            m.version = scan_version_fallback(b);
         }
     } else if b.starts_with(b"\x7fELF")
         && b.len() >= 20

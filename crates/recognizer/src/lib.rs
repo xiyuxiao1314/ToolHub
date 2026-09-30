@@ -53,17 +53,33 @@ pub const KNOWN_TOOLS: &[KnownToolRule] = &[
     KnownToolRule {
         definition_id: "org.openjdk.java",
         name: "Java",
-        file_names: &["java.exe", "java", "javac.exe", "javac"],
+        file_names: &["java.exe", "java"],
         path_substrings: &["java", "jdk", "jbr", "openjdk"],
         capabilities: &["language.java.runtime"],
         vendor: "OpenJDK",
     },
     KnownToolRule {
+        definition_id: "org.openjdk.javac",
+        name: "Java 编译器",
+        file_names: &["javac.exe", "javac"],
+        path_substrings: &["java", "jdk", "openjdk"],
+        capabilities: &["language.java.compile"],
+        vendor: "OpenJDK",
+    },
+    KnownToolRule {
         definition_id: "org.rust.rustc",
-        name: "Rust",
-        file_names: &["rustc.exe", "rustc", "cargo.exe", "cargo"],
-        path_substrings: &["cargo", "rustup", "rust"],
+        name: "Rustc",
+        file_names: &["rustc.exe", "rustc"],
+        path_substrings: &["rustup", "rust"],
         capabilities: &["language.rust.compile"],
+        vendor: "Rust Project",
+    },
+    KnownToolRule {
+        definition_id: "org.rust.cargo",
+        name: "Cargo",
+        file_names: &["cargo.exe", "cargo"],
+        path_substrings: &["cargo", "rustup", "rust"],
+        capabilities: &["language.rust.build"],
         vendor: "Rust Project",
     },
     KnownToolRule {
@@ -144,9 +160,104 @@ pub const KNOWN_TOOLS: &[KnownToolRule] = &[
     },
 ];
 
+/// Windows App Execution Aliases under WindowsApps are tiny stubs, not full tools.
+fn is_windows_store_alias(candidate: &ScanCandidate) -> bool {
+    let path = candidate.path.replace('/', "\\").to_ascii_lowercase();
+    // `...\Microsoft\WindowsApps\...` is reserved for Store app execution aliases.
+    path.contains("\\windowsapps\\")
+}
+
+/// Install-location folders are not tool executables.
+fn is_directory_install_location(candidate: &ScanCandidate) -> bool {
+    let path = Path::new(&candidate.path);
+    if candidate.path.ends_with('/') || candidate.path.ends_with('\\') {
+        return true;
+    }
+    if path.is_dir() {
+        return true;
+    }
+    // Uninstall InstallLocation without a file extension is typically a folder.
+    let file_name = candidate
+        .file_name
+        .as_deref()
+        .unwrap_or_else(|| path.file_name().and_then(|s| s.to_str()).unwrap_or(""));
+    !file_name.contains('.') && path.extension().is_none() && path.is_dir()
+}
+
+/// Prefer PE/ELF versions, then scan/uninstall hints, then a normalized PE version string.
+fn resolve_version(candidate: &ScanCandidate, native_version: Option<String>) -> Option<String> {
+    if let Some(v) = native_version {
+        return Some(v);
+    }
+    let hint = candidate
+        .version_hint
+        .clone()
+        .or_else(|| {
+            candidate
+                .metadata
+                .get("display_version")
+                .and_then(|v| v.as_str())
+                .map(str::to_string)
+        })
+        .unwrap_or_default();
+    if hint.is_empty() {
+        return None;
+    }
+    Some(normalize_display_version(&hint))
+}
+
+/// Keep numeric x.y.z from strings like `2.47.1.windows.1`.
+fn normalize_display_version(raw: &str) -> String {
+    let trimmed = raw.trim().trim_start_matches('v');
+    if toolhub_core::VersionConstraint::parse(&format!("={trimmed}")).is_ok() {
+        return trimmed.to_string();
+    }
+    let mut buf = String::new();
+    for c in trimmed.chars() {
+        if c.is_ascii_digit() {
+            buf.push(c);
+        } else if c == '.' && !buf.is_empty() && !buf.ends_with('.') {
+            buf.push(c);
+        } else {
+            break;
+        }
+    }
+    let parts: Vec<&str> = buf
+        .trim_end_matches('.')
+        .split('.')
+        .filter(|s| !s.is_empty())
+        .take(3)
+        .collect();
+    if parts.is_empty() {
+        trimmed.to_string()
+    } else {
+        parts.join(".")
+    }
+}
+
 /// Recognize a candidate using static path/name metadata only.
 pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
     let mut evidence = vec![];
+    if is_directory_install_location(candidate) {
+        return RecognitionResult {
+            recognized: false,
+            definition: None,
+            instance: None,
+            evidence,
+            confidence: 0.0,
+            ambiguity: Some("install location folder is not a tool executable".into()),
+        };
+    }
+    if is_windows_store_alias(candidate) {
+        return RecognitionResult {
+            recognized: false,
+            definition: None,
+            instance: None,
+            evidence,
+            confidence: 0.0,
+            ambiguity: Some("windows store app execution alias is not a full tool install".into()),
+        };
+    }
     let file_name = candidate
         .file_name
         .clone()
@@ -313,7 +424,7 @@ pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
         ))
         .expect("stable id"),
         definition_id: definition.id.clone(),
-        version: native.version.clone(),
+        version: resolve_version(candidate, native.version.clone()),
         platform,
         arch: native.arch.unwrap_or_else(|| "unknown".into()),
         path: candidate.path.clone(),
@@ -344,6 +455,16 @@ pub fn recognize_with_resources(
     candidate: &ScanCandidate,
     store: &resources::ResourceStore,
 ) -> RecognitionResult {
+    if is_directory_install_location(candidate) || is_windows_store_alias(candidate) {
+        return RecognitionResult {
+            recognized: false,
+            definition: None,
+            instance: None,
+            evidence: vec![],
+            confidence: 0.0,
+            ambiguity: Some("not a full tool executable".into()),
+        };
+    }
     let file = candidate.file_name.as_deref().unwrap_or("");
     let Some(rule) = store
         .rules()
@@ -410,7 +531,7 @@ pub fn recognize_with_resources(
         ))
         .unwrap(),
         definition_id: definition.id.clone(),
-        version: native.version,
+        version: resolve_version(candidate, native.version),
         platform: match native.format.as_deref() {
             Some("pe") => "windows",
             Some("elf") => "linux",

@@ -205,6 +205,44 @@ impl Registry {
             });
             tx.execute("INSERT INTO scan_candidates(id,path,canonical_path,file_name,size_bytes,sha256,version_hint,recognized,metadata_json,discovered_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10) ON CONFLICT(id) DO UPDATE SET canonical_path=excluded.canonical_path,file_name=excluded.file_name,size_bytes=excluded.size_bytes,sha256=excluded.sha256,version_hint=excluded.version_hint,recognized=excluded.recognized,metadata_json=excluded.metadata_json,discovered_at=excluded.discovered_at",params![id,candidate.path,candidate.canonical_path,candidate.file_name,candidate.size_bytes.map(|s|s as i64),candidate.sha256,candidate.version_hint,recognized as i32,serde_json::to_string(&candidate.metadata)?,now])?;
         }
+        // If this scan saw a path but did not recognize it as a tool executable
+        // (e.g. uninstall InstallLocation folder), retire any stale instance on that path.
+        let mut seen_not_tool: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for candidate in candidates {
+            let key = identity_key(
+                candidate
+                    .canonical_path
+                    .as_deref()
+                    .unwrap_or(&candidate.path),
+            );
+            let recognized = instances.iter().any(|i| {
+                identity_key(
+                    i.instance
+                        .canonical_path
+                        .as_deref()
+                        .unwrap_or(&i.instance.path),
+                ) == key
+            });
+            if !recognized {
+                seen_not_tool.insert(key);
+            }
+        }
+        if !seen_not_tool.is_empty() {
+            let mut stmt = tx.prepare("SELECT id, path, canonical_path FROM tool_instances WHERE status='available'")?;
+            let stale: Vec<(String, String, Option<String>)> = stmt
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+                .collect::<Result<Vec<_>, _>>()?;
+            drop(stmt);
+            for (id, path, canonical) in stale {
+                let key = identity_key(canonical.as_deref().unwrap_or(&path));
+                if seen_not_tool.contains(&key) && !ids.contains(&id) {
+                    tx.execute(
+                        "UPDATE tool_instances SET status='missing' WHERE id=?1",
+                        [&id],
+                    )?;
+                }
+            }
+        }
         for scope in scopes.iter().filter(|s| s.complete) {
             let mut query=tx.prepare("SELECT m.instance_id FROM scan_membership m JOIN tool_instances i ON i.id=m.instance_id WHERE m.provider=?1 AND m.root=?2 AND i.status='available'")?;
             let members = query
@@ -478,7 +516,8 @@ impl Registry {
                     i.environment_id, i.trust_json, i.status, i.arch, i.platform
              FROM tool_instances i
              JOIN tool_definitions d ON d.id = i.definition_id
-             WHERE d.name LIKE ?1 OR i.path LIKE ?1 OR d.id LIKE ?1
+             WHERE i.status = 'available'
+               AND (d.name LIKE ?1 OR i.path LIKE ?1 OR d.id LIKE ?1)
              ORDER BY d.name, i.path",
         )?;
         let rows = stmt
