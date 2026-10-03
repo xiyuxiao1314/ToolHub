@@ -183,10 +183,58 @@
           "markdownDescription": "Enables the app_versions command without any pre-configured scope."
         },
         {
+          "description": "Enables the default_export_path_string command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-default-export-path-string",
+          "markdownDescription": "Enables the default_export_path_string command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the open_program_folder command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-open-program-folder",
+          "markdownDescription": "Enables the open_program_folder command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the open_terminal command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-open-terminal",
+          "markdownDescription": "Enables the open_terminal command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the pick_program_path command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-pick-program-path",
+          "markdownDescription": "Enables the pick_program_path command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the read_text_file command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-read-text-file",
+          "markdownDescription": "Enables the read_text_file command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the reveal_path command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-reveal-path",
+          "markdownDescription": "Enables the reveal_path command without any pre-configured scope."
+        },
+        {
           "description": "Enables the rpc command without any pre-configured scope.",
           "type": "string",
           "const": "allow-rpc",
           "markdownDescription": "Enables the rpc command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the save_text_file command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-save-text-file",
+          "markdownDescription": "Enables the save_text_file command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the scan_root_for_path command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-scan-root-for-path",
+          "markdownDescription": "Enables the scan_root_for_path command without any pre-configured scope."
         },
         {
           "description": "Denies the app_versions command without any pre-configured scope.",
@@ -195,10 +243,58 @@
           "markdownDescription": "Denies the app_versions command without any pre-configured scope."
         },
         {
+          "description": "Denies the default_export_path_string command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-default-export-path-string",
+          "markdownDescription": "Denies the default_export_path_string command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the open_program_folder command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-open-program-folder",
+          "markdownDescription": "Denies the open_program_folder command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the open_terminal command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-open-terminal",
+          "markdownDescription": "Denies the open_terminal command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the pick_program_path command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-pick-program-path",
+          "markdownDescription": "Denies the pick_program_path command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the read_text_file command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-read-text-file",
+          "markdownDescription": "Denies the read_text_file command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the reveal_path command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-reveal-path",
+          "markdownDescription": "Denies the reveal_path command without any pre-configured scope."
+        },
+        {
           "description": "Denies the rpc command without any pre-configured scope.",
           "type": "string",
           "const": "deny-rpc",
           "markdownDescription": "Denies the rpc command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the save_text_file command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-save-text-file",
+          "markdownDescription": "Denies the save_text_file command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the scan_root_for_path command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-scan-root-for-path",
+          "markdownDescription": "Denies the scan_root_for_path command without any pre-configured scope."
         },
         {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",

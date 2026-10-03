@@ -228,7 +228,9 @@ impl Registry {
             }
         }
         if !seen_not_tool.is_empty() {
-            let mut stmt = tx.prepare("SELECT id, path, canonical_path FROM tool_instances WHERE status='available'")?;
+            let mut stmt = tx.prepare(
+                "SELECT id, path, canonical_path FROM tool_instances WHERE status='available'",
+            )?;
             let stale: Vec<(String, String, Option<String>)> = stmt
                 .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
                 .collect::<Result<Vec<_>, _>>()?;
@@ -510,18 +512,26 @@ impl Registry {
     }
 
     pub fn search(&mut self, query: &str) -> RegistryResult<Vec<InstanceRow>> {
+        self.search_with_missing(query, false)
+    }
+
+    pub fn search_with_missing(
+        &mut self,
+        query: &str,
+        include_missing: bool,
+    ) -> RegistryResult<Vec<InstanceRow>> {
         let like = format!("%{}%", query);
         let mut stmt = self.db.conn.prepare(
             "SELECT i.id, i.definition_id, d.name, i.version, i.path, i.canonical_path,
                     i.environment_id, i.trust_json, i.status, i.arch, i.platform
              FROM tool_instances i
              JOIN tool_definitions d ON d.id = i.definition_id
-             WHERE i.status = 'available'
+             WHERE (i.status = 'available' OR ?2)
                AND (d.name LIKE ?1 OR i.path LIKE ?1 OR d.id LIKE ?1)
              ORDER BY d.name, i.path",
         )?;
         let rows = stmt
-            .query_map(params![like], |r| {
+            .query_map(params![like, include_missing], |r| {
                 Ok(InstanceRow {
                     id: r.get(0)?,
                     definition_id: r.get(1)?,
@@ -1165,6 +1175,24 @@ mod tests {
             status: "available".into(),
             capabilities: vec!["language.python.execute".into()],
         }
+    }
+
+    #[test]
+    fn missing_instances_are_visible_only_when_explicitly_requested() {
+        let mut reg = Registry::open_memory().unwrap();
+        reg.ensure_builtin_environments().unwrap();
+        reg.upsert_instance(&sample("present", "C:/present/python.exe"))
+            .unwrap();
+        let mut missing = sample("missing", "C:/missing/python.exe");
+        missing.status = "missing".into();
+        reg.upsert_instance(&missing).unwrap();
+        assert_eq!(reg.search("Python").unwrap().len(), 1);
+        assert_eq!(reg.search_with_missing("Python", true).unwrap().len(), 2);
+        assert_eq!(
+            reg.search_with_missing("C:/missing", true).unwrap()[0].status,
+            "missing"
+        );
+        assert!(reg.search("C:/missing").unwrap().is_empty());
     }
 
     #[test]

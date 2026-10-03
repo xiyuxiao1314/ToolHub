@@ -120,10 +120,7 @@ fn soak_one_daemon_many_requests() {
         );
     }
     let elapsed = start.elapsed();
-    assert!(
-        elapsed < Duration::from_secs(120),
-        "soak took {elapsed:?}"
-    );
+    assert!(elapsed < Duration::from_secs(120), "soak took {elapsed:?}");
 
     // Still healthy
     let p2 = d.call("ping", "{}");
@@ -140,7 +137,10 @@ fn soak_scan_query_interleave() {
     let mut d = ChildDaemon::spawn(&db);
     for i in 0..20 {
         let s = d.call("scan.start", &scan);
-        assert!(s.contains("candidates") || s.contains("result"), "i={i} {s}");
+        assert!(
+            s.contains("candidates") || s.contains("result"),
+            "i={i} {s}"
+        );
         let q = d.call("registry.search", r#"{"query":"a"}"#);
         assert!(
             q.contains("result") || q.contains("[]") || q.contains("[{"),

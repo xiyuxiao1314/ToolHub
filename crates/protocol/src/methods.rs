@@ -55,6 +55,14 @@ pub enum Method {
     EventsSubscribe,
     EventsPoll,
     EventsUnsubscribe,
+    ProgramList,
+    ProgramScanStart,
+    ProgramScanStatus,
+    ProgramScanCancel,
+    ProgramSelect,
+    ProgramSave,
+    ProgramRemove,
+    ProgramLaunch,
 }
 
 pub const METHOD_NAMES: &[(&str, Method)] = &[
@@ -111,6 +119,14 @@ pub const METHOD_NAMES: &[(&str, Method)] = &[
     ("events.subscribe", Method::EventsSubscribe),
     ("events.poll", Method::EventsPoll),
     ("events.unsubscribe", Method::EventsUnsubscribe),
+    ("program.list", Method::ProgramList),
+    ("program.scan_start", Method::ProgramScanStart),
+    ("program.scan_status", Method::ProgramScanStatus),
+    ("program.scan_cancel", Method::ProgramScanCancel),
+    ("program.select", Method::ProgramSelect),
+    ("program.save", Method::ProgramSave),
+    ("program.remove", Method::ProgramRemove),
+    ("program.launch", Method::ProgramLaunch),
 ];
 
 impl Method {

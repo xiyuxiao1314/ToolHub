@@ -12,14 +12,27 @@ export interface ResolveOptions { version?:string; cwd?:string; prefer_environme
 export interface ExecuteParams { instance_id?:string; capability?:string; args:string[]; cwd?:string; approval_id?:string; session_id?:string; execution_id?:string; timeout_ms?:number; max_output_bytes?:number; stdin?:string; }
 export interface ExecutionResult { status:'success'|'failed'|'denied'|'expired'|'timed_out'|'cancelled'|'unavailable'|'invalid_request'; exit_code?:number; stdout:string; stderr:string; duration_ms:number; truncated:boolean; error_code?:string; fallback_allowed?:boolean; execution_id?:string; }
 export interface ApprovalRequest { request_id:string; session_id:string; expires_at:string; }
+export interface ProgramCandidate { id:string; kind:'file'|'command'; name:string; path:string; cwd:string; command:string; evidence:string[]; }
+export interface ProgramEntry extends ProgramCandidate { args:string[]; favorite:boolean; available:boolean; launch_count:number; last_launched:string|null; }
+export interface ProgramSelection extends Omit<ProgramCandidate,'id'> { selection_id:string; args:string[]; favorite:boolean; }
+export interface ProgramDraft { id?:string; selection_id?:string; cwd_selection_id?:string; name:string; command:string; args:string[]; favorite:boolean; }
+export interface ProgramScan { id?:string; status:'idle'|'running'|'completed'|'partial'|'cancelled'|'failed'; roots?:string[]; roots_attempted?:string[]; visited?:number; skipped?:number; unreadable?:number; current?:string; limitations?:string[]; total:number; candidates:ProgramCandidate[]; }
 export interface MethodMap {
+ 'program.list': {params:{};result:ProgramEntry[]};
+ 'program.scan_start': {params:{roots?:string[]};result:{id:string}};
+ 'program.scan_status': {params:{offset?:number;limit?:number};result:ProgramScan};
+ 'program.scan_cancel': {params:{};result:{cancel_requested:boolean}};
+ 'program.select': {params:{candidate_ids:string[]}|{path:string;kind:'file'|'command'};result:ProgramSelection[]};
+ 'program.save': {params:{items:ProgramDraft[]};result:{saved:number}};
+ 'program.remove': {params:{id:string};result:{removed:boolean}};
+ 'program.launch': {params:{id:string};result:{pid:number;submitted:true}};
  'status': { params: {}; result: StatusResult };
  'capability.list': { params: {}; result: Json[] };
  'registry.correct': { params: {id:string;trust?:'verified'|'known'|'user_trusted'|'unknown'|'blocked';name?:string}; result: Json };
 
  'ping': { params: {}; result: Json };
  'protocol.negotiate': { params: {versions:string[]}; result: Json };
- 'registry.search': { params: {query:string}; result: InstanceRow[] };
+ 'registry.search': { params: {query:string; include_missing?:boolean}; result: InstanceRow[] };
  'registry.inspect_instance': { params: {id:string}; result: Json };
  'resolve.capability': { params: {capability:string}&ResolveOptions; result: ResolveResult };
  'scan.start': { params: {mode:'quick'|'full'|'custom'}; result: Json };

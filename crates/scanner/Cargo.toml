@@ -10,10 +10,12 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 walkdir = { workspace = true }
 which = { workspace = true }
+uuid = { workspace = true }
 dirs = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
+windows-sys = { version = "0.61.2", features = ["Win32_Storage_FileSystem"] }
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import Programs from './Programs'
 
 type Json = Record<string, unknown> | unknown[] | string | number | boolean | null
 
@@ -7,10 +8,11 @@ async function rpc(method: string, params: Json = {}): Promise<any> {
   return invoke('rpc', { method, params })
 }
 
-type PageId = 'tools' | 'agents' | 'envs' | 'market' | 'tasks' | 'settings'
+type PageId = 'tools' | 'programs' | 'agents' | 'envs' | 'market' | 'tasks' | 'settings'
 
 const NAV: { id: PageId; label: string; icon: string }[] = [
   { id: 'tools', label: '工具', icon: '🧰' },
+  { id: 'programs', label: '程序', icon: '🚀' },
   { id: 'agents', label: '智能体', icon: '🤖' },
   { id: 'envs', label: '环境', icon: '🧩' },
   { id: 'market', label: '市场', icon: '🛍️' },
@@ -59,10 +61,22 @@ const DEFAULT_PREFS: UiPrefs = {
 
 function loadPrefs(): UiPrefs {
   try {
-    return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem('th.prefs') || '{}') }
+    return parsePrefs(JSON.parse(localStorage.getItem('th.prefs') || '{}'))
   } catch {
     return { ...DEFAULT_PREFS }
   }
+}
+
+function parsePrefs(raw: unknown): UiPrefs {
+  const p = asRecord(raw)
+  const next = { ...DEFAULT_PREFS }
+  for (const key of ['autoScan', 'showHidden'] as const) {
+    if (typeof p[key] === 'boolean') next[key] = p[key]
+  }
+  if (['ask', 'deny', 'allow'].includes(p.unknownPerm)) next.unknownPerm = p.unknownPerm
+  if (['7', '30', '90'].includes(p.retainDays)) next.retainDays = p.retainDays
+  if (['toolhub', 'sandbox'].includes(p.execPolicy)) next.execPolicy = p.execPolicy
+  return next
 }
 
 function savePrefs(p: UiPrefs) {
@@ -203,7 +217,10 @@ export default function App() {
   const [addToolOpen, setAddToolOpen] = useState(false)
   const [addToolPath, setAddToolPath] = useState('')
   const [exportPath, setExportPath] = useState('')
+  const [agentHelpOpen, setAgentHelpOpen] = useState(false)
   const loadSeq = useRef(0)
+  const startupScan = useRef(false)
+  const searchRef = useRef<HTMLInputElement>(null)
 
   const notify = (msg: string) => setToast(msg)
   const fail = (e: any) => {
@@ -217,16 +234,17 @@ export default function App() {
     setLoading(true)
     setError(null)
     try {
-      const [toolRows, agentRows, envRows, dupRows, actRows, st, cfg] = await Promise.all([
-        rpc('registry.search', { query: '' }),
+      const [toolRows, agentRows, envRows, dupRows, actRows, st, cfg, policy] = await Promise.all([
+        rpc('registry.search', { query: '', include_missing: true }),
         rpc('agent.list', {}),
         rpc('environment.list', {}),
         rpc('environment.duplicates', {}),
         rpc('activity.list', {}),
         rpc('status', {}),
-        rpc('settings.get', {}).catch(() => null),
+        rpc('settings.get', {}),
+        rpc('policy.get', {}),
       ])
-      if (seq !== loadSeq.current) return
+      if (seq !== loadSeq.current) return false
       const rows = listFrom(toolRows)
       setTools(rows)
       setAgents(listFrom(agentRows))
@@ -234,6 +252,14 @@ export default function App() {
       setDups(listFrom(dupRows))
       setActivity(listFrom(actRows))
       setStatus(st)
+      const rule = listFrom(policy?.defaults).find((r: any) => r.scope === 'tool' && r.subject === '*')
+      if (rule && ['ask', 'deny', 'allow'].includes(rule.action)) {
+        setPrefs((prev) => {
+          const next = { ...prev, unknownPerm: rule.action }
+          savePrefs(next)
+          return next
+        })
+      }
       if (cfg) {
         setServerSettings(asRecord(cfg))
         const mode = String(asRecord(cfg).scan_mode || '')
@@ -246,8 +272,10 @@ export default function App() {
         }
         return rows[0] ?? null
       })
+      return true
     } catch (e: any) {
       if (seq === loadSeq.current) fail(e)
+      return false
     } finally {
       if (seq === loadSeq.current) setLoading(false)
     }
@@ -258,31 +286,29 @@ export default function App() {
   }, [page])
 
   useEffect(() => {
-    void load()
-  }, [load])
-
-  useEffect(() => {
     if (!selected?.id) {
       setDetailData(null)
       return
     }
     let alive = true
+    setDetailData(null)
     void rpc('registry.inspect_instance', { id: selected.id })
       .then((data) => alive && setDetailData(data))
       .catch(() => alive && setDetailData(null))
     return () => {
       alive = false
     }
-  }, [selected?.id])
+  }, [selected])
 
   const onScan = async (mode: 'quick' | 'full' = scanMode) => {
+    if (busy) return
     try {
       setBusy(true)
       setError(null)
       notify(mode === 'full' ? '正在深度扫描…' : '正在快速扫描…')
-      await rpc('scan.start', { mode })
-      await load()
-      notify('扫描完成')
+      const result = await rpc('scan.start', { mode })
+      const refreshed = await load()
+      if (refreshed) notify(result.status === 'partial' ? '扫描结束，部分路径无法读取；已更新可读取的工具' : '扫描完成')
     } catch (e: any) {
       fail(e)
     } finally {
@@ -290,38 +316,52 @@ export default function App() {
     }
   }
 
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  useEffect(() => {
+    if (loading || !status || startupScan.current) return
+    startupScan.current = true
+    if (loadPrefs().autoScan) {
+      void rpc('settings.get', {})
+        .then((cfg) => onScan(cfg.scan_mode === 'full' ? 'full' : 'quick'))
+        .catch(fail)
+    }
+  }, [loading, status])
+
+  useEffect(() => {
+    const shortcut = (e: KeyboardEvent) => {
+      if (page === 'programs') return
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setPage('tools')
+        requestAnimationFrame(() => searchRef.current?.focus())
+      }
+    }
+    window.addEventListener('keydown', shortcut)
+    return () => window.removeEventListener('keydown', shortcut)
+  }, [page])
+
   const updatePrefs = async (next: UiPrefs) => {
     setPrefs(next)
     savePrefs(next)
-    try {
-      await rpc('settings.set', {
-        settings: {
-          scan_mode: next === prefs ? scanMode : scanMode,
-        },
-      })
-    } catch {
-      /* controller may be required for server-side settings */
-    }
+    notify('界面设置已保存')
   }
 
   const persistScanMode = async (mode: 'quick' | 'full') => {
-    setScanMode(mode)
+    setBusy(true)
     try {
-      const prev = serverSettings ?? {}
-      await rpc('settings.set', {
-        settings: {
-          scan_mode: mode,
-          scan_roots: prev.scan_roots ?? [],
-          resolver_preferences: prev.resolver_preferences ?? {},
-          privacy: prev.privacy ?? { redact_exports: true },
-        },
-      })
-      notify(`默认扫描模式已设为${mode === 'quick' ? '快速扫描' : '深度扫描'}`)
-      const cfg = await rpc('settings.get', {})
+      const prev = { ...await rpc('settings.get', {}) }
+      delete prev.versions
+      const cfg = await rpc('settings.set', { settings: { ...prev, scan_mode: mode } })
       setServerSettings(asRecord(cfg))
+      setScanMode(mode)
+      notify(`默认扫描模式已设为${mode === 'quick' ? '快速扫描' : '深度扫描'}`)
     } catch (e: any) {
-      // still keep UI selection
-      notify(`扫描模式已切换（服务端：${String(e?.message ?? e)}）`)
+      fail(e)
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -329,10 +369,10 @@ export default function App() {
     try {
       setBusy(true)
       const report = await rpc('export.report', {})
-      const settings = serverSettings ?? (await rpc('settings.get', {}).catch(() => ({})))
+      const settings = await rpc('settings.get', {})
       const payload = JSON.stringify(
         {
-          schema: 'toolhub.report/v1',
+          schema: 'toolhub.config/v1',
           exported_at: new Date().toISOString(),
           ui_prefs: prefs,
           settings,
@@ -363,28 +403,30 @@ export default function App() {
       }
       setBusy(true)
       const text = await invoke<string>('read_text_file', { path: importPath.trim() })
-      const data = JSON.parse(text)
-      if (data.ui_prefs) {
-        const next = { ...DEFAULT_PREFS, ...data.ui_prefs }
-        setPrefs(next)
-        savePrefs(next)
-      }
-      if (data.settings) {
-        try {
-          const clean: any = { ...data.settings }
-          delete clean.versions
-          await rpc('settings.set', { settings: clean })
-        } catch (e: any) {
-          notify(`服务端设置未导入：${String(e?.message ?? e)}`)
+      const data = asRecord(JSON.parse(text))
+      const isConfig = data.schema === 'toolhub.config/v1' ||
+        (data.schema === 'toolhub.report/v1' && (data.ui_prefs || data.settings))
+      if (isConfig) {
+        if (!data.settings || typeof data.settings !== 'object' || Array.isArray(data.settings)) {
+          throw new Error('配置文件缺少有效的 settings 对象')
         }
+        const clean = { ...data.settings }
+        delete clean.versions
+        await rpc('settings.set', { settings: clean })
+        if (data.ui_prefs) {
+          const next = parsePrefs(data.ui_prefs)
+          await rpc('policy.set', { scope: 'tool', subject: '*', action: next.unknownPerm })
+          setPrefs(next)
+          savePrefs(next)
+        }
+      } else if (data.schema === 'toolhub.report/v1' && Array.isArray(data.tools)) {
+        await rpc('import.report', { report: data })
+      } else {
+        throw new Error('不支持的配置格式，请选择 ToolHub 导出的 JSON 文件')
       }
-      if (data.report || data.tools) {
-        const res = await rpc('export.report', { import: data.report ?? data })
-        notify(`已导入报告：${JSON.stringify(res)}`)
-      }
-      await load()
+      if (!await load()) return
       setImportOpen(false)
-      notify('配置导入完成')
+      notify(isConfig ? '配置导入完成；本机工具以实际扫描结果为准' : '已导入工具清单；清单记录需本机扫描确认后才能使用')
     } catch (e: any) {
       fail(e)
     } finally {
@@ -393,10 +435,7 @@ export default function App() {
   }
 
   const resetSettings = async () => {
-    const next = { ...DEFAULT_PREFS }
-    setPrefs(next)
-    savePrefs(next)
-    setScanMode('quick')
+    setBusy(true)
     try {
       await rpc('settings.set', {
         settings: {
@@ -406,12 +445,17 @@ export default function App() {
           privacy: { redact_exports: true },
         },
       })
+      await rpc('policy.set', { scope: 'tool', subject: '*', action: 'ask' })
+      const next = { ...DEFAULT_PREFS }
+      setPrefs(next)
+      savePrefs(next)
+      setScanMode('quick')
+      if (await load()) notify('已重置为默认设置')
     } catch (e: any) {
-      notify(`已恢复界面默认；服务端：${String(e?.message ?? e)}`)
-      return
+      fail(e)
+    } finally {
+      setBusy(false)
     }
-    await load()
-    notify('已重置为默认设置')
   }
 
   const openTerminal = async () => {
@@ -433,6 +477,7 @@ export default function App() {
     if (!path) return
     try {
       await invoke('reveal_path', { path: String(path) })
+      notify('已在文件管理器中定位工具')
     } catch (e: any) {
       fail(e)
     }
@@ -446,10 +491,15 @@ export default function App() {
     }
     try {
       setBusy(true)
-      await rpc('scan.start', { mode: 'custom', roots: [root] })
-      await load()
+      setError(null)
+      const scanRoot = await invoke<string>('scan_root_for_path', { path: root })
+      const result = await rpc('scan.start', { mode: 'custom', roots: [scanRoot] })
+      if (!result.candidates && result.coverage?.roots_failed?.length) throw new Error('无法读取该路径，请检查路径是否存在及访问权限')
+      if (!await load()) return
       setAddToolOpen(false)
-      notify('已扫描该路径并更新工具列表')
+      setCat('all')
+      setQuery(root)
+      notify(result.status === 'partial' ? '已更新工具列表；部分子目录或链接未扫描' : '已扫描该路径并更新工具列表')
     } catch (e: any) {
       fail(e)
     } finally {
@@ -458,24 +508,27 @@ export default function App() {
   }
 
   const saveUnknownPerm = async (value: UiPrefs['unknownPerm']) => {
-    await updatePrefs({ ...prefs, unknownPerm: value })
+    setBusy(true)
     try {
       await rpc('policy.set', {
         scope: 'tool',
         subject: '*',
         action: value === 'allow' ? 'allow' : value === 'deny' ? 'deny' : 'ask',
       })
-      notify('未知工具默认权限已更新')
+      await updatePrefs({ ...prefs, unknownPerm: value })
+      notify('工具默认权限已更新；具体工具和命令规则优先')
     } catch (e: any) {
-      notify(`界面偏好已保存；策略：${String(e?.message ?? e)}`)
+      fail(e)
+    } finally {
+      setBusy(false)
     }
   }
 
   const filteredTools = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = query.trim().toLowerCase().replace(/\\/g, '/')
     const base = prefs.showHidden ? tools : tools.filter((t) => t.status !== 'missing')
     if (!q) return base
-    return base.filter((t) => `${t.name ?? ''} ${t.path ?? ''} ${t.definition_id ?? ''}`.toLowerCase().includes(q))
+    return base.filter((t) => `${t.name ?? ''} ${t.path ?? ''} ${t.definition_id ?? ''}`.toLowerCase().replace(/\\/g, '/').includes(q))
   }, [tools, query, prefs.showHidden])
 
   const cats = useMemo(() => {
@@ -496,7 +549,14 @@ export default function App() {
     return filteredTools.filter((t) => toolTags(String(t.name ?? ''), String(t.path ?? '')).some((x) => x.toLowerCase() === cat))
   }, [filteredTools, cat])
 
+  useEffect(() => {
+    setSelected((prev: any) => shown.find((t) => t.id === prev?.id) ?? shown[0] ?? null)
+  }, [shown])
+
   const statusRec = asRecord(status?.result ?? status)
+  const refresh = async (message: string) => {
+    if (await load()) notify(message)
+  }
 
   return (
     <div className="app-shell">
@@ -523,11 +583,11 @@ export default function App() {
           <button className="quick-btn" onClick={() => { setPage('tools'); setAddToolOpen(true) }}>
             ＋ 添加工具
           </button>
-          <button className="quick-btn" onClick={() => void onScan('quick')} disabled={busy}>
+          <button className="quick-btn" onClick={() => void onScan()} disabled={busy}>
             🔍 扫描本机
           </button>
           <button className="quick-btn" onClick={() => setPage('market')}>
-            📦 从模板安装
+            📦 模板与清单
           </button>
           <button className="quick-btn" onClick={() => { setPage('settings'); setImportOpen(true) }}>
             ⬇️ 导入配置
@@ -552,6 +612,8 @@ export default function App() {
           </div>
         )}
 
+        {page === 'programs' && <Programs notify={notify} />}
+
         {page === 'tools' && (
           <>
             <div className="topbar">
@@ -560,7 +622,7 @@ export default function App() {
                 <p>管理和使用本地及远程工具，让智能体拥有更强的能力。</p>
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button className="btn" onClick={() => void onScan('full')} disabled={busy}>
+                <button className="btn" onClick={() => void onScan()} disabled={busy}>
                   {busy ? '处理中…' : '扫描本机'}
                 </button>
                 <button className="btn btn-primary" onClick={() => setAddToolOpen(true)}>
@@ -573,7 +635,7 @@ export default function App() {
                 {addToolOpen && (
                   <div className="card card-pad" style={{ marginBottom: 12 }}>
                     <h3 style={{ marginTop: 0 }}>添加工具</h3>
-                    <p className="muted">输入本机已安装工具的绝对路径或目录，将进行定向扫描。</p>
+                    <p className="muted">输入本机已安装工具的绝对路径或目录，将扫描其所在目录。</p>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input
                         className="select"
@@ -596,9 +658,10 @@ export default function App() {
                   <div className="search-box">
                     <span>🔍</span>
                     <input
+                      ref={searchRef}
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
-                      placeholder="搜索工具名称、描述或标签..."
+                      placeholder="搜索工具名称或路径..."
                     />
                     <span className="kbd">Ctrl K</span>
                   </div>
@@ -677,10 +740,10 @@ export default function App() {
                       ))}
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => void openTerminal()}>
+                      <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => void openTerminal()} disabled={selected.platform === 'foreign' || selected.status !== 'available'}>
                         &gt;_ 打开终端
                       </button>
-                      <button className="btn" onClick={() => void revealPath()}>
+                      <button className="btn" onClick={() => void revealPath()} disabled={selected.platform === 'foreign' || selected.status !== 'available'}>
                         打开位置
                       </button>
                     </div>
@@ -695,7 +758,7 @@ export default function App() {
                         环境
                       </button>
                       <button className={`tab ${detailTab === 'usage' ? 'active' : ''}`} onClick={() => setDetailTab('usage')}>
-                        使用记录
+                        近期活动
                       </button>
                     </div>
                     {detailTab === 'overview' && (
@@ -770,9 +833,9 @@ export default function App() {
                     {detailTab === 'usage' && (
                       <div>
                         {activity.length === 0 ? (
-                          <div className="empty">暂无使用记录</div>
+                          <div className="empty">暂无活动记录</div>
                         ) : (
-                          <ul className="list-clean">
+                          <ul className="list-clean" aria-label="全局近期活动">
                             {activity.slice(0, 8).map((a: any, i: number) => (
                               <li key={i}>
                                 <div>
@@ -802,20 +865,27 @@ export default function App() {
               </div>
               <button
                 className="btn btn-primary"
-                onClick={() => notify('可通过 MCP / CLI 接入；请在智能体侧配置 ToolHub 端点后刷新列表')}
+                onClick={() => setAgentHelpOpen((open) => !open)}
               >
-                ＋ 添加智能体
+                接入说明
               </button>
             </div>
             <div className="layout-1">
+              {agentHelpOpen && <div className="card card-pad" style={{ marginBottom: 16 }}>
+                <h3>通过 MCP / CLI 接入</h3>
+                <p>在智能体的 MCP 设置中，将 ToolHub 同目录的 toolhub.exe 设为启动命令，参数填写 mcp serve。也可使用 CLI 查询本机工具。</p>
+                <pre>toolhub.exe mcp serve{'\n'}toolhub.exe --json search python</pre>
+                <p className="muted">此列表显示本机检测到的适配器；检测到软件不代表已建立连接。</p>
+                <button className="btn" onClick={() => void refresh('智能体列表已刷新')}>刷新列表</button>
+              </div>}
               <div className="card card-pad">
                 {agents.length === 0 ? (
                   <div className="empty">
                     暂无已接入的智能体。
                     <div className="muted" style={{ marginTop: 8 }}>
-                      本机软件请到「工具」页查看。添加后点「添加智能体」旁的说明可查看接入方式。
+                      点击「接入说明」查看配置方式；安装好的适配器可通过刷新重新检测。
                     </div>
-                    <button className="btn" style={{ marginTop: 12 }} onClick={() => void load()}>
+                    <button className="btn" style={{ marginTop: 12 }} onClick={() => void refresh('智能体列表已刷新')}>
                       刷新列表
                     </button>
                   </div>
@@ -827,7 +897,7 @@ export default function App() {
                           <strong>{String(a.name ?? a.id ?? '智能体')}</strong>
                           <div className="muted">{String(a.id ?? a.agent_id ?? '')}</div>
                         </div>
-                        <StatusBadge text={String(a.status ?? a.state ?? '未知')} tone="ok" />
+                        <StatusBadge text={a.health === 'detected' ? '已检测' : String(a.status ?? a.state ?? a.health ?? '未知')} tone="muted" />
                       </li>
                     ))}
                   </ul>
@@ -848,7 +918,7 @@ export default function App() {
                 className="btn"
                 onClick={() => {
                   notify('正在刷新环境列表…')
-                  void load().then(() => notify('环境已刷新'))
+                  void refresh('环境已刷新')
                 }}
               >
                 刷新
@@ -894,12 +964,14 @@ export default function App() {
                           <button
                             className="btn"
                             onClick={() => {
-                              setQuery(name)
+                              const definition = tools.find((t) => t.definition_id === name)
+                              setCat('all')
+                              setQuery(String(definition?.name ?? name))
                               setPage('tools')
                               notify(`已在工具页搜索「${name}」`)
                             }}
                           >
-                            查看实例
+                            查看实例 ({count})
                           </button>
                         </li>
                       )
@@ -935,7 +1007,7 @@ export default function App() {
                 <ul className="list-clean">
                   <li>
                     <div>
-                      <strong>从本机路径安装/识别</strong>
+                      <strong>从本机路径识别</strong>
                       <div className="muted">输入已安装软件路径，执行定向扫描并入库。</div>
                     </div>
                     <button
@@ -974,13 +1046,13 @@ export default function App() {
             <div className="topbar">
               <div>
                 <h1>任务</h1>
-                <p>查看智能体通过 ToolHub 发起的任务、执行状态与结果记录。</p>
+                <p>查看 ToolHub 的扫描、配置变更和工具执行活动。</p>
               </div>
               <button
                 className="btn"
                 onClick={() => {
                   notify('正在刷新任务列表…')
-                  void load().then(() => notify('任务已刷新'))
+                  void refresh('任务已刷新')
                 }}
               >
                 刷新
@@ -1018,13 +1090,13 @@ export default function App() {
                 <div className="setting-row">
                   <div>
                     <h3>默认扫描模式</h3>
-                    <div className="muted">设置添加工具或启动时的默认扫描模式。</div>
+                    <div className="muted">用于「扫描本机」按钮和启动自动扫描。</div>
                   </div>
                   <div className="seg">
-                    <button className={scanMode === 'quick' ? 'active' : ''} onClick={() => void persistScanMode('quick')}>
+                    <button className={scanMode === 'quick' ? 'active' : ''} onClick={() => void persistScanMode('quick')} disabled={busy}>
                       快速扫描
                     </button>
-                    <button className={scanMode === 'full' ? 'active' : ''} onClick={() => void persistScanMode('full')}>
+                    <button className={scanMode === 'full' ? 'active' : ''} onClick={() => void persistScanMode('full')} disabled={busy}>
                       深度扫描
                     </button>
                   </div>
@@ -1035,6 +1107,8 @@ export default function App() {
                     <div className="muted">应用启动时自动扫描本地已安装的工具。</div>
                   </div>
                   <button
+                    aria-label="启动时自动扫描"
+                    aria-pressed={prefs.autoScan}
                     className={`switch ${prefs.autoScan ? 'on' : ''}`}
                     onClick={() => void updatePrefs({ ...prefs, autoScan: !prefs.autoScan })}
                   >
@@ -1047,6 +1121,8 @@ export default function App() {
                     <div className="muted">在工具列表中显示已隐藏/失效的工具。</div>
                   </div>
                   <button
+                    aria-label="显示隐藏工具"
+                    aria-pressed={prefs.showHidden}
                     className={`switch ${prefs.showHidden ? 'on' : ''}`}
                     onClick={() => void updatePrefs({ ...prefs, showHidden: !prefs.showHidden })}
                   >
@@ -1055,12 +1131,14 @@ export default function App() {
                 </div>
                 <div className="setting-row">
                   <div>
-                    <h3>未知工具默认权限</h3>
-                    <div className="muted">扫描到未识别的新工具时的默认权限设置。</div>
+                    <h3>工具默认权限</h3>
+                    <div className="muted">适用于无更具体规则的工具；具体工具和命令规则优先。</div>
                   </div>
                   <select
                     className="select"
                     value={prefs.unknownPerm}
+                    aria-label="工具默认权限"
+                    disabled={busy}
                     onChange={(e) => void saveUnknownPerm(e.target.value as UiPrefs['unknownPerm'])}
                   >
                     <option value="ask">询问我</option>
@@ -1071,11 +1149,13 @@ export default function App() {
                 <div className="setting-row">
                   <div>
                     <h3>日志保留时长</h3>
-                    <div className="muted">设置操作日志和运行日志的本地保留时间。</div>
+                    <div className="muted">自动日志清理尚未实现，当前不会按该值删除日志。</div>
                   </div>
                   <select
                     className="select"
                     value={prefs.retainDays}
+                    aria-label="日志保留时长（暂未实现）"
+                    disabled
                     onChange={(e) => void updatePrefs({ ...prefs, retainDays: e.target.value })}
                   >
                     <option value="7">7 天</option>
@@ -1086,17 +1166,19 @@ export default function App() {
                 <div className="setting-row">
                   <div>
                     <h3>默认执行策略</h3>
-                    <div className="muted">当智能体请求调用工具时的执行策略。</div>
+                    <div className="muted">ToolHub 提供本机调用；沙箱回退由外部智能体决定。</div>
                   </div>
                   <div className="seg">
                     <button
                       className={prefs.execPolicy === 'toolhub' ? 'active' : ''}
+                      disabled
                       onClick={() => void updatePrefs({ ...prefs, execPolicy: 'toolhub' })}
                     >
                       优先 ToolHub
                     </button>
                     <button
                       className={prefs.execPolicy === 'sandbox' ? 'active' : ''}
+                      disabled
                       onClick={() => void updatePrefs({ ...prefs, execPolicy: 'sandbox' })}
                     >
                       允许回退到沙箱
@@ -1106,16 +1188,24 @@ export default function App() {
                 <div className="setting-row">
                   <div>
                     <h3>配置管理</h3>
-                    <div className="muted">导出完整报告与设置，或从 JSON 文件导入。</div>
+                    <div className="muted">导出设置及工具报告快照；配置导入恢复设置，不复制本机安装记录。</div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <input
+                      className="select"
+                      aria-label="导出文件路径"
+                      value={exportPath}
+                      onChange={(e) => setExportPath(e.target.value)}
+                      placeholder="导出路径（留空使用文档目录）"
+                      disabled={busy}
+                    />
                     <button className="btn" onClick={() => setImportOpen(true)}>
                       导入配置
                     </button>
                     <button className="btn btn-primary" onClick={() => void exportConfig()} disabled={busy}>
                       {busy ? '导出中…' : '导出配置'}
                     </button>
-                    <button className="btn btn-danger" onClick={() => void resetSettings()}>
+                    <button className="btn btn-danger" onClick={() => void resetSettings()} disabled={busy}>
                       重置默认设置
                     </button>
                   </div>
@@ -1176,7 +1266,7 @@ export default function App() {
                     </div>
                     <div className="kv-row">
                       <span>服务状态</span>
-                      <StatusBadge text="正常" />
+                      <StatusBadge text={error ? '连接异常' : !status ? '连接中' : loading ? '刷新中' : '正常'} tone={error ? 'warn' : 'ok'} />
                     </div>
                   </div>
                 </div>

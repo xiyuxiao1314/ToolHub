@@ -44,3 +44,7 @@ Names above express design intent; field definitions and wire compatibility are 
 ## Review gates
 
 Freeze shared domain and protocol contracts before parallel implementation consumes them. Require a fixture-driven native discovery path, an explicit authorization path, and bounded daemon failure behavior before treating end-to-end execution as delivered. Desktop may prototype against reviewed mock contracts; displayed production data must come from the shared daemon registry.
+
+## Owner-approved Programs extension (2026-10-03)
+
+Project launch entries are separate from recognized ToolInstances. The scanner exposes read-only entrypoint candidates; the daemon owns cancellable background discovery, selection grants, atomic SQLite persistence and explicit controller-only launches. Desktop owns the native file/folder picker and user selection/editor flow. Migration 003 adds program_entries without changing tool or agent authorization. A Windows console helper assigns fresh input/output handles and keeps batch output visible. The protocol and SDK add program.* methods atomically; ordinary agents cannot call these methods. This owner-requested extension expands the desktop's personal launch workflow beyond the original tool inventory baseline.

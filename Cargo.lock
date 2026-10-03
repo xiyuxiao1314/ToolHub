@@ -4031,6 +4031,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4043,6 +4044,7 @@ dependencies = [
  "tauri-build",
  "toolhub-ipc",
  "toolhub-protocol",
+ "windows",
 ]
 
 [[package]]
@@ -4162,8 +4164,10 @@ dependencies = [
  "serde_json",
  "tempfile",
  "toolhub-core",
+ "uuid",
  "walkdir",
  "which",
+ "windows-sys 0.61.2",
  "winreg 0.52.0",
 ]
 

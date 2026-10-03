@@ -32,3 +32,7 @@ Finalize identity formats, relationship cardinality, evidence provenance, confid
 The source design uses multiple illustrative spellings for video-frame extraction. Review and select canonical capability identifiers and any alias strategy; do not silently treat examples as an approved taxonomy.
 
 Database schema and manifest/wire representations must share the same reviewed meanings. This document intentionally does not introduce a second set of implementation structs.
+
+## User-selected program entries
+
+ProgramCandidate describes a potential project file/command entrypoint and its observable evidence; it carries no AI authorship assertion or tool trust. ProgramEntry adds user-confirmed name, arguments, favorite and launch metadata. Selection grants bind a candidate/file/folder to an authenticated controller principal in daemon memory. New entries and changed paths require such a grant; existing entry IDs allow metadata edits. A batch save validates all drafts and commits atomically; duplicate file paths or identical command/cwd pairs are rejected. Availability is recomputed from the actual file/work directory. These entities do not change ToolDefinition/ToolInstance recognition, resolution or policy.

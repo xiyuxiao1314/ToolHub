@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-default-export-path-string"
+description = "Enables the default_export_path_string command without any pre-configured scope."
+commands.allow = ["default_export_path_string"]
+
+[[permission]]
+identifier = "deny-default-export-path-string"
+description = "Denies the default_export_path_string command without any pre-configured scope."
+commands.deny = ["default_export_path_string"]

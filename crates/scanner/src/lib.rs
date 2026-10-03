@@ -1,6 +1,7 @@
 //! Read-only discovery -> ScanCandidate pipeline.
 //! Default discovery never installs, writes config, or executes unknown binaries.
 
+pub mod programs;
 mod providers;
 mod types;
 

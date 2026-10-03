@@ -7,6 +7,11 @@ use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 #[path = "execution_jobs.rs"]
 mod execution_jobs;
+#[cfg(windows)]
+#[path = "program_process.rs"]
+mod program_process;
+#[path = "programs.rs"]
+pub(crate) mod programs;
 #[path = "scan_jobs.rs"]
 mod scan_jobs;
 #[path = "workflows.rs"]
@@ -47,6 +52,7 @@ pub struct DaemonService {
     #[allow(dead_code)]
     pub seq: AtomicU64,
     pub registry_path: String,
+    pub programs: programs::ProgramRuntime,
 }
 
 impl DaemonService {
@@ -116,6 +122,7 @@ impl DaemonService {
             verified_updates: BTreeMap::new(),
             seq: AtomicU64::new(1),
             registry_path: path.to_string_lossy().to_string(),
+            programs: programs::ProgramRuntime::default(),
         })
     }
 
@@ -235,7 +242,14 @@ impl DaemonService {
             })),
             Method::SearchTools => {
                 let q = params.get("query").and_then(|v| v.as_str()).unwrap_or("");
-                let hits = self.registry.search(q).map_err(db_err)?;
+                let include_missing = params
+                    .get("include_missing")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                let hits = self
+                    .registry
+                    .search_with_missing(q, include_missing)
+                    .map_err(db_err)?;
                 Ok(json!(hits))
             }
             Method::InspectTool | Method::InspectInstance => {

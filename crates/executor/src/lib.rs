@@ -834,6 +834,32 @@ pub fn build_approval(
 mod tests {
     use super::*;
 
+    fn fixture_python() -> String {
+        if let Some(path) = std::env::var_os("TOOLHUB_TEST_PYTHON") {
+            return std::fs::canonicalize(path)
+                .expect("TOOLHUB_TEST_PYTHON must point to an installed Python executable")
+                .to_string_lossy()
+                .into_owned();
+        }
+        let names: &[&str] = if cfg!(windows) {
+            &["python.exe", "python3.exe"]
+        } else {
+            &["python3", "python"]
+        };
+        for dir in std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()) {
+            for name in names {
+                let path = dir.join(name);
+                if path.is_file() {
+                    return std::fs::canonicalize(path)
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned();
+                }
+            }
+        }
+        panic!("Python fixture unavailable; set TOOLHUB_TEST_PYTHON to an installed interpreter")
+    }
+
     #[test]
     fn secrets_excluded_by_default() {
         std::env::set_var("OPENAI_API_KEY", "sk-test-secret");
@@ -861,11 +887,7 @@ mod tests {
     #[test]
     fn ask_with_validated_approval_proceeds() {
         let policy = PolicyEngine::with_defaults(); // Tool:* = Ask
-        let python = if cfg!(windows) {
-            "python".to_string()
-        } else {
-            "python3".to_string()
-        };
+        let python = fixture_python();
         let req = ExecutionRequest {
             instance_id: toolhub_core::InstanceId::new("x1").unwrap(),
             executable: python.clone(),
@@ -944,13 +966,9 @@ mod tests {
 
     #[test]
     fn normal_parent_exit_closes_owned_descendant_pipes() {
-        let python = if cfg!(windows) {
-            r"C:\Users\hp\AppData\Local\Programs\Python\Python313\python.exe"
-        } else {
-            "python3"
-        };
+        let python = fixture_python();
         let req = ExecutionRequest {
-            instance_id: toolhub_core::InstanceId::new("fixture").unwrap(), executable:python.into(),
+            instance_id: toolhub_core::InstanceId::new("fixture").unwrap(), executable:python,
             args:vec!["-c".into(),"import subprocess,sys; subprocess.Popen([sys.executable,'-c','import time; time.sleep(2)']); print('parent',flush=True)".into()],
             cwd:None, env_overrides:BTreeMap::new(), timeout_ms:300, max_output_bytes:1024, stdin:None,agent_id:None,
         };
@@ -973,11 +991,7 @@ mod tests {
     fn fixture_request(script: &str, timeout: u64, cap: u64) -> ExecutionRequest {
         ExecutionRequest {
             instance_id: toolhub_core::InstanceId::new("owned.fixture").unwrap(),
-            executable: if cfg!(windows) {
-                r"C:\Users\hp\AppData\Local\Programs\Python\Python313\python.exe".into()
-            } else {
-                "python3".into()
-            },
+            executable: fixture_python(),
             args: vec!["-c".into(), script.into()],
             cwd: None,
             env_overrides: BTreeMap::new(),
@@ -1153,11 +1167,7 @@ mod tests {
     #[test]
     fn timeout_kills_child() {
         // Use a long-running Python sleep which exists in test envs.
-        let python = if cfg!(windows) {
-            "python".to_string()
-        } else {
-            "python3".to_string()
-        };
+        let python = fixture_python();
         let req = ExecutionRequest {
             instance_id: toolhub_core::InstanceId::new("x1").unwrap(),
             executable: python.clone(),

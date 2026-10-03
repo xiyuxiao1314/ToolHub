@@ -214,9 +214,7 @@ fn normalize_display_version(raw: &str) -> String {
     }
     let mut buf = String::new();
     for c in trimmed.chars() {
-        if c.is_ascii_digit() {
-            buf.push(c);
-        } else if c == '.' && !buf.is_empty() && !buf.ends_with('.') {
+        if c.is_ascii_digit() || (c == '.' && !buf.is_empty() && !buf.ends_with('.')) {
             buf.push(c);
         } else {
             break;

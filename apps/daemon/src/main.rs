@@ -84,6 +84,10 @@ fn response_for_bytes(
     }
 }
 fn main() -> anyhow::Result<()> {
+    #[cfg(windows)]
+    if service::programs::run_console_helper() {
+        return Ok(());
+    }
     if std::env::args().any(|arg| arg == "--agent-fixture") {
         let mut reader = BufReader::new(std::io::stdin());
         let bytes = toolhub_ipc::read_bounded_line(&mut reader)?

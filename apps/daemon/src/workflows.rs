@@ -30,6 +30,14 @@ pub(super) fn is_extended(name: &str) -> bool {
             | "events.subscribe"
             | "events.poll"
             | "events.unsubscribe"
+            | "program.list"
+            | "program.scan_start"
+            | "program.scan_status"
+            | "program.scan_cancel"
+            | "program.select"
+            | "program.save"
+            | "program.remove"
+            | "program.launch"
     )
 }
 impl DaemonService {
@@ -94,6 +102,7 @@ impl DaemonService {
         params: &Value,
     ) -> Result<Value, ProtocolError> {
         match name {
+            name if name.starts_with("program.") => self.dispatch_program(name, params),
             "scan.cancel" => self.cancel_scan(params),
             "capability.list" => {
                 let registry = self.resources.capabilities();
@@ -260,7 +269,7 @@ impl DaemonService {
             )),
         }
     }
-    fn require_controller(&self) -> Result<(), ProtocolError> {
+    pub(super) fn require_controller(&self) -> Result<(), ProtocolError> {
         if self.is_admin() {
             Ok(())
         } else {

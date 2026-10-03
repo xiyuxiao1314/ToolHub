@@ -22,7 +22,9 @@ pub fn validate_method_params(request: &JsonRpcRequest) -> Result<(), ProtocolEr
         | Method::InspectInstance
         | Method::SkillInspect
         | Method::SkillResolve
-        | Method::DiscoveryInspect => &["id"],
+        | Method::DiscoveryInspect
+        | Method::ProgramRemove
+        | Method::ProgramLaunch => &["id"],
         Method::ResolveCapability => &["capability"],
         Method::SearchTools => &["query"],
         Method::RequestApproval => &["instance_id"],
@@ -112,6 +114,11 @@ pub fn validate_method_params(request: &JsonRpcRequest) -> Result<(), ProtocolEr
             return Err(invalid("args must be a bounded string array".into()));
         }
     }
+    if let Some(value) = params.get("include_missing") {
+        if !value.is_boolean() {
+            return Err(invalid("include_missing must be a boolean".into()));
+        }
+    }
     for (key, max) in [
         ("timeout_ms", crate::limits::MAX_TIMEOUT_MS),
         ("max_output_bytes", crate::limits::MAX_OUTPUT_BYTES),
@@ -143,6 +150,29 @@ pub fn validate_method_params(request: &JsonRpcRequest) -> Result<(), ProtocolEr
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn missing_filter_requires_an_explicit_boolean() {
+        for value in [serde_json::json!(true), serde_json::json!(false)] {
+            assert!(validate_method_params(&JsonRpcRequest::new(
+                1,
+                "registry.search",
+                serde_json::json!({"query":"", "include_missing":value})
+            ))
+            .is_ok());
+        }
+        for value in [
+            serde_json::json!("true"),
+            serde_json::json!(null),
+            serde_json::json!(1),
+        ] {
+            assert!(validate_method_params(&JsonRpcRequest::new(
+                1,
+                "registry.search",
+                serde_json::json!({"query":"", "include_missing":value})
+            ))
+            .is_err());
+        }
+    }
     #[test]
     fn no_silent_default_for_wrong_parameter_types() {
         for params in [

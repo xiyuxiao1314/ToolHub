@@ -1,8 +1,21 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Local ToolHub window can call only its RPC and version bridges.",
+  "description": "Local ToolHub window can use the RPC, version, configuration file and path bridges.",
   "local": true,
-  "windows": ["main"],
-  "permissions": ["allow-rpc", "allow-app-versions"]
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "allow-rpc",
+    "allow-app-versions",
+    "allow-default-export-path-string",
+    "allow-save-text-file",
+    "allow-read-text-file",
+    "allow-open-terminal",
+    "allow-reveal-path",
+    "allow-scan-root-for-path",
+    "allow-pick-program-path",
+    "allow-open-program-folder"
+  ]
 }

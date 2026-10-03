@@ -91,9 +91,7 @@ fn normalize_pe_version(raw: &str) -> String {
     // Leading `1.98.1 (build)` or `2.47.1.windows.1` -> `1.98.1` / `2.47.1`.
     let mut buf = String::new();
     for c in trimmed.chars() {
-        if c.is_ascii_digit() {
-            buf.push(c);
-        } else if c == '.' && !buf.is_empty() && !buf.ends_with('.') {
+        if c.is_ascii_digit() || (c == '.' && !buf.is_empty() && !buf.ends_with('.')) {
             buf.push(c);
         } else {
             break;
