@@ -10,7 +10,7 @@
     <img alt="Status beta" src="https://img.shields.io/badge/status-beta-orange" />
   </p>
   <p><strong>简体中文</strong> | <a href="README.en.md">English</a></p>
-  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.1">下载 v0.3.0-beta.1</a> · <a href="#接入-ai-agent">Agent 接入</a> · <a href="#从源码构建">源码构建</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">反馈问题</a></p>
+  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.1">下载 v0.3.0-beta.1</a> · <a href="#界面预览">界面预览</a> · <a href="#接入-ai-agent">Agent 接入</a> · <a href="#从源码构建">源码构建</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">反馈问题</a></p>
 </div>
 
 ## 为什么做 ToolHub
@@ -20,6 +20,34 @@
 ToolHub 把本机工具整理成可查询的目录：在哪里、版本是什么、属于哪个环境、提供什么能力、当前是否可用。人通过桌面界面查看和管理，Agent 通过本地 MCP 或 CLI 查询。你创建的应用可以进入“程序架”，通用的工作方法可以保存为 Skill，能力包则把流程说明和工具依赖一起分享。
 
 ToolHub 使用已有工具，工具发现不依赖 AI 服务；它不会自动下载 FFmpeg、安装语言环境或清理你的电脑。Agent 接入后需要遵循自己的任务指引，ToolHub 不能强制所有 Agent 改变工具选择习惯。
+
+## 界面预览
+
+以下截图来自 **v0.3.0-beta.1 Windows 发布版**，使用独立演示数据。当前桌面界面为简体中文；点击图片可查看原图。
+
+### 工具总览
+
+把多个安装实例按工具合并，通过分类、搜索和分页定位工具；右侧查看版本、路径、环境与信任状态。
+
+![ToolHub 工具总览：工具分组、分页与 Git 实例详情](docs/images/tools.png)
+
+### 程序架
+
+集中管理文件和命令两种启动入口，保留工作目录，支持收藏、后台启动和打开目录。图中的项目入口为演示样例。
+
+![ToolHub 程序架：文件与命令入口、收藏和工作目录](docs/images/programs.png)
+
+### 通用 Skill 库
+
+查看可跨 Agent 复用的流程，核对输入输出、适用平台、权限声明与本机工具依赖，再复制给 Agent 使用。
+
+![ToolHub Skill 库：视频处理流程、适用范围与依赖检查](docs/images/skills.png)
+
+### 能力包市场
+
+浏览内置能力包，预览流程与依赖检查结果，确认后加入自己的 Skill 库，或复制、导出分享。
+
+![ToolHub 能力包市场：分类目录、视频处理流程与本机依赖](docs/images/market.png)
 
 ## 当前功能
 
