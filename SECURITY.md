@@ -44,3 +44,8 @@ MCP clientInfo labels and detected/configured host records are display observati
 The shared Skill library accepts declared generic instruction workflows and keeps host-exclusive Skills in their hosts. It neither enumerates Agent Skill directories nor installs or synchronizes those Skills. Portability is an interoperability assessment, not a trust boundary: explicit declarations and known-reference checks cannot prove arbitrary text portable or safe. A known host API mention is marked needs_review because quotation alone does not prove a dependency. Neither authorship labels nor a portable status authenticate a package or change tool trust.
 
 Package instructions remain untrusted data. Imports read bounded confined files; they run no hooks. Every list/inspection rereads instructions and compatibility; non-reusable instructions are withheld from inspection and excluded from MCP search. Old entries remain for correction rather than being deleted or silently converted. Permission declarations are descriptive; the existing controller checks, execution policy, pinned image and one-use approval continue to decide actual execution.
+
+
+## Preview platform execution boundary
+
+Windows keeps a non-writable executable handle through launch; Linux launches the held descriptor through `/proc/self/fd`. macOS preview does not yet provide an equivalent identity-preserving launch. Its managed tool execution and execution approvals return Unavailable before consuming an approval or starting a task. The executor also rejects pinned launches directly; it never retries an unpinned path. Discovery, portable Skills, MCP queries and explicit user program launches remain separate supported workflows.

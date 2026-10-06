@@ -82,8 +82,11 @@ Windows 与 macOS 共用代码、数据模型和 MCP 接口，部分桌面能力
 | 程序后台启动 | `.exe/.bat/.cmd/.lnk/.ps1` 和 CMD 命令 | 可执行文件、`.sh/.command` 和 sh 命令；`.app` 整体入口暂不支持 |
 | 在工具目录打开终端 | CMD | Terminal；系统可能要求允许自动化控制 Terminal |
 | 程序“终端启动” | 支持 | 暂不支持；可后台启动或自行在终端运行 |
+| 受控工具执行 / 执行审批（CLI、MCP） | 支持 | 暂不支持；身份绑定启动未实现，不降级为普通路径执行 |
 | 登录自启动、原生 EXE 图标提取 | 支持 | 暂不支持 |
 | 项目程序默认扫描范围 | 本地固定/可移动磁盘，过滤系统与依赖目录 | 用户主目录；可显式选择项目目录 |
+
+macOS 可查询工具、Skill 与能力包并使用程序架；`execute_tool` 和执行审批明确返回不可用，不会绕过可执行文件身份校验。Agent 如需直接调用查询到的工具，仍须遵守自身宿主的执行权限。
 
 macOS 包由 GitHub 的 macOS 环境生成；发布时记录构建与测试结果。尚无实体 Mac 上的完整交互验收。Linux、Windows ARM64、移动端暂不提供发布包。
 
@@ -237,7 +240,7 @@ Windows 产物为 `target/release/toolhub-desktop.exe`、`toolhubd.exe`、`toolh
 验证与打包：
 
 ```sh
-cargo test --workspace --locked
+cargo test --release --workspace --locked -- --test-threads=1
 node --test packages/sdk-typescript/test/client.test.js
 python scripts/package-release.py --platform windows-x64
 # 在对应架构的 Mac 上：--platform macos-arm64 或 --platform macos-x64

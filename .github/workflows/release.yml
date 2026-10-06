@@ -48,7 +48,7 @@ jobs:
           npm ci --prefix apps/desktop/ui
           npm run build --prefix apps/desktop/ui
       - name: Native checks
-        run: cargo test --workspace --locked -- --test-threads=1
+        run: cargo test --release --workspace --locked -- --test-threads=1
       - name: TypeScript SDK
         run: node --test packages/sdk-typescript/test/client.test.js
       - name: Release build

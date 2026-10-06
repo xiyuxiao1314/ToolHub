@@ -8,7 +8,7 @@ use std::sync::{mpsc, Arc};
 mod process_tree;
 pub use process_tree::Tree as OwnedProcessTree;
 mod executable_pin;
-pub use executable_pin::ExecutablePin;
+pub use executable_pin::{ExecutablePin, PINNED_EXECUTION_SUPPORTED};
 use std::time::{Duration, Instant};
 
 use toolhub_core::{
@@ -1064,8 +1064,15 @@ mod tests {
             &pin,
             Arc::new(AtomicBool::new(false)),
         );
-        assert_eq!(result.status, ExecutionStatus::Success);
-        assert!(result.stdout.contains("pinned-fixture"));
+        if PINNED_EXECUTION_SUPPORTED {
+            assert_eq!(result.status, ExecutionStatus::Success, "{result:?}");
+            assert!(result.stdout.contains("pinned-fixture"));
+        } else {
+            assert_eq!(result.status, ExecutionStatus::Unavailable);
+            assert_eq!(result.error_code.as_deref(), Some("executable_pin_failed"));
+            assert!(result.stderr.contains("no unpinned fallback"));
+            assert!(result.stdout.is_empty());
+        }
     }
 
     #[cfg(windows)]

@@ -237,6 +237,12 @@ impl DaemonService {
             request.timeout_ms.to_string(),
             request.max_output_bytes.to_string(),
         ]);
+        if !toolhub_executor::PINNED_EXECUTION_SUPPORTED {
+            return Err(ProtocolError::new(
+                ErrorCode::Unavailable,
+                "macOS preview does not support identity-pinned tool execution or its approvals; use discovery only",
+            ));
+        }
         let hash = toolhub_executor::hash_file(&executable)
             .map_err(|_| ProtocolError::new(ErrorCode::Unavailable, "cannot hash executable"))?;
         let env_digest = toolhub_executor::env_digest(&toolhub_executor::sanitize_env(

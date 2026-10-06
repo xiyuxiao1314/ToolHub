@@ -5,6 +5,10 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+// macOS cannot execute a Mach-O image through /dev/fd while preserving this pin.
+// Refuse this boundary until a native identity-preserving launch is implemented.
+pub const PINNED_EXECUTION_SUPPORTED: bool = cfg!(any(windows, target_os = "linux"));
+
 pub struct ExecutablePin {
     file: File,
     path: PathBuf,
@@ -48,15 +52,19 @@ impl ExecutablePin {
         {
             Ok(Command::new(&self.path))
         }
-        #[cfg(unix)]
+        #[cfg(not(any(windows, target_os = "linux")))]
+        {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "identity-pinned tool execution is not supported on this platform; no unpinned fallback",
+            ))
+        }
+        #[cfg(target_os = "linux")]
         {
             use std::os::fd::AsRawFd;
             use std::os::unix::process::CommandExt;
             let fd = self.file.as_raw_fd();
-            #[cfg(target_os = "linux")]
             let path = format!("/proc/self/fd/{fd}");
-            #[cfg(not(target_os = "linux"))]
-            let path = format!("/dev/fd/{fd}");
             let mut command = Command::new(path);
             // SAFETY: fcntl is async-signal-safe. Only the forked child clears
             // CLOEXEC on its own inherited descriptor. The parent retains its flag.
