@@ -9,6 +9,7 @@
     <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-lightgrey" />
     <img alt="Status beta" src="https://img.shields.io/badge/status-beta-orange" />
   </p>
+  <p><strong>简体中文</strong> | <a href="README.en.md">English</a></p>
   <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.1">下载 v0.3.0-beta.1</a> · <a href="#接入-ai-agent">Agent 接入</a> · <a href="#从源码构建">源码构建</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">反馈问题</a></p>
 </div>
 
