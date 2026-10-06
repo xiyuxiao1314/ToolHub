@@ -90,7 +90,11 @@ else:
 
 cli=output/('ToolHub-CLI-'+version+'-'+opts.platform)
 cli.mkdir()
-for name in ['toolhub','toolhubd']: shutil.copy2(binary_dir/(name+suffix),cli/(name+suffix))
+for name in ['toolhub','toolhubd']:
+    shutil.copy2(binary_dir/(name+suffix),cli/(name+suffix))
+    if not suffix:
+        subprocess.run(['codesign','--force','--sign','-',str(cli/name)],check=True)
+        subprocess.run(['codesign','--verify','--strict',str(cli/name)],check=True)
 copy_assets(cli,desktop=False)
 assets.append(zip_folder(cli,'ToolHub-CLI-v'+version+'-'+opts.platform+'.zip'))
 print(json.dumps({'version':version,'platform':opts.platform,'assets':[str(p) for p in assets]},indent=2))

@@ -259,7 +259,11 @@ mod tests {
     fn proposal_is_persistent_metadata_until_controller_selects_and_saves() {
         let tmp = tempfile::tempdir().unwrap();
         let db = tmp.path().join("registry.sqlite");
-        let file = tmp.path().join("start.cmd");
+        let file = tmp.path().join(if cfg!(windows) {
+            "start.cmd"
+        } else {
+            "start.command"
+        });
         let marker = tmp.path().join("EXECUTED");
         std::fs::write(
             &file,

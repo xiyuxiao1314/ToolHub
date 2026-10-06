@@ -689,7 +689,11 @@ mod tests {
     fn selection_required_controller_only_persistence_and_atomic_save() {
         let tmp = tempfile::tempdir().unwrap();
         let db = tmp.path().join("registry.sqlite");
-        let file = tmp.path().join("start.cmd");
+        let file = tmp.path().join(if cfg!(windows) {
+            "start.cmd"
+        } else {
+            "start.command"
+        });
         std::fs::write(&file, "@echo off").unwrap();
         let mut svc = DaemonService::open(&db).unwrap();
         assert!(call(&mut svc, "program.list", json!({}), false)
