@@ -136,7 +136,10 @@ pub fn local_disk_roots() -> Vec<String> {
 }
 
 fn installed_roots() -> Vec<String> {
+    #[cfg(windows)]
     let mut roots = Vec::new();
+    #[cfg(not(windows))]
+    let roots = Vec::new();
     #[cfg(windows)]
     {
         use winreg::{enums::*, RegKey};

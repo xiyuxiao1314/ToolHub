@@ -35,7 +35,7 @@ def copy_assets(destination, desktop=True):
 
 def zip_folder(folder, name):
     target=output/name
-    with zipfile.ZipFile(target,'x',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as archive:
+    with zipfile.ZipFile(target,'x',compression=zipfile.ZIP_DEFLATED,compresslevel=9,strict_timestamps=False) as archive:
         for item in sorted(folder.rglob('*')):
             archive.write(item,item.relative_to(folder.parent))
     return target

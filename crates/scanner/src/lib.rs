@@ -466,8 +466,17 @@ mod tests {
     #[test]
     fn path_provider_finds_executables_in_fixture() {
         let dir = tempfile::tempdir().unwrap();
-        let bin = dir.path().join("mytool.exe");
+        let bin = dir.path().join(if cfg!(windows) {
+            "mytool.exe"
+        } else {
+            "mytool"
+        });
         std::fs::write(&bin, b"fake").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
         let p = PathProvider;
         let found = p.scan_root(dir.path().to_str().unwrap()).unwrap();
         assert!(found
@@ -479,13 +488,18 @@ mod tests {
     fn scan_does_not_execute_unknown_binaries() {
         // Marker file would be created if a probe ran; scan must not create it.
         let dir = tempfile::tempdir().unwrap();
-        let marker = dir.path().join("EXECUTED_MARKER");
-        let _evil = dir.path().join("unknown-tool-that-writes-marker");
-        #[cfg(windows)]
-        let evil = dir.path().join("unknown-tool.exe");
-        let _ = &marker;
-        // We only write a non-executable file with a suspicious name.
-        std::fs::write(&evil, b"#!/bin/sh\ntouch EXECUTED_MARKER\n").unwrap();
+        let evil = dir.path().join(if cfg!(windows) {
+            "unknown-tool.exe"
+        } else {
+            "unknown-tool-that-writes-marker"
+        });
+        let marker = std::path::PathBuf::from(format!("{}.marker", evil.display()));
+        std::fs::write(&evil, b"#!/bin/sh\n: > \"$0.marker\"\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&evil, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
         let report = run_scan(
             ScanMode::Quick,
             Some(vec![dir.path().to_string_lossy().to_string()]),

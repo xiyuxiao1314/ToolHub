@@ -1,5 +1,7 @@
 //! Explicit settings actions manage only ToolHub's current-user login registration.
-use crate::startup_diagnostics::{self, StartupRecord};
+#[cfg(windows)]
+use crate::startup_diagnostics;
+use crate::startup_diagnostics::StartupRecord;
 use serde::Serialize;
 use std::path::Path;
 

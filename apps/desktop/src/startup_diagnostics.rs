@@ -33,6 +33,7 @@ pub(crate) fn record(stage: &str, error: Option<&str>) {
         }
     }
 }
+#[cfg(windows)]
 pub(crate) fn last() -> Option<StartupRecord> {
     let path = path()?;
     if std::fs::metadata(&path).ok()?.len() > 8192 {

@@ -12,3 +12,6 @@ Thumbs.db
 /.workbench-cache/
 
 dist/
+
+__pycache__/
+*.py[cod]
