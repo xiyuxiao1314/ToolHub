@@ -435,6 +435,9 @@ mod tests {
                     Err(_) => return false,
                 }
             };
+            // Windows accepted sockets retain the nonblocking listener mode.
+            // Use blocking reads with the existing timeout for the bounded fixture.
+            stream.set_nonblocking(false).unwrap();
             stream
                 .set_read_timeout(Some(std::time::Duration::from_secs(2)))
                 .unwrap();

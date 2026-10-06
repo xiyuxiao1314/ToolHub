@@ -43,7 +43,7 @@ fn linked(path: &Path) -> Result<bool, String> {
 }
 fn bundled_root() -> Result<PathBuf, String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    let packaged = exe.parent().ok_or("安装目录不可用")?.join("skills/market");
+    let packaged = crate::installation::asset_root(&exe)?.join("skills/market");
     if packaged.is_dir() {
         Ok(packaged)
     } else {

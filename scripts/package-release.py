@@ -63,8 +63,9 @@ else:
     for name in names:
         shutil.copy2(binary_dir/name,executable/name)
         (executable/name).chmod(0o755)
-    # Keep siblings next to the paired executables; all clients share this layout.
-    copy_assets(executable)
+    # macOS code signing requires non-code assets in Contents/Resources.
+    # Paired executable files remain together in Contents/MacOS.
+    copy_assets(resources)
     iconset=output/'ToolHub.iconset'
     iconset.mkdir()
     for size in [16,32,128,256,512]:
@@ -74,8 +75,8 @@ else:
     subprocess.run(['iconutil','-c','icns',str(iconset),'-o',str(resources/'ToolHub.icns')],check=True)
     info={'CFBundleName':'ToolHub','CFBundleDisplayName':'ToolHub','CFBundleIdentifier':'dev.toolhub.desktop','CFBundleExecutable':'toolhub-desktop','CFBundlePackageType':'APPL','CFBundleShortVersionString':version.split('-')[0],'CFBundleVersion':version.split('-')[0],'CFBundleIconFile':'ToolHub.icns','LSMinimumSystemVersion':'13.0','NSHighResolutionCapable':True,'NSAppleEventsUsageDescription':'ToolHub opens Terminal at a directory you select.'}
     (app/'Contents/Info.plist').write_bytes(plistlib.dumps(info))
-    for name in names: subprocess.run(['codesign','--force','--sign','-',str(executable/name)],check=True)
-    subprocess.run(['codesign','--force','--deep','--sign','-',str(app)],check=True)
+    for name in ['toolhubd','toolhub']: subprocess.run(['codesign','--force','--sign','-',str(executable/name)],check=True)
+    subprocess.run(['codesign','--force','--sign','-',str(app)],check=True)
     subprocess.run(['codesign','--verify','--deep','--strict',str(app)],check=True)
     # Include explicit install/help documents outside the application too.
     for name in ['LICENSE','README.md']: shutil.copy2(root/name,folder/name)

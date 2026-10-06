@@ -7,6 +7,7 @@ mod startup_diagnostics;
 mod windows_startup_task;
 use file_icon::tool_file_icon;
 mod integration;
+mod installation;
 mod market;
 use market::{market_add, market_export, market_inspect, market_list, market_pick, market_share};
 #[cfg(target_os = "macos")]

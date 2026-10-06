@@ -141,10 +141,7 @@ pub async fn pick_skill_folder(window: tauri::WebviewWindow) -> Result<Option<St
 #[tauri::command]
 pub fn builtin_skill_paths() -> Result<Vec<String>, String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    let packaged = exe
-        .parent()
-        .ok_or("installation directory unavailable")?
-        .join("skills/library");
+    let packaged = crate::installation::asset_root(&exe)?.join("skills/library");
     let root = if packaged.is_dir() {
         packaged
     } else {
