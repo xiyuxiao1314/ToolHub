@@ -172,42 +172,40 @@ impl Registry {
             )?;
             ids.push(id);
         }
-        for candidate in candidates {
-            let key = identity_key(
-                candidate
-                    .canonical_path
-                    .as_deref()
-                    .unwrap_or(&candidate.path),
-            );
+        // Build the path index once. Re-reading and canonicalizing every stored
+        // candidate for each observation makes large PATH scans quadratic.
+        let mut candidate_ids = std::collections::HashMap::new();
+        let mut candidate_keys = std::collections::HashMap::new();
+        {
             let mut query = tx.prepare("SELECT id,path,canonical_path FROM scan_candidates")?;
-            let old = query
-                .query_map([], |r| {
-                    Ok((
-                        r.get::<_, String>(0)?,
-                        r.get::<_, String>(1)?,
-                        r.get::<_, Option<String>>(2)?,
-                    ))
-                })?
-                .collect::<Result<Vec<_>, _>>()?;
-            let id = old
-                .into_iter()
-                .find(|(_, p, c)| identity_key(c.as_deref().unwrap_or(p)) == key)
-                .map(|r| r.0)
-                .unwrap_or_else(|| candidate.id.clone());
-            drop(query);
-            let recognized = instances.iter().any(|i| {
+            let rows = query.query_map([], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, Option<String>>(2)?,
+                ))
+            })?;
+            for row in rows {
+                let (id, path, canonical) = row?;
+                let key = identity_key(canonical.as_deref().unwrap_or(&path));
+                candidate_ids
+                    .entry(key.clone())
+                    .or_insert_with(|| id.clone());
+                candidate_keys.insert(id, key);
+            }
+        }
+        let recognized_paths: std::collections::HashSet<_> = instances
+            .iter()
+            .map(|i| {
                 identity_key(
                     i.instance
                         .canonical_path
                         .as_deref()
                         .unwrap_or(&i.instance.path),
-                ) == key
-            });
-            tx.execute("INSERT INTO scan_candidates(id,path,canonical_path,file_name,size_bytes,sha256,version_hint,recognized,metadata_json,discovered_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10) ON CONFLICT(id) DO UPDATE SET canonical_path=excluded.canonical_path,file_name=excluded.file_name,size_bytes=excluded.size_bytes,sha256=excluded.sha256,version_hint=excluded.version_hint,recognized=excluded.recognized,metadata_json=excluded.metadata_json,discovered_at=excluded.discovered_at",params![id,candidate.path,candidate.canonical_path,candidate.file_name,candidate.size_bytes.map(|s|s as i64),candidate.sha256,candidate.version_hint,recognized as i32,serde_json::to_string(&candidate.metadata)?,now])?;
-        }
-        // If this scan saw a path but did not recognize it as a tool executable
-        // (e.g. uninstall InstallLocation folder), retire any stale instance on that path.
-        let mut seen_not_tool: std::collections::HashSet<String> = std::collections::HashSet::new();
+                )
+            })
+            .collect();
+        let mut seen_not_tool = std::collections::HashSet::new();
         for candidate in candidates {
             let key = identity_key(
                 candidate
@@ -215,14 +213,22 @@ impl Registry {
                     .as_deref()
                     .unwrap_or(&candidate.path),
             );
-            let recognized = instances.iter().any(|i| {
-                identity_key(
-                    i.instance
-                        .canonical_path
-                        .as_deref()
-                        .unwrap_or(&i.instance.path),
-                ) == key
-            });
+            let id = candidate_ids
+                .get(&key)
+                .cloned()
+                .unwrap_or_else(|| candidate.id.clone());
+            let recognized = recognized_paths.contains(&key);
+            tx.execute("INSERT INTO scan_candidates(id,path,canonical_path,file_name,size_bytes,sha256,version_hint,recognized,metadata_json,discovered_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10) ON CONFLICT(id) DO UPDATE SET canonical_path=excluded.canonical_path,file_name=excluded.file_name,size_bytes=excluded.size_bytes,sha256=excluded.sha256,version_hint=excluded.version_hint,recognized=excluded.recognized,metadata_json=excluded.metadata_json,discovered_at=excluded.discovered_at",params![id,candidate.path,candidate.canonical_path,candidate.file_name,candidate.size_bytes.map(|s|s as i64),candidate.sha256,candidate.version_hint,recognized as i32,serde_json::to_string(&candidate.metadata)?,now])?;
+            // Keep the transaction-local index current, including a supplied ID
+            // that replaces a previous row at another path.
+            if let Some(previous) = candidate_keys.insert(id.clone(), key.clone()) {
+                if previous != key && candidate_ids.get(&previous) == Some(&id) {
+                    candidate_ids.remove(&previous);
+                }
+            }
+            candidate_ids.insert(key.clone(), id);
+            // Observed non-tools retire stale instances, as before; metadata
+            // discovery never grants executable trust or execution authority.
             if !recognized {
                 seen_not_tool.insert(key);
             }
@@ -1315,6 +1321,61 @@ mod tests {
             reg.get_instance("other").unwrap().unwrap().status,
             "available"
         );
+    }
+
+    #[test]
+    fn large_scan_keeps_candidate_identity_and_updates_in_one_transaction() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut reg = Registry::open_memory().unwrap();
+        let candidates: Vec<_> = (0..1500)
+            .map(|index| {
+                let path = dir.path().join(format!("fixture-{index}.exe"));
+                std::fs::write(&path, b"owned metadata fixture").unwrap();
+                toolhub_core::ScanCandidate::from_path(path.to_string_lossy().to_string())
+            })
+            .collect();
+        let started = std::time::Instant::now();
+        reg.ingest_scan(&[], &[], &candidates, &[]).unwrap();
+        let mut repeated = candidates.clone();
+        for (index, candidate) in repeated.iter_mut().enumerate() {
+            candidate.id = format!("new-scan-{index}");
+            candidate.version_hint = Some("updated".into());
+        }
+        repeated.push(repeated[0].clone());
+        reg.ingest_scan(&[], &[], &repeated, &[]).unwrap();
+        assert_eq!(reg.count_candidates().unwrap(), 1500);
+        let (id, version): (String, String) = reg
+            .db
+            .conn
+            .query_row(
+                "SELECT id,version_hint FROM scan_candidates WHERE path=?1",
+                [&candidates[0].path],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(id, candidates[0].id);
+        assert_eq!(version, "updated");
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(30),
+            "large scan ingestion took {:?}",
+            started.elapsed()
+        );
+
+        reg.db.conn.execute_batch("CREATE TRIGGER fixture_fail_candidate BEFORE INSERT ON scan_candidates WHEN NEW.version_hint='fail' BEGIN SELECT RAISE(ABORT,'owned fixture failure'); END;").unwrap();
+        let mut failing = vec![repeated[0].clone(), repeated[1].clone()];
+        failing[0].version_hint = Some("must roll back".into());
+        failing[1].version_hint = Some("fail".into());
+        assert!(reg.ingest_scan(&[], &[], &failing, &[]).is_err());
+        let version: String = reg
+            .db
+            .conn
+            .query_row(
+                "SELECT version_hint FROM scan_candidates WHERE id=?1",
+                [&candidates[0].id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(version, "updated");
     }
 
     #[test]
