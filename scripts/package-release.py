@@ -8,7 +8,7 @@ arguments = argparse.ArgumentParser()
 arguments.add_argument('--platform', choices=['windows-x64','macos-arm64','macos-x64'], required=True)
 arguments.add_argument('--binary-dir', default='target/release')
 opts = arguments.parse_args()
-version = tomllib.loads((root/'Cargo.toml').read_text())['workspace']['package']['version']
+version = tomllib.loads((root/'Cargo.toml').read_text(encoding='utf-8'))['workspace']['package']['version']
 binary_dir = (root/opts.binary_dir).resolve()
 output = root/'dist'/'release'/opts.platform
 output.mkdir(parents=True, exist_ok=False)
@@ -16,7 +16,7 @@ suffix = '.exe' if opts.platform.startswith('windows') else ''
 names = ['toolhub-desktop', 'toolhubd', 'toolhub']
 for name in names:
     if not (binary_dir/(name+suffix)).is_file(): raise SystemExit('Missing native binary: '+name)
-reported = subprocess.check_output([str(binary_dir/('toolhub'+suffix)), '--version'], text=True).strip()
+reported = subprocess.check_output([str(binary_dir/('toolhub'+suffix)), '--version'], text=True, encoding='utf-8').strip()
 if reported != 'toolhub '+version: raise SystemExit('CLI and source version mismatch')
 license_cache=output/'license-data'
 license_cache.mkdir()
@@ -31,7 +31,7 @@ def copy_assets(destination, desktop=True):
     shutil.copytree(license_cache/'THIRD-PARTY-LICENSES',destination/'THIRD-PARTY-LICENSES')
     shutil.copy2(license_cache/'DEPENDENCIES.json',destination/'DEPENDENCIES.json')
     shutil.copy2(root/'docs/releases'/('v'+version+'.md'),destination/'RELEASE-NOTES.md')
-    (destination/'package.json').write_text(json.dumps({'schema':'toolhub.release/v1','version':version,'platform':opts.platform,'signing':'unsigned' if suffix else 'ad-hoc; not notarized','binaries':[(n+suffix) for n in names if desktop or n!='toolhub-desktop']},indent=2)+'\n')
+    (destination/'package.json').write_text(json.dumps({'schema':'toolhub.release/v1','version':version,'platform':opts.platform,'signing':'unsigned' if suffix else 'ad-hoc; not notarized','binaries':[(n+suffix) for n in names if desktop or n!='toolhub-desktop']},indent=2)+'\n',encoding='utf-8')
 
 def zip_folder(folder, name):
     target=output/name
@@ -48,9 +48,9 @@ if suffix:
     copy_assets(folder)
     shutil.copy2(root/'scripts/install-local.ps1',folder/'install-local.ps1')
     # The local installer expects this metadata and a complete file checksum manifest.
-    (folder/'package.json').write_text(json.dumps({'schema':'toolhub.package/v1','build_id':'release-'+version.replace('.','-'),'version':reported,'configuration':'release','unsigned':True,'binaries':[n+suffix for n in names]},indent=2)+'\n')
+    (folder/'package.json').write_text(json.dumps({'schema':'toolhub.package/v1','build_id':'release-'+version.replace('.','-'),'version':reported,'configuration':'release','unsigned':True,'binaries':[n+suffix for n in names]},indent=2)+'\n',encoding='utf-8')
     sums=['{}  {}'.format(hashlib.sha256(p.read_bytes()).hexdigest(),p.relative_to(folder).as_posix()) for p in sorted(folder.rglob('*')) if p.is_file()]
-    (folder/'SHA256SUMS.txt').write_text('\n'.join(sums)+'\n')
+    (folder/'SHA256SUMS.txt').write_text('\n'.join(sums)+'\n',encoding='utf-8')
     assets.append(zip_folder(folder,'ToolHub-v'+version+'-windows-x64.zip'))
 else:
     if sys.platform!='darwin': raise SystemExit('macOS assets must be generated on macOS')

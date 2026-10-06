@@ -2,8 +2,8 @@
 import json, pathlib, shutil, subprocess
 
 def collect(root, destination):
-    target = subprocess.check_output(['rustc','-vV'], text=True).split('host: ')[1].splitlines()[0]
-    metadata=json.loads(subprocess.check_output(['cargo','metadata','--format-version','1','--locked','--filter-platform',target],cwd=root,text=True))
+    target = subprocess.check_output(['rustc','-vV'], text=True, encoding='utf-8').split('host: ')[1].splitlines()[0]
+    metadata=json.loads(subprocess.check_output(['cargo','metadata','--format-version','1','--locked','--filter-platform',target],cwd=root,text=True, encoding='utf-8'))
     license_root=destination/'THIRD-PARTY-LICENSES'
     license_root.mkdir()
     inventory=[]
@@ -28,7 +28,7 @@ def collect(root, destination):
         if name in seen: continue
         seen.add(name)
         source=installed/name
-        package=json.loads((source/'package.json').read_text())
+        package=json.loads((source/'package.json').read_text(encoding='utf-8'))
         queue.extend(package.get('dependencies',{}))
         folder=license_root/('npm-'+name.replace('/','-')+'-'+package['version'])
         folder.mkdir()
@@ -37,4 +37,4 @@ def collect(root, destination):
             if file.is_file() and file.name.lower().startswith(('license','licence','copying','notice')):
                 shutil.copy2(file,folder/file.name);texts.append(file.name)
         inventory.append({'ecosystem':'npm','name':name,'version':package['version'],'declared_license':package.get('license'),'license_texts':texts})
-    (destination/'DEPENDENCIES.json').write_text(json.dumps(inventory,ensure_ascii=False,indent=2)+'\n')
+    (destination/'DEPENDENCIES.json').write_text(json.dumps(inventory,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')

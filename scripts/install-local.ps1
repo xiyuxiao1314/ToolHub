@@ -1,3 +1,4 @@
+[CmdletBinding(PositionalBinding=$false)]
 param([switch]$VerifyOnly, [switch]$UpdateCodexMcp)
 $ErrorActionPreference = 'Stop'
 $sourceRoot = [IO.Path]::GetFullPath($PSScriptRoot)
