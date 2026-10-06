@@ -1,0 +1,96 @@
+{
+  "capturedAt": "2026-09-30T11:42:21.989Z",
+  "base": "http://127.0.0.1:18765",
+  "log": [
+    {
+      "kind": "action",
+      "page": "Overview",
+      "action": "quick-scan-click"
+    },
+    {
+      "kind": "action",
+      "page": "Overview",
+      "action": "quick-scan-settled",
+      "status": {
+        "candidate_count": 1120,
+        "daemon": "toolhubd",
+        "last_scan": "2026-09-30T11:42:10.638012200Z",
+        "protocol_version": "1.0",
+        "registry_path": "C:\\Users\\AA\\AppData\\Local\\Temp\\toolhub-ui-evidence.sqlite",
+        "tool_count": 12
+      }
+    },
+    {
+      "kind": "page",
+      "page": "Overview",
+      "screenshot": "docs/reviews/evidence/nine-page/01-Overview.png",
+      "mainChars": 1131,
+      "hasError": false,
+      "snippet": "Overview\n\n工具：12候选：1120\n\n快速扫描\nActivity\n2026-09-30T11:42:10.642007900+00:00 — scan.finished — read-only scan finished\n2026-09-30T11:42:10.638034900+00:00 — scan — native scan ingested\n2026-09-30T11:41:14.831275800+00:00 — scan.started — read-"
+    },
+    {
+      "kind": "page",
+      "page": "Tools",
+      "screenshot": "docs/reviews/evidence/nine-page/02-Tools.png",
+      "mainChars": 494,
+      "hasError": false,
+      "snippet": "Tools\n搜索 \n名称\t版本\t信任\t路径\nPython\t\tunknown\tC:\\Users\\AA\\AppData\\Local/Microsoft/WindowsApps\\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\\python.exe\nPython\t\tunknown\tC:\\Users\\AA\\AppData\\Local/Microsoft/WindowsApps\\Microsoft.DesktopAppInstaller_8weky"
+    },
+    {
+      "kind": "page",
+      "page": "Environments",
+      "screenshot": "docs/reviews/evidence/nine-page/03-Environments.png",
+      "mainChars": 1551,
+      "hasError": false,
+      "snippet": "Environments\n{\n  \"envs\": [\n    {\n      \"id\": \"env.cargo.150a924db3bb147a9612\",\n      \"kind\": \"cargo\",\n      \"labels\": [\n        \"inferred from path; size unknown\"\n      ],\n      \"name\": \".cargo\",\n      \"origin\": \"unknown\",\n      \"owner\": {\n"
+    },
+    {
+      "kind": "page",
+      "page": "Capabilities",
+      "screenshot": "docs/reviews/evidence/nine-page/04-Capabilities.png",
+      "mainChars": 2547,
+      "hasError": true,
+      "snippet": "Capabilities / Resolve\n{\n  \"alternatives\": [],\n  \"canonical\": \"language.python.execute\",\n  \"capability\": \"language.python.execute\",\n  \"eligibility_error\": null,\n  \"error\": null,\n  \"explanation\": \"selected Python from 1 candidates using proj"
+    },
+    {
+      "kind": "page",
+      "page": "Skills",
+      "screenshot": "docs/reviews/evidence/nine-page/05-Skills.png",
+      "mainChars": 14,
+      "hasError": false,
+      "snippet": "Skills\n\n尚未注册技能"
+    },
+    {
+      "kind": "page",
+      "page": "Agents",
+      "screenshot": "docs/reviews/evidence/nine-page/06-Agents.png",
+      "mainChars": 9,
+      "hasError": false,
+      "snippet": "Agents\n[]"
+    },
+    {
+      "kind": "page",
+      "page": "Activity",
+      "screenshot": "docs/reviews/evidence/nine-page/07-Activity.png",
+      "mainChars": 1855,
+      "hasError": false,
+      "snippet": "Activity\n[\n  {\n    \"kind\": \"scan.finished\",\n    \"summary\": \"read-only scan finished\",\n    \"ts\": \"2026-09-30T11:42:10.642007900+00:00\"\n  },\n  {\n    \"kind\": \"scan\",\n    \"summary\": \"native scan ingested\",\n    \"ts\": \"2026-09-30T11:42:10.6380349"
+    },
+    {
+      "kind": "page",
+      "page": "Security",
+      "screenshot": "docs/reviews/evidence/nine-page/08-Security.png",
+      "mainChars": 423,
+      "hasError": false,
+      "snippet": "Security\n{\n  \"defaults\": [\n    {\n      \"action\": \"allow\",\n      \"scope\": \"command\",\n      \"subject\": \"version-probe\"\n    },\n    {\n      \"action\": \"ask\",\n      \"scope\": \"tool\",\n      \"subject\": \"*\"\n    },\n    {\n      \"action\": \"deny\",\n      "
+    },
+    {
+      "kind": "page",
+      "page": "Settings",
+      "screenshot": "docs/reviews/evidence/nine-page/09-Settings.png",
+      "mainChars": 360,
+      "hasError": false,
+      "snippet": "Settings\n{\n  \"versions\": {\n    \"app\": \"0.2.0\",\n    \"core\": \"0.2.0\",\n    \"protocol\": \"1.0\"\n  },\n  \"status\": {\n    \"candidate_count\": 1120,\n    \"daemon\": \"toolhubd\",\n    \"last_scan\": \"2026-09-30T11:42:10.638012200Z\",\n    \"protocol_version\": \""
+    }
+  ]
+}

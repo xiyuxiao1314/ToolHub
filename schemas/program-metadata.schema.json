@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ToolHub declarative program metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "purpose": {
+      "type": "string",
+      "maxLength": 4096
+    },
+    "agent_visible": {
+      "type": "boolean",
+      "default": false
+    },
+    "inputs": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "maxLength": 4096
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "maxLength": 4096
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "maxLength": 4096
+      }
+    },
+    "examples": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "maxLength": 4096
+      }
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "schema": "toolhub.bundle/v1",
+  "version": "1.0.0",
+  "author": "ToolHub 内置目录",
+  "license": "MIT",
+  "category": "document",
+  "tags": [
+    "PDF",
+    "文字提取",
+    "OCR"
+  ],
+  "manifest": {
+    "schema": "toolhub.skill/v1",
+    "id": "workflow.document.pdf-ocr",
+    "name": "PDF 文字提取与扫描件识别",
+    "description": "先尝试 PDF 原生文字，再对扫描页使用 OCR；说明识别局限。",
+    "kind": "instruction",
+    "instruction_file": "SKILL.md",
+    "requires": [
+      {
+        "capability": "document.pdf.text.extract"
+      }
+    ],
+    "optional": [
+      {
+        "capability": "document.pdf.render"
+      },
+      {
+        "capability": "document.ocr"
+      }
+    ],
+    "portability": {
+      "scope": "portable",
+      "platforms": [
+        "windows",
+        "macos",
+        "linux"
+      ],
+      "inputs": [
+        "用户指定的 PDF 文件和页码范围"
+      ],
+      "outputs": [
+        "带页码对应关系的文字文件和识别局限"
+      ],
+      "permissions": [
+        "read_files",
+        "write_files",
+        "execute_tools"
+      ],
+      "host_dependencies": []
+    }
+  },
+  "instructions": "---\nname: toolhub-pdf-text-ocr\ndescription: 经 ToolHub 查找 PDF 文字提取、渲染与 OCR 能力，提取本地 PDF 或扫描页文字；不自动安装 OCR 语言包。\n---\n\n# PDF 文字处理\n\n先按用户指定文件查找 document.pdf.text.extract，检查实际工具路径与权限。先提取原生文字并抽查；扫描 PDF 或空文本再检查 document.pdf.render 和 document.ocr。OCR 前检查所需语言数据；缺依赖明确告知，不自动安装。\n\n调用前检查输入范围和输出目录。需要执行批准时用 request_execution_approval，等待用户确认后继续。按页处理扫描件，保留原文件。长任务使用 background=true、工作目录内的 outputs 相对路径以及 get_task；取消用 cancel_task。\n\n完成后检查输出非空并抽查识别质量，保留页码对应关系。说明扫描质量、版式和语言导致的误差，给出实际文件路径。不要宣称 OCR 文字完全准确。\n"
+}

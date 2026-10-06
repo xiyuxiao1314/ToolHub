@@ -1,0 +1,22 @@
+ToolHub
+Copyright 2026 xiyuxiao1314 and contributors. Source code: MIT License.
+
+ToolHub's application icon was created for this project. Third-party tool
+logos are used to identify their respective software; their names and marks
+belong to their respective owners and do not imply endorsement.
+
+Rust and JavaScript dependencies retain their respective licenses. Exact
+dependency versions are recorded in Cargo.lock and the npm lockfiles. A
+release dependency inventory lists Cargo package license declarations; it
+is an inventory, not a legal certification. Source links and declarations
+can be inspected with cargo metadata and the corresponding package sources.
+
+SQLite is included through rusqlite's bundled SQLite build. SQLite's own
+dedication is at https://www.sqlite.org/copyright.html .
+React: https://github.com/facebook/react/blob/main/LICENSE
+Tauri: https://github.com/tauri-apps/tauri (MIT OR Apache-2.0)
+Rust dependency sources: https://crates.io/
+
+Discovered third-party applications (including FFmpeg, Python, Node.js,
+7-Zip and others) are not included in ToolHub release assets. Their licensing
+and installation are independent of ToolHub.

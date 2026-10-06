@@ -1,0 +1,15 @@
+START=19:37:07.39 
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.31s
+     Running tests\soak.rs (target\debug\deps\soak-c5b6a78d1bcd3293.exe)
+
+running 5 tests
+test soak_one_daemon_many_requests ... ok
+test soak_one_real_quick_scan_still_works ... ok
+test soak_recovers_after_bad_requests ... ok
+test soak_registry_survives_restart ... ok
+test soak_scan_query_interleave ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 76.96s
+
+SOAK_EXIT=0 
+END=19:38:24.79 

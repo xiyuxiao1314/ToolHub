@@ -1,0 +1,30 @@
+fn main() {
+    tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
+        tauri_build::AppManifest::new().commands(&[
+            "rpc",
+            "app_versions",
+            "autostart_status",
+            "autostart_set",
+            "agent_integration",
+            "agent_mcp_check",
+            "market_list",
+            "market_pick",
+            "market_inspect",
+            "market_add",
+            "market_share",
+            "market_export",
+            "tool_file_icon",
+            "default_export_path_string",
+            "save_text_file",
+            "read_text_file",
+            "open_terminal",
+            "reveal_path",
+            "scan_root_for_path",
+            "pick_program_path",
+            "pick_skill_folder",
+            "builtin_skill_paths",
+            "open_program_folder",
+        ]),
+    ))
+    .expect("build desktop permissions");
+}

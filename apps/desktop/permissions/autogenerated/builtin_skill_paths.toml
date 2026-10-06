@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-builtin-skill-paths"
+description = "Enables the builtin_skill_paths command without any pre-configured scope."
+commands.allow = ["builtin_skill_paths"]
+
+[[permission]]
+identifier = "deny-builtin-skill-paths"
+description = "Denies the builtin_skill_paths command without any pre-configured scope."
+commands.deny = ["builtin_skill_paths"]

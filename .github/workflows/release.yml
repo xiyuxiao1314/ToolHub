@@ -1,0 +1,73 @@
+name: Native release packages
+on:
+  push:
+    branches: [main, 'codex/release-*']
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            platform: windows-x64
+          - runner: macos-15
+            platform: macos-arm64
+          - runner: macos-15-intel
+            platform: macos-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: '2'
+      MACOSX_DEPLOYMENT_TARGET: '13.0'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # official release
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # official release
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/desktop/ui/package-lock.json
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # official release
+        with:
+          python-version: '3.12'
+      - name: Rust toolchain
+        run: rustup update stable
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        id: rust-cache
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-${{ matrix.platform }}-${{ hashFiles('Cargo.lock') }}-release-2
+      - name: Frontend
+        run: |
+          npm ci --prefix apps/desktop/ui
+          npm run build --prefix apps/desktop/ui
+      - name: Native checks
+        run: cargo test --release --workspace --locked -- --test-threads=1
+      - name: TypeScript SDK
+        run: node --test packages/sdk-typescript/test/client.test.js
+      - name: Release build
+        run: cargo build --release -p toolhub-cli -p toolhub-daemon -p toolhub-desktop --locked
+      - name: Package
+        run: python scripts/package-release.py --platform ${{ matrix.platform }}
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        if: always() && steps.rust-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ steps.rust-cache.outputs.cache-primary-key }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # official release
+        with:
+          name: ${{ matrix.platform }}
+          path: |
+            dist/release/${{ matrix.platform }}/*.zip
+            dist/release/${{ matrix.platform }}/*.dmg
+          if-no-files-found: error
+          retention-days: 14

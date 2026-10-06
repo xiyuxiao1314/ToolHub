@@ -41,9 +41,9 @@ Reviewed revision: `codex/toolhub-r4-final` after MiMo repair commit (see git lo
 ## Honest limitations
 
 1. **Review independence limited** (owner-authorized dual role).
-2. Soak and release-build packaging were not fully observed before handoff packaging.
-3. Desktop nine-flow UI operation screenshots and macOS host checks remain unverified.
-4. No merge into docs `main`, no public release, no workbench archive without further owner instruction.
+2. Soak and release-build packaging were not fully observed before handoff packaging. **Update (owner-authorized residual window):** long soak later fully observed 5/5 — see `B02-R4-RESIDUAL.md`.
+3. Desktop nine-flow UI operation screenshots and macOS host checks remain unverified. **Update:** nine-page UI operation evidence captured in the residual window (browser + invoke shim + live daemon); macOS still excluded by owner direction.
+4. No merge into docs `main`, no public release, no workbench archive without further owner instruction. Merge/workbench remain gated on independent subagent code review.
 
 ## Local / remote
 

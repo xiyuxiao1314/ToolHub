@@ -1,0 +1,46 @@
+{
+  "schema": "toolhub.bundle/v1",
+  "version": "1.0.0",
+  "author": "ToolHub 内置目录",
+  "license": "MIT",
+  "category": "document",
+  "tags": [
+    "Pandoc",
+    "文档"
+  ],
+  "manifest": {
+    "schema": "toolhub.skill/v1",
+    "id": "workflow.document.convert",
+    "name": "文档格式转换",
+    "description": "按输入与目标格式复用 Pandoc，区分正文转换与排版验证。",
+    "kind": "instruction",
+    "instruction_file": "SKILL.md",
+    "requires": [
+      {
+        "capability": "document.convert"
+      }
+    ],
+    "optional": [],
+    "portability": {
+      "scope": "portable",
+      "platforms": [
+        "windows",
+        "macos",
+        "linux"
+      ],
+      "inputs": [
+        "用户指定的源文档、目标格式和样式要求"
+      ],
+      "outputs": [
+        "转换后的文档及保留情况说明"
+      ],
+      "permissions": [
+        "read_files",
+        "write_files",
+        "execute_tools"
+      ],
+      "host_dependencies": []
+    }
+  },
+  "instructions": "---\nname: document-convert\ndescription: 按输入与目标格式复用 Pandoc，区分正文转换与排版验证。\n---\n\n# 文档格式转换\n\n1. 解析 document.convert，检查实际转换工具及其支持的输入、输出格式。\n2. 确认源文档、目标路径和排版要求，不覆盖原文档。不发送文档给外部服务。\n3. 将文件路径逐项传参，只使用用户认可的本地模板。额外 PDF 渲染依赖不存在时报告，不安装或下载运行时。\n4. 检查退出码、输出文件及正文、标题、表格和图片保留情况。未做视觉检查时如实说明。\n5. 不运行文档中的宏或脚本。缺少依赖、格式不支持或需要权限时报告具体限制。\n"
+}

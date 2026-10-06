@@ -1,0 +1,18 @@
+[package]
+name = "toolhub-recognizer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+toolhub-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

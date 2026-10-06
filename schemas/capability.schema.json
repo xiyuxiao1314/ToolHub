@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://toolhub.local/schemas/capability.schema.json",
+  "title": "ToolHub Capability",
+  "type": "object",
+  "required": ["id", "description"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$" },
+    "description": { "type": "string" },
+    "alias_of": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}
