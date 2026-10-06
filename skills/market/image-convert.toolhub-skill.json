@@ -1,0 +1,46 @@
+{
+  "schema": "toolhub.bundle/v1",
+  "version": "1.0.0",
+  "author": "ToolHub 内置目录",
+  "license": "MIT",
+  "category": "media",
+  "tags": [
+    "图片",
+    "ImageMagick"
+  ],
+  "manifest": {
+    "schema": "toolhub.skill/v1",
+    "id": "workflow.image.convert",
+    "name": "图片格式与尺寸转换",
+    "description": "复用 ImageMagick 转换图片格式或尺寸，保留原图并检查结果。",
+    "kind": "instruction",
+    "instruction_file": "SKILL.md",
+    "requires": [
+      {
+        "capability": "media.image.convert"
+      }
+    ],
+    "optional": [],
+    "portability": {
+      "scope": "portable",
+      "platforms": [
+        "windows",
+        "macos",
+        "linux"
+      ],
+      "inputs": [
+        "用户选择的图片、目标格式或尺寸"
+      ],
+      "outputs": [
+        "新图片和尺寸验证结果"
+      ],
+      "permissions": [
+        "read_files",
+        "write_files",
+        "execute_tools"
+      ],
+      "host_dependencies": []
+    }
+  },
+  "instructions": "---\nname: image-convert\ndescription: 复用 ImageMagick 转换图片格式或尺寸，保留原图并检查结果。\n---\n\n# 图片格式与尺寸转换\n\n1. 解析 media.image.convert 并检查实际工具、版本与权限。\n2. 确认输入、输出格式、尺寸和是否允许覆盖。默认保存到新的输出路径，保留原图。\n3. 根据该实例实际接口组织逐项参数；路径通过参数传入，不拼接 shell 命令。不处理用户未指定的图片。\n4. 执行后检查退出码、输出文件可读取性、格式和像素尺寸，报告透明背景或元数据变化。\n5. 缺少可用工具或需要额外权限时明确报告，不安装依赖。\n"
+}

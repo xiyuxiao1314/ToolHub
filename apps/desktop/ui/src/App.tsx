@@ -1,6 +1,14 @@
+import ToolsList from './ToolsList'
+import ManagedTasks from './ManagedTasks'
+import Skills from './Skills'
+import Market from './Market'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import Programs from './Programs'
+import ToolIcon from './ToolIcon'
+import AgentHelp from './AgentHelp'
+import StartupSetting from './StartupSetting'
+import brandIcon from './assets/toolhub-a.png'
 
 type Json = Record<string, unknown> | unknown[] | string | number | boolean | null
 
@@ -8,13 +16,14 @@ async function rpc(method: string, params: Json = {}): Promise<any> {
   return invoke('rpc', { method, params })
 }
 
-type PageId = 'tools' | 'programs' | 'agents' | 'envs' | 'market' | 'tasks' | 'settings'
+type PageId = 'tools' | 'programs' | 'agents' | 'envs' | 'skills' | 'market' | 'tasks' | 'settings'
 
 const NAV: { id: PageId; label: string; icon: string }[] = [
   { id: 'tools', label: '工具', icon: '🧰' },
   { id: 'programs', label: '程序', icon: '🚀' },
   { id: 'agents', label: '智能体', icon: '🤖' },
   { id: 'envs', label: '环境', icon: '🧩' },
+  { id: 'skills', label: 'Skill 库', icon: '📚' },
   { id: 'market', label: '市场', icon: '🛍️' },
   { id: 'tasks', label: '任务', icon: '📋' },
   { id: 'settings', label: '设置', icon: '⚙️' },
@@ -124,15 +133,8 @@ function formatTs(raw: unknown): string {
   return Number.isNaN(d.getTime()) ? text : d.toLocaleString('zh-CN', { hour12: false })
 }
 
-function toolIcon(name: string): { bg: string; text: string } {
-  const n = (name || '?').toLowerCase()
-  if (n.includes('python')) return { bg: '#3776ab', text: 'Py' }
-  if (n.includes('node')) return { bg: '#3c873a', text: 'JS' }
-  if (n.includes('git')) return { bg: '#f05033', text: 'Git' }
-  if (n.includes('javac') || n.includes('编译')) return { bg: '#c2410c', text: 'Jc' }
-  if (n.includes('java')) return { bg: '#e76f00', text: 'Jv' }
-  if (n.includes('rust') || n.includes('cargo')) return { bg: '#b7410e', text: 'Rs' }
-  return { bg: '#64748b', text: name.slice(0, 2).toUpperCase() }
+function toolKindCount(items: any[]): number {
+  return new Set(items.map((t) => String(t.definition_id || t.id || t.path))).size
 }
 
 function toolTags(name: string, path: string): string[] {
@@ -140,6 +142,7 @@ function toolTags(name: string, path: string): string[] {
   const tags: string[] = []
   if (/python|node|java|rust|cargo|golang|go\.exe/.test(n)) tags.push('Runtime')
   if (/\.exe|\\cmd\\|\\bin\\|\.cmd|\.bat/.test(n)) tags.push('CLI')
+  if (/ffmpeg|ffprobe|7-?zip|7za?\.exe|imagemagick|magick|pandoc|poppler|pdfto|tesseract|yt-dlp|curl/.test(`${name} ${path.replace(/\\/g, '/').split('/').pop()}`.toLowerCase())) tags.push('实用工具')
   if (/sdk|jdk/.test(n)) tags.push('SDK')
   if (/git|docker|code/.test(n)) tags.push('DevOps')
   return tags.length ? tags : ['工具']
@@ -154,15 +157,6 @@ function tagClass(tag: string): string {
 
 function StatusBadge({ text, tone = 'ok' }: { text: string; tone?: 'ok' | 'warn' | 'muted' }) {
   return <span className={`badge badge-${tone}`}>{text}</span>
-}
-
-function ToolIcon({ name, size = 48 }: { name: string; size?: number }) {
-  const { bg, text } = toolIcon(name)
-  return (
-    <div className="tool-icon" style={{ background: bg, width: size, height: size, fontSize: size < 40 ? 14 : 18 }}>
-      {text}
-    </div>
-  )
 }
 
 function Toast({ message, onClose }: { message: string; onClose: () => void }) {
@@ -196,6 +190,8 @@ export default function App() {
     return saved && NAV.some((n) => n.id === saved) ? saved : 'tools'
   })
   const [tools, setTools] = useState<any[]>([])
+  const [searchRows, setSearchRows] = useState<any[]>([])
+  const [grouped, setGrouped] = useState(() => localStorage.getItem('th.grouped') !== 'false')
   const [agents, setAgents] = useState<any[]>([])
   const [envs, setEnvs] = useState<any[]>([])
   const [dups, setDups] = useState<any[]>([])
@@ -221,6 +217,7 @@ export default function App() {
   const loadSeq = useRef(0)
   const startupScan = useRef(false)
   const searchRef = useRef<HTMLInputElement>(null)
+  const contentRef = useRef<HTMLElement>(null)
 
   const notify = (msg: string) => setToast(msg)
   const fail = (e: any) => {
@@ -283,6 +280,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('th.page', page)
+    if (contentRef.current) contentRef.current.scrollTop = 0
   }, [page])
 
   useEffect(() => {
@@ -524,12 +522,21 @@ export default function App() {
     }
   }
 
+  const inventoryCounts = useMemo(() => {
+    const available = tools.filter((t) => t.status !== 'missing')
+    return { registered: tools.length, available: available.length, unavailable: tools.length - available.length, kinds: toolKindCount(available) }
+  }, [tools])
+
   const filteredTools = useMemo(() => {
-    const q = query.trim().toLowerCase().replace(/\\/g, '/')
-    const base = prefs.showHidden ? tools : tools.filter((t) => t.status !== 'missing')
-    if (!q) return base
-    return base.filter((t) => `${t.name ?? ''} ${t.path ?? ''} ${t.definition_id ?? ''}`.toLowerCase().replace(/\\/g, '/').includes(q))
-  }, [tools, query, prefs.showHidden])
+    const base = query.trim() ? searchRows : tools
+    return prefs.showHidden ? base : base.filter(t => t.status !== 'missing')
+  }, [tools, searchRows, query, prefs.showHidden])
+
+  useEffect(() => {
+    let active = true
+    const timer = setTimeout(() => { if(query.trim()) void rpc('registry.search', {query:query.trim(),include_missing:true}).then(rows => { if(active) setSearchRows(listFrom(rows)) }).catch(fail) }, 180)
+    return () => { active = false; clearTimeout(timer) }
+  }, [query, tools])
 
   const cats = useMemo(() => {
     const count = (k: string) =>
@@ -538,6 +545,7 @@ export default function App() {
       { label: `全部 (${filteredTools.length})`, key: 'all' },
       { label: `CLI (${count('cli')})`, key: 'cli' },
       { label: `Runtime (${count('runtime')})`, key: 'runtime' },
+      { label: `实用工具 (${count('实用工具')})`, key: '实用工具' },
       { label: `SDK (${count('sdk')})`, key: 'sdk' },
       { label: `DevOps (${count('devops')})`, key: 'devops' },
     ]
@@ -562,50 +570,53 @@ export default function App() {
     <div className="app-shell">
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
       <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-badge">TH</div>
-          <span>ToolHub</span>
-        </div>
-        <nav className="nav">
-          {NAV.map((item) => (
-            <button
-              key={item.id}
-              className={`nav-btn ${page === item.id ? 'active' : ''}`}
-              onClick={() => setPage(item.id)}
-            >
-              <span>{item.icon}</span>
-              <span>{item.label}</span>
+        <div className="sidebar-scroll">
+          <div className="brand">
+            <img className="brand-badge" src={brandIcon} alt="" aria-hidden="true" />
+            <span>ToolHub</span>
+          </div>
+          <nav className="nav">
+            {NAV.map((item) => (
+              <button
+                key={item.id}
+                className={`nav-btn ${page === item.id ? 'active' : ''}`}
+                onClick={() => setPage(item.id)}
+              >
+                <span>{item.icon}</span>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </nav>
+          <div className="quick">
+            <div className="quick-title">快速操作</div>
+            <button className="quick-btn" onClick={() => { setPage('tools'); setAddToolOpen(true) }}>
+              ＋ 添加工具
             </button>
-          ))}
-        </nav>
-        <div className="quick">
-          <div className="quick-title">快速操作</div>
-          <button className="quick-btn" onClick={() => { setPage('tools'); setAddToolOpen(true) }}>
-            ＋ 添加工具
-          </button>
-          <button className="quick-btn" onClick={() => void onScan()} disabled={busy}>
-            🔍 扫描本机
-          </button>
-          <button className="quick-btn" onClick={() => setPage('market')}>
-            📦 模板与清单
-          </button>
-          <button className="quick-btn" onClick={() => { setPage('settings'); setImportOpen(true) }}>
-            ⬇️ 导入配置
-          </button>
+            <button className="quick-btn" onClick={() => void onScan()} disabled={busy}>
+              🔍 扫描本机
+            </button>
+            <button className="quick-btn" onClick={() => setPage('market')}>
+              📦 模板与清单
+            </button>
+            <button className="quick-btn" onClick={() => { setPage('settings'); setImportOpen(true) }}>
+              ⬇️ 导入配置
+            </button>
+          </div>
         </div>
         <div className="side-foot">
-          <div className="muted">工具总数</div>
-          <strong>{tools.length}</strong>
-          <div className="progress">
-            <i style={{ width: `${Math.min(100, tools.length * 4)}%` }} />
+          <div className="muted">可用工具</div>
+          <strong>{inventoryCounts.available}</strong>
+          <div className="progress" title={`可用 ${inventoryCounts.available} / 已登记 ${inventoryCounts.registered}`}>
+            <i style={{ width: `${inventoryCounts.registered ? inventoryCounts.available / inventoryCounts.registered * 100 : 0}%` }} />
           </div>
           <div className="muted" style={{ fontSize: 12 }}>
-            本地磁盘 · 已识别 {tools.length} 个工具
+            已登记 {inventoryCounts.registered} 个安装实例<br />
+            不可用 {inventoryCounts.unavailable} · 共 {inventoryCounts.kinds} 种可用工具
           </div>
         </div>
       </aside>
 
-      <section className="content">
+      <section className="content" ref={contentRef}>
         {error && (
           <div className="layout-1" style={{ paddingBottom: 0 }}>
             <div className="error-box">{error}</div>
@@ -661,7 +672,7 @@ export default function App() {
                       ref={searchRef}
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
-                      placeholder="搜索工具名称或路径..."
+                      placeholder="搜索名称、路径，或压缩视频 / OCR 等任务..."
                     />
                     <span className="kbd">Ctrl K</span>
                   </div>
@@ -673,39 +684,14 @@ export default function App() {
                     </button>
                   ))}
                 </div>
-                <div className="tool-list">
-                  {loading && <div className="empty">加载中…</div>}
-                  {!loading && shown.length === 0 && <div className="empty">没有匹配的工具</div>}
-                  {shown.map((t, i) => {
-                    const active = selected && selected.id === t.id
-                    return (
-                      <button key={t.id ?? i} className={`tool-item ${active ? 'active' : ''}`} onClick={() => setSelected(t)}>
-                        <ToolIcon name={String(t.name ?? '')} />
-                        <div>
-                          <div className="tool-name">
-                            {String(t.name ?? '—')}
-                            {t.version ? ` ${t.version}` : ''}
-                          </div>
-                          <div className="tool-desc">{String(t.path ?? '')}</div>
-                          <div className="tags">
-                            {toolTags(String(t.name ?? ''), String(t.path ?? '')).map((tag) => (
-                              <span key={tag} className={tagClass(tag)}>
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="tool-meta">
-                          <div className="ver">{t.version ? String(t.version) : '—'}</div>
-                          <StatusBadge text={t.status === 'available' ? '已安装' : String(t.status ?? '未知')} tone="ok" />
-                          <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-                            {trustLabel(t.trust)}
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  })}
+                <div className="tool-count-note" role="status" aria-live="polite">
+                  <div>当前 {shown.length} 个安装实例 · {toolKindCount(shown)} 种工具 <button className="btn" onClick={() => {setGrouped(!grouped);localStorage.setItem('th.grouped',String(!grouped))}}>{grouped ? '显示安装实例' : '按工具合并'}</button></div>
+                  <div className="muted">
+                    分类标签可重叠；不同安装位置分别计数。
+                    {!prefs.showHidden && inventoryCounts.unavailable > 0 && ` 已隐藏 ${inventoryCounts.unavailable} 个不可用实例。`}
+                  </div>
                 </div>
+                <ToolsList key={JSON.stringify([query.trim(), cat, prefs.showHidden, grouped])} items={shown} grouped={grouped} selected={selected} onSelect={setSelected} loading={loading} tags={toolTags} tagClass={tagClass} trustLabel={trustLabel} badge={item => <StatusBadge text={item.status === 'available' ? '已安装' : item.status === 'missing' ? '不可用' : String(item.status ?? '未知')} tone={item.status === 'available' ? 'ok' : 'warn'} />} />
               </div>
 
               <aside className="card card-pad">
@@ -714,7 +700,7 @@ export default function App() {
                 ) : (
                   <>
                     <div className="detail-head">
-                      <ToolIcon name={String(selected.name ?? '')} size={56} />
+                      <ToolIcon name={String(selected.name ?? '')} path={String(selected.path ?? '')} version={String(selected.version ?? '')} size={56} />
                       <div style={{ flex: 1 }}>
                         <h2>
                           {String(selected.name ?? '—')}
@@ -747,6 +733,8 @@ export default function App() {
                         打开位置
                       </button>
                     </div>
+                    <div className="program-actions"><button className="btn" disabled={selected.status !== 'available'} onClick={() => void rpc('registry.prefer_instance',{id:selected.id,clear:selected.preferred===true}).then(()=>refresh('默认路径已保存，执行仍需权限')).catch(fail)}>{selected.preferred?'取消默认路径':'设为默认路径'}</button><button className="btn" onClick={() => void rpc('registry.health_instance',{id:selected.id}).then(result=>refresh(result.path_exists?'文件可读取，尚未执行验证':'路径已失效')).catch(fail)}>检查文件</button><button className="btn" disabled={selected.status !== 'available'} onClick={() => void invoke<string|null>('pick_program_path',{directory:true}).then(project=>project&&rpc('registry.prefer_instance',{id:selected.id,project})).then(()=>notify('项目默认路径已保存')).catch(fail)}>设为项目默认</button>{trustLevel(selected.trust)==='unknown'&&<button className="btn" onClick={()=>void rpc('registry.correct',{id:selected.id,trust:'user_trusted'}).then(()=>refresh('已信任此路径；执行仍需本次批准')).catch(fail)}>信任此路径</button>}{detailData?.version_probe_args&&<button className="btn" disabled={trustLevel(selected.trust)==='unknown'||selected.status!=='available'} onClick={()=>void (async()=>{try{const params={instance_id:selected.id,args:detailData.version_probe_args,cwd:selected.path.slice(0,Math.max(selected.path.lastIndexOf('/'),selected.path.lastIndexOf('\\'))),timeout_ms:10000};const requested=await rpc('execute.approval_request',params);const approval=await rpc('execute.approve',{request_id:requested.request_id});const result=await rpc('execute.tool',{...params,approval_id:approval.approval_id,session_id:approval.session_id});if(result.status==='success')await rpc('registry.health_instance',{id:selected.id,execution_id:result.execution_id});await refresh(result.status==='success'?'版本检查运行成功':'版本检查：'+result.status)}catch(e){fail(e)}})()}>执行版本检查（本次授权）</button>}</div>
+                    {selected.health && <p className="muted">文件检查：{selected.health.path_exists?'可读取':'失效'} · {new Date(selected.health.checked_at).toLocaleString()} · {selected.health.execution_tested?'已执行验证':'尚未执行验证'}</p>}
                     <div className="tabs">
                       <button className={`tab ${detailTab === 'overview' ? 'active' : ''}`} onClick={() => setDetailTab('overview')}>
                         概览
@@ -856,6 +844,8 @@ export default function App() {
           </>
         )}
 
+        {page === 'skills' && <Skills notify={notify} />}
+
         {page === 'agents' && (
           <>
             <div className="topbar">
@@ -871,17 +861,11 @@ export default function App() {
               </button>
             </div>
             <div className="layout-1">
-              {agentHelpOpen && <div className="card card-pad" style={{ marginBottom: 16 }}>
-                <h3>通过 MCP / CLI 接入</h3>
-                <p>在智能体的 MCP 设置中，将 ToolHub 同目录的 toolhub.exe 设为启动命令，参数填写 mcp serve。也可使用 CLI 查询本机工具。</p>
-                <pre>toolhub.exe mcp serve{'\n'}toolhub.exe --json search python</pre>
-                <p className="muted">此列表显示本机检测到的适配器；检测到软件不代表已建立连接。</p>
-                <button className="btn" onClick={() => void refresh('智能体列表已刷新')}>刷新列表</button>
-              </div>}
+              {agentHelpOpen && <AgentHelp notify={notify} fail={fail} refresh={() => void refresh('智能体列表已刷新')} />}
               <div className="card card-pad">
                 {agents.length === 0 ? (
                   <div className="empty">
-                    暂无已接入的智能体。
+                    尚未检测到智能体或接入配置。
                     <div className="muted" style={{ marginTop: 8 }}>
                       点击「接入说明」查看配置方式；安装好的适配器可通过刷新重新检测。
                     </div>
@@ -890,17 +874,24 @@ export default function App() {
                     </button>
                   </div>
                 ) : (
-                  <ul className="list-clean">
+                  <><div className="program-actions"><button className="btn" onClick={() => void refresh('智能体列表已刷新')}>重新检测</button><button className="btn" onClick={()=>void invoke<any>('agent_mcp_check').then(r=>notify('ToolHub MCP 自检通过：'+r.tool_count+' 个元工具；宿主需实际加载配置')).catch(fail)}>运行 MCP 自检</button></div><ul className="list-clean agent-inventory">
                     {agents.map((a, i) => (
                       <li key={i}>
                         <div>
                           <strong>{String(a.name ?? a.id ?? '智能体')}</strong>
-                          <div className="muted">{String(a.id ?? a.agent_id ?? '')}</div>
+                          <div className="muted">{String(a.executable ?? '启动文件待定位')}</div>
+                          <div className="tags"><span className="tag">{a.configuration?.configured ? (a.configuration.enabled === false ? 'MCP 配置已禁用' : 'MCP 已配置') : (a.configuration?.reader_supported ? '默认位置未发现配置' : '配置位置待确认')}</span></div>
+                          {a.configuration?.config_path && <div className="muted">配置位置：{String(a.configuration.config_path)}</div>}
+                          {a.configuration?.scope && <div className="muted">配置范围：{String(a.configuration.scope)}</div>}
+                          {a.configuration?.note && <div className="muted">{String(a.configuration.note)}</div>}
+                          {a.configuration?.error && <div className="help-warning">配置检查：{String(a.configuration.error)}</div>}
+                          <div className="muted">最近握手：{a.last_handshake_at ? new Date(a.last_handshake_at).toLocaleString() : '尚无记录'} · 最近调用成功：{a.last_call_at ? new Date(a.last_call_at).toLocaleString() : '尚无记录'}</div>
+                          <div className="muted">{a.last_detected_at ? '最近检测：' + new Date(a.last_detected_at).toLocaleString() : ''}</div>
                         </div>
-                        <StatusBadge text={a.health === 'detected' ? '已检测' : String(a.status ?? a.state ?? a.health ?? '未知')} tone="muted" />
+                        <StatusBadge text={a.health === 'detected' ? '已检测到程序' : (a.last_handshake_at || a.last_call_at ? '有 MCP 历史记录' : '当前未检测到，保留记录')} tone="muted" />
                       </li>
                     ))}
-                  </ul>
+                  </ul></>
                 )}
               </div>
             </div>
@@ -983,63 +974,7 @@ export default function App() {
           </>
         )}
 
-        {page === 'market' && (
-          <>
-            <div className="topbar">
-              <div>
-                <h1>市场</h1>
-                <p>发现可接入 ToolHub 的工具模板、技能包与智能体扩展。</p>
-              </div>
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  setAddToolOpen(true)
-                  setPage('tools')
-                  notify('可在「工具」页添加本机工具；模板市场即将接入')
-                }}
-              >
-                添加本机工具
-              </button>
-            </div>
-            <div className="layout-1">
-              <div className="card card-pad">
-                <h3>本地模板入口</h3>
-                <ul className="list-clean">
-                  <li>
-                    <div>
-                      <strong>从本机路径识别</strong>
-                      <div className="muted">输入已安装软件路径，执行定向扫描并入库。</div>
-                    </div>
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => {
-                        setPage('tools')
-                        setAddToolOpen(true)
-                      }}
-                    >
-                      去添加
-                    </button>
-                  </li>
-                  <li>
-                    <div>
-                      <strong>导入工具清单</strong>
-                      <div className="muted">使用「设置 → 导入配置」导入 toolhub.report JSON。</div>
-                    </div>
-                    <button
-                      className="btn"
-                      onClick={() => {
-                        setPage('settings')
-                        setImportOpen(true)
-                      }}
-                    >
-                      去导入
-                    </button>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </>
-        )}
+        {page === 'market' && <Market notify={notify} onLibrary={() => setPage('skills')} onTools={() => setPage('tools')} onAddTool={() => {setPage('tools');setAddToolOpen(true)}} />}
 
         {page === 'tasks' && (
           <>
@@ -1058,6 +993,7 @@ export default function App() {
                 刷新
               </button>
             </div>
+            <ManagedTasks notify={notify} />
             <div className="layout-1">
               <div className="card card-pad">
                 <ul className="list-clean">
@@ -1087,6 +1023,7 @@ export default function App() {
             </div>
             <div className="layout-2">
               <div className="card">
+                <StartupSetting notify={notify} />
                 <div className="setting-row">
                   <div>
                     <h3>默认扫描模式</h3>

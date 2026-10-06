@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-market-export"
+description = "Enables the market_export command without any pre-configured scope."
+commands.allow = ["market_export"]
+
+[[permission]]
+identifier = "deny-market-export"
+description = "Denies the market_export command without any pre-configured scope."
+commands.deny = ["market_export"]

@@ -8,6 +8,8 @@ use crate::id::SkillId;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SkillManifest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub portability: Option<crate::skill_portability::SkillPortability>,
     pub schema: String,
     pub id: SkillId,
     pub name: String,
@@ -103,6 +105,9 @@ impl SkillManifest {
             ));
         }
         crate::validate_id(self.id.as_str(), "skill")?;
+        if let Some(portability) = &self.portability {
+            portability.validate()?;
+        }
         for req in self.requires.iter().chain(&self.optional) {
             crate::validate_id(req.capability.as_str(), "capability")?;
             if !crate::capability::is_canonical_capability(req.capability.as_str()) {

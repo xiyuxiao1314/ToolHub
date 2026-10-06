@@ -4,9 +4,11 @@
 pub mod programs;
 mod providers;
 mod types;
+mod utilities;
 
 pub use providers::*;
 pub use types::*;
+pub use utilities::*;
 
 use toolhub_core::ScanCandidate;
 
@@ -91,6 +93,7 @@ pub fn run_scan_with_cancel(
         Box::new(KnownDirsProvider),
         Box::new(PackageManagerProvider),
         Box::new(NativeDeveloperProvider),
+        Box::new(PortableUtilitiesProvider),
         Box::new(WslMetadataProvider),
         if cfg!(windows) {
             Box::new(WindowsRegistryProvider) as Box<dyn ScannerProvider>
@@ -116,7 +119,7 @@ pub fn run_scan_with_cancel(
                 break;
             }
             report.coverage.roots_attempted.push(root.clone());
-            match p.scan_root(&root) {
+            match p.scan_root_with_cancel(&root, cancelled) {
                 Ok(mut found) => {
                     report.coverage.roots_ok.push(root.clone());
                     let complete = matches!(p.name(), "path" | "known_dirs");
@@ -343,6 +346,13 @@ pub trait ScannerProvider: Send + Sync {
     }
     /// Read-only inspection of one root. Errors become coverage failures.
     fn scan_root(&self, root: &str) -> Result<Vec<ScanCandidate>, std::io::Error>;
+    fn scan_root_with_cancel(
+        &self,
+        root: &str,
+        _cancelled: &std::sync::atomic::AtomicBool,
+    ) -> Result<Vec<ScanCandidate>, std::io::Error> {
+        self.scan_root(root)
+    }
 }
 
 /// B02-13: permission-limited scanner extension. No write/install/execute authority.

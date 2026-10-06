@@ -112,6 +112,78 @@ pub const KNOWN_TOOLS: &[KnownToolRule] = &[
         vendor: "FFmpeg",
     },
     KnownToolRule {
+        definition_id: "org.ffmpeg.ffprobe",
+        name: "FFprobe",
+        file_names: &["ffprobe.exe", "ffprobe"],
+        path_substrings: &["ffmpeg", "ffprobe"],
+        capabilities: &["media.video.probe"],
+        vendor: "FFmpeg",
+    },
+    KnownToolRule {
+        definition_id: "org.7zip.7z",
+        name: "7-Zip",
+        file_names: &["7z.exe", "7za.exe", "7z", "7za"],
+        path_substrings: &["7-zip", "7zip"],
+        capabilities: &["archive.extract", "archive.create"],
+        vendor: "7-Zip",
+    },
+    KnownToolRule {
+        definition_id: "org.imagemagick.magick",
+        name: "ImageMagick",
+        file_names: &["magick.exe", "magick"],
+        path_substrings: &["imagemagick"],
+        capabilities: &["media.image.convert"],
+        vendor: "ImageMagick",
+    },
+    KnownToolRule {
+        definition_id: "org.pandoc.pandoc",
+        name: "Pandoc",
+        file_names: &["pandoc.exe", "pandoc"],
+        path_substrings: &["pandoc"],
+        capabilities: &["document.convert"],
+        vendor: "Pandoc",
+    },
+    KnownToolRule {
+        definition_id: "org.poppler.pdftoppm",
+        name: "Poppler PDF 渲染",
+        file_names: &["pdftoppm.exe", "pdftoppm"],
+        path_substrings: &["poppler"],
+        capabilities: &["document.pdf.render"],
+        vendor: "Poppler",
+    },
+    KnownToolRule {
+        definition_id: "org.poppler.pdftotext",
+        name: "Poppler PDF 文本",
+        file_names: &["pdftotext.exe", "pdftotext"],
+        path_substrings: &["poppler"],
+        capabilities: &["document.pdf.text.extract"],
+        vendor: "Poppler",
+    },
+    KnownToolRule {
+        definition_id: "org.tesseract.tesseract",
+        name: "Tesseract OCR",
+        file_names: &["tesseract.exe", "tesseract"],
+        path_substrings: &["tesseract"],
+        capabilities: &["document.ocr"],
+        vendor: "Tesseract OCR",
+    },
+    KnownToolRule {
+        definition_id: "org.ytdlp.ytdlp",
+        name: "yt-dlp",
+        file_names: &["yt-dlp.exe", "yt-dlp"],
+        path_substrings: &["yt-dlp"],
+        capabilities: &["media.video.download"],
+        vendor: "yt-dlp",
+    },
+    KnownToolRule {
+        definition_id: "org.curl.curl",
+        name: "cURL",
+        file_names: &["curl.exe", "curl"],
+        path_substrings: &["curl", "system32"],
+        capabilities: &["network.http.request"],
+        vendor: "cURL",
+    },
+    KnownToolRule {
         definition_id: "org.docker.docker",
         name: "Docker",
         file_names: &["docker.exe", "docker"],
@@ -159,6 +231,15 @@ pub const KNOWN_TOOLS: &[KnownToolRule] = &[
         vendor: "LLVM/GCC/MSVC",
     },
 ];
+
+/// Shell completion files are metadata, even when their basename matches a known tool.
+pub fn is_shell_completion_path(path: &str) -> bool {
+    let path = format!("/{}", path.replace('\\', "/").to_ascii_lowercase());
+    path.contains("/bash-completion/")
+        || path.contains("/bash_completion.d/")
+        || path.contains("/fish/completions/")
+        || path.contains("/zsh/site-functions/")
+}
 
 /// Windows App Execution Aliases under WindowsApps are tiny stubs, not full tools.
 fn is_windows_store_alias(candidate: &ScanCandidate) -> bool {
@@ -236,14 +317,14 @@ fn normalize_display_version(raw: &str) -> String {
 /// Recognize a candidate using static path/name metadata only.
 pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
     let mut evidence = vec![];
-    if is_directory_install_location(candidate) {
+    if is_shell_completion_path(&candidate.path) || is_directory_install_location(candidate) {
         return RecognitionResult {
             recognized: false,
             definition: None,
             instance: None,
             evidence,
             confidence: 0.0,
-            ambiguity: Some("install location folder is not a tool executable".into()),
+            ambiguity: Some("completion data or install folder is not a tool executable".into()),
         };
     }
     if is_windows_store_alias(candidate) {
@@ -453,7 +534,10 @@ pub fn recognize_with_resources(
     candidate: &ScanCandidate,
     store: &resources::ResourceStore,
 ) -> RecognitionResult {
-    if is_directory_install_location(candidate) || is_windows_store_alias(candidate) {
+    if is_shell_completion_path(&candidate.path)
+        || is_directory_install_location(candidate)
+        || is_windows_store_alias(candidate)
+    {
         return RecognitionResult {
             recognized: false,
             definition: None,
@@ -655,6 +739,22 @@ fn _unused_map() -> BTreeMap<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn completion_metadata_cannot_be_recognized_by_builtin_or_resource_rules() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("share/bash-completion/completions/yt-dlp");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, b"__yt_dlp() { COMPREPLY=(); }\n").unwrap();
+        let candidate = cand(&path.to_string_lossy());
+        assert!(!recognize(&candidate).recognized);
+        let resources = resources::ResourceStore::open(&temp.path().join("resources")).unwrap();
+        assert!(!recognize_with_resources(&candidate, &resources).recognized);
+        assert!(is_shell_completion_path(
+            r"C:\share\bash-completion\completions\yt-dlp"
+        ));
+        assert!(!is_shell_completion_path(r"C:\tools\yt-dlp.exe"));
+    }
 
     #[test]
     fn valid_pe_format_is_not_product_identity() {

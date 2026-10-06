@@ -1,36 +1,25 @@
-# ToolHub B02/R3 local Windows package (unsigned RC)
-# Produces dist/toolhub-<version>/ with binaries, UI dist, schemas, resources, docs, recursive checksums.
-
+param([string]$BuildId = ('agent-ready-' + (Get-Date -Format 'yyyyMMdd-HHmmss')), [ValidateSet('release','debug')][string]$Configuration = 'release')
 $ErrorActionPreference = 'Stop'
-$root = Split-Path $PSScriptRoot -Parent
-$ver = '0.2.0'
-$dist = Join-Path $root "dist\toolhub-$ver"
-Remove-Item $dist -Recurse -Force -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Force -Path $dist | Out-Null
-
-Copy-Item (Join-Path $root 'target\release\toolhubd.exe') $dist
-Copy-Item (Join-Path $root 'target\release\toolhub.exe') $dist
-Copy-Item (Join-Path $root 'target\release\toolhub-desktop.exe') $dist
-Copy-Item (Join-Path $root 'schemas') (Join-Path $dist 'schemas') -Recurse
-if (Test-Path (Join-Path $root 'resources')) {
-  Copy-Item (Join-Path $root 'resources') (Join-Path $dist 'resources') -Recurse
+$projectRoot = Split-Path $PSScriptRoot -Parent
+if ($BuildId -notmatch '^[a-zA-Z0-9][a-zA-Z0-9-]{1,63}$') { throw 'Invalid build identifier' }
+$outputRoot = Join-Path $projectRoot 'dist'
+$packagePath = Join-Path $outputRoot ('toolhub-' + $BuildId)
+if (Test-Path -LiteralPath $packagePath) { throw 'Package already exists; choose a fresh build identifier' }
+$binaryRoot = Join-Path $projectRoot ('target\' + $Configuration)
+foreach ($binaryName in @('toolhub.exe','toolhubd.exe','toolhub-desktop.exe')) {
+  if (-not (Test-Path -LiteralPath (Join-Path $binaryRoot $binaryName) -PathType Leaf)) { throw ('Missing binary: ' + $binaryName) }
 }
-if (Test-Path (Join-Path $root 'apps\desktop\ui\dist')) {
-  Copy-Item (Join-Path $root 'apps\desktop\ui\dist') (Join-Path $dist 'ui-dist') -Recurse
+New-Item -ItemType Directory -Path $packagePath -Force | Out-Null
+foreach ($binaryName in @('toolhub.exe','toolhubd.exe','toolhub-desktop.exe')) { Copy-Item -LiteralPath (Join-Path $binaryRoot $binaryName) -Destination $packagePath }
+foreach ($assetName in @('schemas','resources','skills')) { if (Test-Path -LiteralPath (Join-Path $projectRoot $assetName)) { Copy-Item -LiteralPath (Join-Path $projectRoot $assetName) -Destination (Join-Path $packagePath $assetName) -Recurse } }
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install-local.ps1') -Destination $packagePath
+Copy-Item -LiteralPath (Join-Path $projectRoot 'docs\development\PACKAGE.md') -Destination (Join-Path $packagePath 'README.md')
+$versionOutput = & (Join-Path $packagePath 'toolhub.exe') '--version'
+if ($LASTEXITCODE -ne 0) { throw 'CLI version check failed' }
+@{schema='toolhub.package/v1';build_id=$BuildId;version=$versionOutput;configuration=$Configuration;created_at=(Get-Date).ToUniversalTime().ToString('o');unsigned=$true;binaries=@('toolhub.exe','toolhubd.exe','toolhub-desktop.exe')} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $packagePath 'package.json') -Encoding utf8NoBOM
+$checksumLines = Get-ChildItem -LiteralPath $packagePath -Recurse -File | Sort-Object FullName | ForEach-Object {
+  $relativePath = $_.FullName.Substring($packagePath.Length + 1).Replace('\','/')
+  ((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $relativePath)
 }
-if (Test-Path (Join-Path $root 'packages\sdk-typescript')) {
-  Copy-Item (Join-Path $root 'packages\sdk-typescript') (Join-Path $dist 'sdk-typescript') -Recurse
-}
-Copy-Item (Join-Path $root 'docs\development\PACKAGE.md') (Join-Path $dist 'README.md')
-Copy-Item (Join-Path $root 'docs\development\UNINSTALL.md') $dist
-
-# Recursive checksums
-$sums = Join-Path $dist 'SHA256SUMS.txt'
-if (Test-Path $sums) { Remove-Item $sums }
-Get-ChildItem $dist -Recurse -File | ForEach-Object {
-  $rel = $_.FullName.Substring($dist.Length + 1).Replace('\', '/')
-  $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
-  "$h  $rel" | Add-Content $sums
-}
-Write-Host "Packaged $dist"
-Get-Content $sums | Select-Object -First 12
+$checksumLines | Set-Content -LiteralPath (Join-Path $packagePath 'SHA256SUMS.txt') -Encoding utf8NoBOM
+Write-Output $packagePath

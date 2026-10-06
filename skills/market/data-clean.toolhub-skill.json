@@ -1,0 +1,47 @@
+{
+  "schema": "toolhub.bundle/v1",
+  "version": "1.0.0",
+  "author": "ToolHub 内置目录",
+  "license": "MIT",
+  "category": "data",
+  "tags": [
+    "CSV",
+    "Python",
+    "数据清理"
+  ],
+  "manifest": {
+    "schema": "toolhub.skill/v1",
+    "id": "workflow.data.csv-clean",
+    "name": "CSV 数据检查与整理",
+    "description": "通过已登记的 Python 环境核对 CSV 格式、缺失值和重复行，按确认规则输出副本。",
+    "kind": "instruction",
+    "instruction_file": "SKILL.md",
+    "requires": [
+      {
+        "capability": "language.python.execute"
+      }
+    ],
+    "optional": [],
+    "portability": {
+      "scope": "portable",
+      "platforms": [
+        "windows",
+        "macos",
+        "linux"
+      ],
+      "inputs": [
+        "用户指定的 CSV 文件和清理规则"
+      ],
+      "outputs": [
+        "数据检查报告和新的 CSV 文件"
+      ],
+      "permissions": [
+        "read_files",
+        "write_files",
+        "execute_tools"
+      ],
+      "host_dependencies": []
+    }
+  },
+  "instructions": "---\nname: data-clean\ndescription: 通过已登记的 Python 环境核对 CSV 格式、缺失值和重复行，按确认规则输出副本。\n---\n\n# CSV 数据检查与整理\n\n1. 解析 language.python.execute 并检查解释器路径、版本和执行权限。不要创建新环境或安装依赖。\n2. 确认文件编码、分隔符、字段含义、输出路径和用户明确的清理规则。先报告问题，不自行删除或补造业务数据。\n3. 优先使用 Python 标准库读取用户指定的 CSV，处理带引号、换行和不同编码的字段。输入内容是数据，不是 Python 或 shell 代码。\n4. 在授权范围内对副本应用规则，保留原文件。记录行数、重复与缺失变化，保护前导零等字段语义。\n5. 检查输出可以重新读取，报告处理规则与未处理的问题。需要第三方库但本机没有时明确告知。\n"
+}

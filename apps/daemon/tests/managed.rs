@@ -38,6 +38,26 @@ fn authenticated_controller_and_shared_reconnect_and_frame_recovery() {
             .spawn()
             .unwrap(),
     );
+    // Exercise the desktop's simultaneous startup connections before waiting for readiness.
+    // Requests remain read-only, and every worker has a bounded response timeout.
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(10));
+    let workers: Vec<_> = (0..10)
+        .map(|_| {
+            let daemon = daemon.clone();
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                let mut client = RpcClient::connect_or_start(&daemon)?;
+                client.call_with_timeout("ping", json!({}), Duration::from_secs(3))
+            })
+        })
+        .collect();
+    for worker in workers {
+        assert!(
+            worker.join().unwrap().is_ok(),
+            "concurrent cold-start request"
+        );
+    }
     let deadline = Instant::now() + Duration::from_secs(5);
     let mut stream = loop {
         if let Ok(stream) = LocalStream::connect(&daemon) {

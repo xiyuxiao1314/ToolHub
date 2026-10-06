@@ -111,7 +111,7 @@ impl Drop for McpClient {
 fn initialize_negotiates_only_supported_version() {
     let mut c = McpClient::spawn(false);
     c.send(json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2099-01-01","capabilities":{},"clientInfo":{"name":"test","version":"0"}}}));
-    assert_eq!(c.read()["result"]["protocolVersion"], "2024-11-05");
+    assert_eq!(c.read()["result"]["protocolVersion"], "2025-11-25");
 }
 #[test]
 fn rejects_tool_requests_before_initialized() {
@@ -126,7 +126,7 @@ fn notifications_get_no_reply_and_null_id_is_request() {
     c.send(json!({"jsonrpc":"2.0","id":null,"method":"tools/list","params":{}}));
     let value = c.read();
     assert!(value["id"].is_null());
-    assert_eq!(value["result"]["tools"].as_array().unwrap().len(), 7);
+    assert_eq!(value["result"]["tools"].as_array().unwrap().len(), 12);
 }
 #[test]
 fn schema_types_enforced_and_recovery_after_malformed_json() {
@@ -136,7 +136,7 @@ fn schema_types_enforced_and_recovery_after_malformed_json() {
     c.send(json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_tools","arguments":{"query":false}}}));
     assert_eq!(c.read()["error"]["code"], -32602);
     c.send(json!({"jsonrpc":"2.0","id":3,"method":"tools/list","params":{}}));
-    assert_eq!(c.read()["result"]["tools"].as_array().unwrap().len(), 7);
+    assert_eq!(c.read()["result"]["tools"].as_array().unwrap().len(), 12);
 }
 #[test]
 fn tool_semantic_failure_is_content_and_is_error() {

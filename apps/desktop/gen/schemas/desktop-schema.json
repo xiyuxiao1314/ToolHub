@@ -177,16 +177,82 @@
       "description": "Permission identifier",
       "oneOf": [
         {
+          "description": "Enables the agent_integration command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-agent-integration",
+          "markdownDescription": "Enables the agent_integration command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the agent_mcp_check command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-agent-mcp-check",
+          "markdownDescription": "Enables the agent_mcp_check command without any pre-configured scope."
+        },
+        {
           "description": "Enables the app_versions command without any pre-configured scope.",
           "type": "string",
           "const": "allow-app-versions",
           "markdownDescription": "Enables the app_versions command without any pre-configured scope."
         },
         {
+          "description": "Enables the autostart_set command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-autostart-set",
+          "markdownDescription": "Enables the autostart_set command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the autostart_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-autostart-status",
+          "markdownDescription": "Enables the autostart_status command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the builtin_skill_paths command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-builtin-skill-paths",
+          "markdownDescription": "Enables the builtin_skill_paths command without any pre-configured scope."
+        },
+        {
           "description": "Enables the default_export_path_string command without any pre-configured scope.",
           "type": "string",
           "const": "allow-default-export-path-string",
           "markdownDescription": "Enables the default_export_path_string command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the market_add command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-market-add",
+          "markdownDescription": "Enables the market_add command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the market_export command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-market-export",
+          "markdownDescription": "Enables the market_export command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the market_inspect command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-market-inspect",
+          "markdownDescription": "Enables the market_inspect command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the market_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-market-list",
+          "markdownDescription": "Enables the market_list command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the market_pick command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-market-pick",
+          "markdownDescription": "Enables the market_pick command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the market_share command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-market-share",
+          "markdownDescription": "Enables the market_share command without any pre-configured scope."
         },
         {
           "description": "Enables the open_program_folder command without any pre-configured scope.",
@@ -205,6 +271,12 @@
           "type": "string",
           "const": "allow-pick-program-path",
           "markdownDescription": "Enables the pick_program_path command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the pick_skill_folder command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-pick-skill-folder",
+          "markdownDescription": "Enables the pick_skill_folder command without any pre-configured scope."
         },
         {
           "description": "Enables the read_text_file command without any pre-configured scope.",
@@ -237,16 +309,88 @@
           "markdownDescription": "Enables the scan_root_for_path command without any pre-configured scope."
         },
         {
+          "description": "Enables the tool_file_icon command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-tool-file-icon",
+          "markdownDescription": "Enables the tool_file_icon command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the agent_integration command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-agent-integration",
+          "markdownDescription": "Denies the agent_integration command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the agent_mcp_check command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-agent-mcp-check",
+          "markdownDescription": "Denies the agent_mcp_check command without any pre-configured scope."
+        },
+        {
           "description": "Denies the app_versions command without any pre-configured scope.",
           "type": "string",
           "const": "deny-app-versions",
           "markdownDescription": "Denies the app_versions command without any pre-configured scope."
         },
         {
+          "description": "Denies the autostart_set command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-autostart-set",
+          "markdownDescription": "Denies the autostart_set command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the autostart_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-autostart-status",
+          "markdownDescription": "Denies the autostart_status command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the builtin_skill_paths command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-builtin-skill-paths",
+          "markdownDescription": "Denies the builtin_skill_paths command without any pre-configured scope."
+        },
+        {
           "description": "Denies the default_export_path_string command without any pre-configured scope.",
           "type": "string",
           "const": "deny-default-export-path-string",
           "markdownDescription": "Denies the default_export_path_string command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the market_add command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-market-add",
+          "markdownDescription": "Denies the market_add command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the market_export command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-market-export",
+          "markdownDescription": "Denies the market_export command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the market_inspect command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-market-inspect",
+          "markdownDescription": "Denies the market_inspect command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the market_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-market-list",
+          "markdownDescription": "Denies the market_list command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the market_pick command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-market-pick",
+          "markdownDescription": "Denies the market_pick command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the market_share command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-market-share",
+          "markdownDescription": "Denies the market_share command without any pre-configured scope."
         },
         {
           "description": "Denies the open_program_folder command without any pre-configured scope.",
@@ -265,6 +409,12 @@
           "type": "string",
           "const": "deny-pick-program-path",
           "markdownDescription": "Denies the pick_program_path command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the pick_skill_folder command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-pick-skill-folder",
+          "markdownDescription": "Denies the pick_skill_folder command without any pre-configured scope."
         },
         {
           "description": "Denies the read_text_file command without any pre-configured scope.",
@@ -295,6 +445,12 @@
           "type": "string",
           "const": "deny-scan-root-for-path",
           "markdownDescription": "Denies the scan_root_for_path command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the tool_file_icon command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-tool-file-icon",
+          "markdownDescription": "Denies the tool_file_icon command without any pre-configured scope."
         },
         {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",

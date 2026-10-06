@@ -1,5 +1,9 @@
 use super::*;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
+
+// Desktop pages connect concurrently; serialize readiness so they share one startup.
+static SERVICE_STARTUP: Mutex<()> = Mutex::new(());
 /// One connection to the managed service. A failed call is never replayed; the next call reconnects.
 pub struct RpcClient {
     daemon: PathBuf,
@@ -17,6 +21,9 @@ impl RpcClient {
         })
     }
     fn connect_ready(daemon: &Path) -> IpcResult<LocalStream> {
+        let _startup = SERVICE_STARTUP
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         if let Ok(stream) = LocalStream::connect(daemon) {
             return Ok(stream);
         }
@@ -35,13 +42,22 @@ impl RpcClient {
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
             if let Ok(mut stream) = LocalStream::connect(daemon) {
-                stream.set_timeout(Duration::from_secs(2))?;
-                write_frame(
-                    &mut stream,
-                    &JsonRpcRequest::new(0, "ping", serde_json::json!({})),
-                )?;
-                let response = read_response(&mut stream)?;
-                if response.id == Some(serde_json::json!(0)) && response.error.is_none() {
+                // Retry only the readiness ping, never a user's RPC. A slow competing
+                // startup or transient pipe closure must not abort the entire readiness window.
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                let ready = (|| -> IpcResult<bool> {
+                    stream.set_timeout(remaining.min(Duration::from_secs(2)))?;
+                    write_frame(
+                        &mut stream,
+                        &JsonRpcRequest::new(0, "ping", serde_json::json!({})),
+                    )?;
+                    let response = read_response(&mut stream)?;
+                    Ok(response.jsonrpc == "2.0"
+                        && response.id == Some(serde_json::json!(0))
+                        && response.result.is_some()
+                        && response.error.is_none())
+                })();
+                if matches!(ready, Ok(true)) {
                     // Reap the managed child only after it eventually exits, never on client drop.
                     std::thread::spawn(move || {
                         let _ = child.wait();

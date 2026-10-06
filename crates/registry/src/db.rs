@@ -10,6 +10,8 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (1, include_str!("migrations/001_init.sql")),
     (2, include_str!("migrations/002_scan_integrity.sql")),
     (3, include_str!("migrations/003_programs.sql")),
+    (4, include_str!("migrations/004_program_proposals.sql")),
+    (5, include_str!("migrations/005_managed_tasks.sql")),
 ];
 
 pub fn open_path(path: &std::path::Path) -> RegistryResult<RegistryDb> {
@@ -83,7 +85,7 @@ mod tests {
     #[test]
     fn migrates_from_empty() {
         let db = open_memory().unwrap();
-        assert_eq!(db.schema_version().unwrap(), 3);
+        assert_eq!(db.schema_version().unwrap(), 5);
     }
 
     #[test]
@@ -92,9 +94,46 @@ mod tests {
         let path = dir.path().join("t.db");
         {
             let db = open_path(&path).unwrap();
-            assert_eq!(db.schema_version().unwrap(), 3);
+            assert_eq!(db.schema_version().unwrap(), 5);
         }
         let db2 = open_path(&path).unwrap();
-        assert_eq!(db2.schema_version().unwrap(), 3);
+        assert_eq!(db2.schema_version().unwrap(), 5);
+    }
+
+    #[test]
+    fn adds_proposals_without_changing_existing_v3_programs() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)",
+        )
+        .unwrap();
+        for (version, sql) in MIGRATIONS.iter().take(3) {
+            conn.execute_batch(sql).unwrap();
+            conn.execute(
+                "INSERT INTO schema_migrations VALUES(?1,'fixture')",
+                [version],
+            )
+            .unwrap();
+        }
+        conn.execute("INSERT INTO program_entries(id,identity,entry_json,updated_at) VALUES('existing','file:fixture','preserve exactly','fixture')",[]).unwrap();
+        let db = init(conn).unwrap();
+        assert_eq!(db.schema_version().unwrap(), 5);
+        assert_eq!(
+            db.conn
+                .query_row(
+                    "SELECT entry_json FROM program_entries WHERE id='existing'",
+                    [],
+                    |r| r.get::<_, String>(0)
+                )
+                .unwrap(),
+            "preserve exactly"
+        );
+        assert_eq!(
+            db.conn
+                .query_row("SELECT COUNT(*) FROM program_proposals", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
     }
 }

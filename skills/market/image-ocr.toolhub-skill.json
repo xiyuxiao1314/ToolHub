@@ -1,0 +1,46 @@
+{
+  "schema": "toolhub.bundle/v1",
+  "version": "1.0.0",
+  "author": "ToolHub 内置目录",
+  "license": "MIT",
+  "category": "document",
+  "tags": [
+    "Tesseract",
+    "OCR"
+  ],
+  "manifest": {
+    "schema": "toolhub.skill/v1",
+    "id": "workflow.document.image-ocr",
+    "name": "图片文字识别",
+    "description": "复用本机 OCR，从指定图片提取文字并说明识别不确定性。",
+    "kind": "instruction",
+    "instruction_file": "SKILL.md",
+    "requires": [
+      {
+        "capability": "document.ocr"
+      }
+    ],
+    "optional": [],
+    "portability": {
+      "scope": "portable",
+      "platforms": [
+        "windows",
+        "macos",
+        "linux"
+      ],
+      "inputs": [
+        "用户指定的扫描图片和识别语言"
+      ],
+      "outputs": [
+        "识别文字及错误风险说明"
+      ],
+      "permissions": [
+        "read_files",
+        "write_files",
+        "execute_tools"
+      ],
+      "host_dependencies": []
+    }
+  },
+  "instructions": "---\nname: image-ocr\ndescription: 复用本机 OCR，从指定图片提取文字并说明识别不确定性。\n---\n\n# 图片文字识别\n\n1. 解析 document.ocr，检查 OCR 工具路径、支持的语言数据和权限。\n2. 确认要处理的图片、页码或区域，以及输出位置。不将图片上传到外部服务。\n3. 依据工具实际接口识别用户指定内容；语言数据缺失时报告，不自动下载。\n4. 检查退出码和输出文字。抽样对照原图，标明模糊内容、表格顺序及数字识别风险；不可读内容不编造。\n5. 保留原图，写入新文字文件。授权不足或无可用工具时停止相关操作。\n"
+}

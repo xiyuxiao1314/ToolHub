@@ -6,6 +6,9 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
 pub mod adapters;
+pub mod discovery;
+pub mod hosts;
+pub mod mimo;
 pub mod temp_credentials;
 pub mod update;
 

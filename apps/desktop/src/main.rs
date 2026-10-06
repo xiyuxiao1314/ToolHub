@@ -1,7 +1,20 @@
 //! Native desktop bridge to the authenticated shared user service.
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(windows, windows_subsystem = "windows")]
+mod autostart;
+mod file_icon;
+mod startup_diagnostics;
+#[cfg(windows)]
+mod windows_startup_task;
+use file_icon::tool_file_icon;
+mod integration;
+mod market;
+use market::{market_add, market_export, market_inspect, market_list, market_pick, market_share};
+#[cfg(target_os = "macos")]
+mod macos;
 mod program_picker;
-use program_picker::pick_program_path;
+use autostart::{autostart_set, autostart_status};
+use integration::{agent_integration, agent_mcp_check};
+use program_picker::{builtin_skill_paths, pick_program_path, pick_skill_folder};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
@@ -21,9 +34,7 @@ fn daemon_bin() -> Result<std::path::PathBuf, String> {
 }
 
 fn default_export_path() -> PathBuf {
-    let docs = std::env::var_os("USERPROFILE")
-        .map(PathBuf::from)
-        .map(|p| p.join("Documents"))
+    let docs = dirs::document_dir()
         .filter(|p| p.is_dir())
         .unwrap_or_else(std::env::temp_dir);
     docs.join("toolhub-export.json")
@@ -47,7 +58,7 @@ async fn rpc(method: String, params: Value) -> Result<Value, String> {
 
 #[tauri::command]
 fn app_versions() -> Value {
-    json!({"app":env!("CARGO_PKG_VERSION"),"core":env!("CARGO_PKG_VERSION"),"protocol":toolhub_protocol::PROTOCOL_VERSION})
+    json!({"app":env!("CARGO_PKG_VERSION"),"platform":std::env::consts::OS,"core":env!("CARGO_PKG_VERSION"),"protocol":toolhub_protocol::PROTOCOL_VERSION})
 }
 
 #[tauri::command]
@@ -132,7 +143,11 @@ fn open_terminal(path: String) -> Result<String, String> {
             .spawn()
             .map_err(|e| e.to_string())?;
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        macos::open_terminal(&cwd)?;
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         std::process::Command::new("x-terminal-emulator")
             .current_dir(&cwd)
@@ -202,10 +217,31 @@ fn open_program_folder(path: String) -> Result<String, String> {
 }
 
 fn main() {
-    tauri::Builder::default()
+    let login_launch = std::env::args_os().any(|arg| arg == "--autostart");
+    if login_launch {
+        startup_diagnostics::record("process_started", None);
+    }
+    let result = tauri::Builder::default()
+        .setup(move |_app| {
+            if login_launch {
+                startup_diagnostics::record("window_created", None);
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             rpc,
             app_versions,
+            autostart_status,
+            autostart_set,
+            agent_integration,
+            agent_mcp_check,
+            market_list,
+            market_pick,
+            market_inspect,
+            market_add,
+            market_share,
+            market_export,
+            tool_file_icon,
             default_export_path_string,
             save_text_file,
             read_text_file,
@@ -213,8 +249,16 @@ fn main() {
             reveal_path,
             scan_root_for_path,
             pick_program_path,
+            pick_skill_folder,
+            builtin_skill_paths,
             open_program_folder
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running ToolHub Desktop");
+        .run(tauri::generate_context!());
+    if let Err(error) = result {
+        if login_launch {
+            startup_diagnostics::record("startup_failed", Some(&error.to_string()));
+        }
+        eprintln!("ToolHub Desktop: {error}");
+        std::process::exit(1);
+    }
 }

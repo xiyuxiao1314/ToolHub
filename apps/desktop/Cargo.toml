@@ -15,6 +15,13 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 toolhub-ipc = { workspace = true }
 toolhub-protocol = { workspace = true }
+toolhub-agent-bridge = { workspace = true }
+toolhub-core = { workspace = true }
+toolhub-skills = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+uuid = { workspace = true }
+dirs = { workspace = true }
 
 [[bin]]
 name = "toolhub-desktop"
@@ -26,4 +33,4 @@ custom-protocol = ["tauri/custom-protocol"]
 
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_System_Com", "Win32_UI_Shell", "Win32_UI_Shell_Common"] }
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging", "Win32_Security", "Win32_System_Registry", "Win32_System_Com", "Win32_UI_Shell", "Win32_UI_Shell_Common", "Win32_System_TaskScheduler", "Win32_System_Variant", "Win32_System_Ole", "Win32_System_Threading", "Win32_Security_Authorization"] }

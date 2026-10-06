@@ -5,11 +5,19 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
+#[path = "agent_diagnostics.rs"]
+mod agent_diagnostics;
 #[path = "execution_jobs.rs"]
 mod execution_jobs;
+#[path = "inventory.rs"]
+mod inventory;
+#[path = "managed_tasks.rs"]
+mod managed_tasks;
 #[cfg(windows)]
 #[path = "program_process.rs"]
 mod program_process;
+#[path = "program_proposals.rs"]
+mod program_proposals;
 #[path = "programs.rs"]
 pub(crate) mod programs;
 #[path = "scan_jobs.rs"]
@@ -43,6 +51,7 @@ pub struct DaemonService {
     pub controller_verified: bool,
     pub running_scans: BTreeMap<String, (String, Arc<AtomicBool>)>,
     pub running_jobs: BTreeMap<String, (String, Arc<AtomicBool>)>,
+    pub task_results: BTreeMap<String, Value>,
     pub subscriptions: BTreeMap<String, (String, u64)>,
     pub pending_approvals: BTreeMap<String, execution_jobs::PendingApproval>,
     pub resources: toolhub_recognizer::resources::ResourceStore,
@@ -58,6 +67,7 @@ pub struct DaemonService {
 impl DaemonService {
     pub fn open(path: &Path) -> anyhow::Result<Self> {
         let mut registry = Registry::open_path(path)?;
+        registry.db.conn.execute("UPDATE managed_tasks SET view_json=json_set(view_json,'$.status','interrupted') WHERE json_extract(view_json,'$.status')='running'",[])?;
         registry.ensure_builtin_environments()?;
         // Seed capability taxonomy.
         for (id, desc) in toolhub_core::capability::CORE_CAPABILITIES {
@@ -113,6 +123,7 @@ impl DaemonService {
             connection_principal: None,
             controller_verified: false,
             running_jobs: BTreeMap::new(),
+            task_results: BTreeMap::new(),
             running_scans: BTreeMap::new(),
             subscriptions: BTreeMap::new(),
             pending_approvals: BTreeMap::new(),
@@ -240,18 +251,9 @@ impl DaemonService {
                 "tools": self.registry.count_instances().map_err(db_err)?,
                 "candidates": self.registry.count_candidates().map_err(db_err)?,
             })),
-            Method::SearchTools => {
-                let q = params.get("query").and_then(|v| v.as_str()).unwrap_or("");
-                let include_missing = params
-                    .get("include_missing")
-                    .and_then(Value::as_bool)
-                    .unwrap_or(false);
-                let hits = self
-                    .registry
-                    .search_with_missing(q, include_missing)
-                    .map_err(db_err)?;
-                Ok(json!(hits))
-            }
+            Method::SearchTools => self.search_inventory(params),
+            Method::PreferInstance => self.prefer_instance(params),
+            Method::HealthInstance => self.health_instance(params),
             Method::InspectTool | Method::InspectInstance => {
                 let id = params
                     .get("id")
@@ -265,6 +267,7 @@ impl DaemonService {
                             .capabilities_for_definition(&row.definition_id)
                             .map_err(db_err)?;
                         Ok(json!({
+                            "version_probe_args": inventory::version_probe_args(&row.definition_id),
                             "instance": row,
                             "capabilities": caps,
                         }))
@@ -303,6 +306,7 @@ impl DaemonService {
                     .map_err(db_err)?;
                 let cands: Vec<CandidateInstance> = rows
                     .into_iter()
+                    .filter(|r| Path::new(&r.path).is_file())
                     .map(|r| CandidateInstance {
                         instance_id: r.id,
                         definition_id: r.definition_id,
@@ -335,66 +339,19 @@ impl DaemonService {
                 self.finish_job(job, result)
             }
             Method::ExecuteCancel => self.cancel_execution(params),
+            Method::ExecuteStatus => self.task_status(params),
+            Method::ExecuteList => self.task_list(),
             Method::ApproveExecution => self.approve_pending(params),
+            Method::ApprovalStatus => self.approval_status(params),
             Method::RevokeApproval => self.revoke_approval(params),
             Method::SkillList => {
-                // F15: optional declarative registration via params
                 if let Some(manifest) = params.get("register") {
-                    // R3-F09: one authoritative model at the public boundary.
-                    let parsed = toolhub_core::SkillManifest::parse_yaml_like(manifest)
-                        .map_err(|e| ProtocolError::new(ErrorCode::InvalidParams, e.to_string()))?;
-                    parsed
-                        .assert_safe_paths()
-                        .map_err(|e| ProtocolError::new(ErrorCode::InvalidParams, e.to_string()))?;
-                    let id = parsed.id.as_str().to_string();
-                    let name = parsed.name.clone();
-                    let schema = parsed.schema.clone();
-                    if schema != "toolhub.skill/v1" {
-                        return Err(ProtocolError::new(
-                            ErrorCode::InvalidParams,
-                            "unsupported skill schema",
-                        ));
-                    }
-                    // R2-B09: reject hook/installer payloads and unsafe paths
-                    if manifest.get("hooks").is_some()
-                        || manifest.get("install").is_some()
-                        || manifest.get("postinstall").is_some()
-                    {
-                        return Err(ProtocolError::new(
-                            ErrorCode::Denied,
-                            "skill hooks/installers are not permitted",
-                        ));
-                    }
-                    for key in ["instruction_file", "mcp_config", "package_path"] {
-                        if let Some(p) = manifest.get(key).and_then(|v| v.as_str()) {
-                            if p.contains("..") || p.starts_with('/') || p.contains(':') {
-                                return Err(ProtocolError::new(
-                                    ErrorCode::InvalidParams,
-                                    format!("unsafe skill path: {p}"),
-                                ));
-                            }
-                        }
-                    }
-                    let kind = manifest
-                        .get("kind")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("instruction");
-                    let json_s = serde_json::to_string(manifest).unwrap_or_else(|_| "{}".into());
-                    self.registry
-                        .upsert_skill(&id, &name, &schema, kind, &json_s, None)
-                        .map_err(db_err)?;
+                    self.register_skill(&json!({"manifest":manifest}))?;
                 }
-                let rows = self.registry.list_skills().map_err(db_err)?;
-                let skills: Vec<Value> = rows
-                    .into_iter()
-                    .map(|(id, name, schema, manifest)| {
-                        let m: Value = serde_json::from_str(&manifest).unwrap_or(json!({}));
-                        json!({"id": id, "name": name, "schema": schema, "manifest": m})
-                    })
-                    .collect();
-                Ok(json!(skills))
+                self.list_skill_inventory()
             }
             Method::SkillInspect | Method::SkillResolve => self.resolve_skill(params),
+            Method::SkillPreview => self.preview_skill(params),
             Method::DiscoveryStart => {
                 // R2-B08: session is bound to the authenticated peer principal.
                 let principal = self.peer_principal();
@@ -621,36 +578,8 @@ impl DaemonService {
                 self.agents.cancel_discovery(&principal, id);
                 Ok(json!({"revoked": true}))
             }
-            Method::AgentList => {
-                // F16: detect + health + typed MCP config
-                let agents = toolhub_agent_bridge::detect_all();
-                let endpoint = "toolhub";
-                let view: Vec<Value> = agents
-                    .into_iter()
-                    .map(|a| {
-                        let cfg = serde_json::json!({
-                            "mcpServers": {
-                                "toolhub": {
-                                    "command": "toolhub",
-                                    "args": ["mcp", "serve"],
-                                    "env": {"TOOLHUB_ENDPOINT": endpoint}
-                                }
-                            }
-                        });
-                        json!({
-                            "id": a.id,
-                            "name": a.name,
-                            "kind": a.kind,
-                            "executable": a.executable,
-                            "version": a.version,
-                            "health": "detected",
-                            "mcp_config": cfg,
-                            "launch": toolhub_agent_bridge::discovery_task_prompt(&a.id, "<session>")
-                        })
-                    })
-                    .collect();
-                Ok(json!(view))
-            }
+            Method::AgentList => self.agent_inventory(),
+            Method::AgentObserved => self.agent_observed(params),
             Method::PolicyGet => {
                 let rules = self.registry.list_policy().map_err(db_err)?;
                 Ok(json!({
@@ -746,6 +675,20 @@ impl DaemonService {
                 });
             } else {
                 candidates.push(cand.clone());
+            }
+        }
+        // Older scans may have recognized completion data by basename. Revalidate only
+        // those known data locations so filtered providers cannot leave them available.
+        if !report.cancelled {
+            for row in self.registry.list_instances().map_err(db_err)? {
+                if toolhub_recognizer::is_shell_completion_path(&row.path) {
+                    let mut candidate = toolhub_core::ScanCandidate::from_path(&row.path);
+                    candidate.canonical_path = row.canonical_path;
+                    candidate.metadata["source"] = json!("registered_completion_revalidation");
+                    if !candidates.iter().any(|c| c.path == candidate.path) {
+                        candidates.push(candidate);
+                    }
+                }
             }
         }
         let scopes = report
@@ -924,6 +867,59 @@ fn db_err(e: toolhub_registry::RegistryError) -> ProtocolError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scan_retires_completion_data_without_deleting_files_or_other_instances() {
+        let temp = tempfile::tempdir().unwrap();
+        let data = temp.path().join("share/bash-completion/completions/yt-dlp");
+        std::fs::create_dir_all(data.parent().unwrap()).unwrap();
+        std::fs::write(&data, b"__yt_dlp() { COMPREPLY=(); }\n").unwrap();
+        let mut service = DaemonService::open(&temp.path().join("registry.sqlite")).unwrap();
+        let mut input = UpsertInstanceInput {
+            id: "fixture-completion".into(),
+            definition_id: "org.ytdlp.ytdlp".into(),
+            definition_name: "yt-dlp".into(),
+            version: None,
+            platform: "unknown".into(),
+            arch: "unknown".into(),
+            path: data.to_string_lossy().into_owned(),
+            canonical_path: None,
+            environment_id: None,
+            origin_json: serde_json::to_string(&toolhub_core::Origin::Unknown).unwrap(),
+            owner_json: serde_json::to_string(&toolhub_core::Owner::unknown()).unwrap(),
+            trust_json: serde_json::to_string(&toolhub_core::TrustRecord::unknown()).unwrap(),
+            status: "available".into(),
+            capabilities: vec![],
+        };
+        service.registry.upsert_instance(&input).unwrap();
+        input.id = "fixture-ffmpeg".into();
+        input.definition_id = "org.ffmpeg.ffmpeg".into();
+        input.definition_name = "FFmpeg".into();
+        input.path = temp
+            .path()
+            .join("ffmpeg.exe")
+            .to_string_lossy()
+            .into_owned();
+        service.registry.upsert_instance(&input).unwrap();
+        let mut report = toolhub_scanner::ScanReport {
+            cancelled: true,
+            ..Default::default()
+        };
+        service.ingest_scan(&report, "quick").unwrap();
+        assert_eq!(service.registry.search("").unwrap().len(), 2);
+        report.cancelled = false;
+        service.ingest_scan(&report, "quick").unwrap();
+        let available = service.registry.search("").unwrap();
+        assert_eq!(available.len(), 1);
+        assert_eq!(available[0].definition_id, "org.ffmpeg.ffmpeg");
+        let retired = service
+            .registry
+            .search_with_missing("yt-dlp", true)
+            .unwrap();
+        assert_eq!(retired.len(), 1);
+        assert_eq!(retired[0].status, "missing");
+        assert!(data.is_file());
+    }
 
     #[test]
     fn service_open_and_status() {

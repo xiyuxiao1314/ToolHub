@@ -36,6 +36,14 @@ struct Project {
 }
 
 pub fn supported_file(path: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        return path.is_file()
+            && (matches!(extension(path).as_str(), "sh" | "command")
+                || std::fs::metadata(path).is_ok_and(|m| m.permissions().mode() & 0o111 != 0));
+    }
+    #[cfg(not(unix))]
     matches!(
         extension(path).as_str(),
         "exe" | "bat" | "cmd" | "lnk" | "ps1"
@@ -385,7 +393,12 @@ pub fn scan_programs(roots: Vec<String>, state: Arc<Mutex<ProgramScan>>, cancel:
                         "dist" | "build" | "debug" | "release" | "publish" | "out"
                     )
                 });
-                if ext == "exe" {
+                let native_binary = if cfg!(windows) {
+                    ext == "exe"
+                } else {
+                    !matches!(ext.as_str(), "sh" | "command")
+                };
+                if native_binary {
                     if [
                         "node", "python", "pythonw", "git", "cargo", "rustc", "ffmpeg", "7z",
                         "pip", "uv",
@@ -406,7 +419,7 @@ pub fn scan_programs(roots: Vec<String>, state: Arc<Mutex<ProgramScan>>, cancel:
                 };
                 candidate.evidence = project.evidence.clone();
                 candidate.evidence.push(
-                    if ext == "exe" {
+                    if native_binary {
                         "项目中的可执行入口"
                     } else {
                         "项目中的启动入口"
@@ -522,14 +535,31 @@ mod tests {
             r#"{"name":"example","scripts":{"dev":"vite","test":"test"}}"#,
         )
         .unwrap();
-        for p in [
-            "start.cmd",
-            "build.bat",
-            "target/debug/app.exe",
-            "target/debug/deps/noise.exe",
-            "node_modules/noise/run.cmd",
-        ] {
+        let fixtures = if cfg!(windows) {
+            vec![
+                "start.cmd",
+                "build.bat",
+                "target/debug/app.exe",
+                "target/debug/deps/noise.exe",
+                "node_modules/noise/run.cmd",
+            ]
+        } else {
+            vec![
+                "start.command",
+                "build.sh",
+                "target/debug/app",
+                "target/debug/deps/noise",
+                "node_modules/noise/run.command",
+            ]
+        };
+        for p in fixtures {
             std::fs::write(root.join(p), "fixture").unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(root.join(p), std::fs::Permissions::from_mode(0o755))
+                    .unwrap();
+            }
         }
         let state = Arc::new(Mutex::new(ProgramScan {
             status: "running".into(),
@@ -544,10 +574,9 @@ mod tests {
         assert_eq!(scan.status, "completed");
         assert_eq!(scan.candidates.len(), 3);
         assert!(scan.candidates.iter().any(|c| c.command == "npm run dev"));
-        assert!(!scan
-            .candidates
-            .iter()
-            .any(|c| c.path.contains("noise") || c.path.ends_with("build.bat")));
+        assert!(!scan.candidates.iter().any(|c| c.path.contains("noise")
+            || c.path.ends_with("build.bat")
+            || c.path.ends_with("build.sh")));
     }
     #[test]
     fn cancel_and_manual_validation() {

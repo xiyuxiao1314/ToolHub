@@ -1,4 +1,5 @@
-//! Explicit user launch entries. All operations require an OS-verified controller.
+//! Explicit user launch entries. Metadata proposals are allowed from Agents;
+//! selecting, saving and launching require an OS-verified controller.
 use super::execution_jobs::{invalid, text};
 use super::*;
 use serde::{Deserialize, Serialize};
@@ -8,7 +9,7 @@ use toolhub_scanner::programs::{self, ProgramCandidate, ProgramScan};
 #[derive(Default)]
 pub struct ProgramRuntime {
     scan: Option<(Arc<Mutex<ProgramScan>>, Arc<AtomicBool>)>,
-    selections: BTreeMap<String, (String, ProgramCandidate)>,
+    pub(super) selections: BTreeMap<String, (String, ProgramCandidate)>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -16,20 +17,25 @@ pub(super) struct ProgramEntry {
     #[serde(flatten)]
     pub(super) candidate: ProgramCandidate,
     pub(super) args: Vec<String>,
+    #[serde(default)]
+    pub(super) metadata: toolhub_core::program_metadata::ProgramMetadata,
     favorite: bool,
     last_launched: Option<String>,
     launch_count: u64,
 }
 
-fn identity(c: &ProgramCandidate) -> String {
+pub(super) fn identity(c: &ProgramCandidate) -> String {
+    let normalize = |value: &str| {
+        if cfg!(windows) {
+            value.to_lowercase().replace('/', "\\")
+        } else {
+            value.to_owned()
+        }
+    };
     if c.kind == "file" {
-        format!("file:{}", c.path.to_lowercase().replace('/', "\\"))
+        format!("file:{}", normalize(&c.path))
     } else {
-        format!(
-            "command:{}:{}",
-            c.cwd.to_lowercase().replace('/', "\\"),
-            c.command
-        )
+        format!("command:{}:{}", normalize(&c.cwd), c.command)
     }
 }
 
@@ -44,8 +50,24 @@ impl DaemonService {
         method: &str,
         params: &Value,
     ) -> Result<Value, ProtocolError> {
+        if method == "program.propose" {
+            return self.propose_program(params);
+        }
+        if method == "program.search" {
+            return self.search_shared_programs(params);
+        }
         self.require_controller()?;
         match method {
+            "program.proposals" => self.list_program_proposals(),
+            "program.proposal_dismiss" => {
+                let id = text(params, "id")?;
+                self.registry
+                    .db
+                    .conn
+                    .execute("DELETE FROM program_proposals WHERE id=?1", [id])
+                    .map_err(sql_err)?;
+                Ok(json!({"dismissed":true}))
+            }
             "program.list" => {
                 let mut statement = self
                     .registry
@@ -156,6 +178,9 @@ impl DaemonService {
                 Ok(json!({"cancel_requested":true}))
             }
             "program.select" => {
+                if let Some(ids) = params.get("proposal_ids") {
+                    return self.select_program_proposals(ids);
+                }
                 if self.programs.selections.len() >= 1024 {
                     self.programs.selections.clear();
                 }
@@ -215,11 +240,16 @@ impl DaemonService {
             }
             "program.launch" => {
                 let id = text(params, "id")?;
+                let terminal = match params.get("terminal") {
+                    None => false,
+                    Some(Value::Bool(value)) => *value,
+                    _ => return Err(invalid("terminal 必须为布尔值")),
+                };
                 let mut entry = self.program_entry(id)?;
                 if !entry_available(&entry) {
                     return Err(invalid("启动文件或工作目录已失效，请重新选择"));
                 }
-                let pid = spawn_program(&entry).map_err(|e| invalid(&e))?;
+                let pid = spawn_program(&entry, terminal).map_err(|e| invalid(&e))?;
                 entry.launch_count += 1;
                 entry.last_launched = Some(chrono::Utc::now().to_rfc3339());
                 self.registry
@@ -233,9 +263,9 @@ impl DaemonService {
                 self.event(
                     "program.launched",
                     "user requested a local program launch",
-                    json!({"id":id,"pid":pid}),
+                    json!({"id":id,"pid":pid,"terminal":terminal}),
                 )?;
-                Ok(json!({"pid":pid,"submitted":true}))
+                Ok(json!({"pid":pid,"submitted":true,"terminal":terminal}))
             }
             _ => Err(ProtocolError::new(
                 ErrorCode::MethodNotFound,
@@ -278,6 +308,7 @@ impl DaemonService {
             .filter(|v| !v.is_empty() && v.len() <= 100)
             .ok_or_else(|| invalid("请选择要保存的程序"))?;
         let mut entries = Vec::new();
+        let mut accepted_proposals = Vec::new();
         for patch in items {
             let existing = patch
                 .get("id")
@@ -299,6 +330,19 @@ impl DaemonService {
                     return Err(invalid("请先选择工作目录"));
                 }
                 candidate.cwd = selection.cwd;
+            }
+            let proposed: bool = self
+                .registry
+                .db
+                .conn
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM program_proposals WHERE id=?1)",
+                    [&candidate.id],
+                    |r| r.get(0),
+                )
+                .map_err(sql_err)?;
+            if proposed {
+                accepted_proposals.push(candidate.id.clone());
             }
             candidate.id = existing
                 .as_ref()
@@ -347,7 +391,19 @@ impl DaemonService {
                 .get("favorite")
                 .and_then(Value::as_bool)
                 .ok_or_else(|| invalid("favorite 必须为布尔值"))?;
+            let metadata = match patch.get("metadata") {
+                Some(value) => serde_json::from_value::<
+                    toolhub_core::program_metadata::ProgramMetadata,
+                >(value.clone())
+                .map_err(json_err)?,
+                None => existing
+                    .as_ref()
+                    .map(|e| e.metadata.clone())
+                    .unwrap_or_default(),
+            };
+            metadata.validate().map_err(|e| invalid(&e))?;
             let entry = ProgramEntry {
+                metadata,
                 candidate,
                 args,
                 favorite,
@@ -375,6 +431,10 @@ impl DaemonService {
             }
             tx.execute("INSERT INTO program_entries(id,identity,entry_json,updated_at) VALUES(?1,?2,?3,?4) ON CONFLICT(id) DO UPDATE SET identity=excluded.identity,entry_json=excluded.entry_json,updated_at=excluded.updated_at", rusqlite::params![entry.candidate.id,identity(&entry.candidate),serde_json::to_string(entry).map_err(json_err)?,chrono::Utc::now().to_rfc3339()]).map_err(sql_err)?;
         }
+        for id in accepted_proposals {
+            tx.execute("DELETE FROM program_proposals WHERE id=?1", [id])
+                .map_err(sql_err)?;
+        }
         tx.commit().map_err(sql_err)?;
         self.event(
             "program.saved",
@@ -385,18 +445,22 @@ impl DaemonService {
     }
 }
 
-fn spawn_program(entry: &ProgramEntry) -> Result<u32, String> {
+fn spawn_program(entry: &ProgramEntry, terminal: bool) -> Result<u32, String> {
     #[cfg(windows)]
     {
-        // A new console must receive its own standard handles, not the daemon's null handles.
-        super::program_process::spawn_console_helper(
+        // Background launches create no console; explicit terminal launches get fresh handles.
+        super::program_process::spawn_helper(
             &serde_json::to_string(entry).map_err(|e| e.to_string())?,
             entry,
+            terminal,
         )
     }
     #[cfg(not(windows))]
     {
-        let mut child = program_command(entry)?;
+        if terminal {
+            return Err("当前平台请使用工具详情中的打开终端，或直接后台启动程序".into());
+        }
+        let mut child = program_command(entry, terminal)?;
         let mut child = child.spawn().map_err(|e| format!("启动失败：{e}"))?;
         let pid = child.id();
         std::thread::spawn(move || {
@@ -433,7 +497,7 @@ fn batch_quoted(value: &str) -> String {
     result
 }
 
-fn program_command(entry: &ProgramEntry) -> Result<std::process::Command, String> {
+fn program_command(entry: &ProgramEntry, terminal: bool) -> Result<std::process::Command, String> {
     use std::process::Command;
     let c = &entry.candidate;
     #[cfg(windows)]
@@ -445,7 +509,9 @@ fn program_command(entry: &ProgramEntry) -> Result<std::process::Command, String
             use std::os::windows::process::CommandExt;
             let mut cmd = Command::new(system.join("cmd.exe"));
             // User-authored command text is intentionally shell syntax; cwd never enters this string.
-            cmd.arg("/D").arg("/K").raw_arg(&c.command);
+            // /S removes only our outer pair, preserving quoted paths and shell operators.
+            cmd.args(["/D", "/S", if terminal { "/K" } else { "/C" }])
+                .raw_arg(format!("\"{}\"", c.command));
             cmd
         } else {
             let ext = Path::new(&c.path)
@@ -464,15 +530,13 @@ fn program_command(entry: &ProgramEntry) -> Result<std::process::Command, String
                 }
                 "ps1" => {
                     let mut cmd = Command::new(powershell);
-                    cmd.args([
-                        "-NoProfile",
-                        "-NoExit",
-                        "-ExecutionPolicy",
-                        "Bypass",
-                        "-File",
-                    ])
-                    .arg(&c.path)
-                    .args(&entry.args);
+                    cmd.arg("-NoProfile");
+                    if terminal {
+                        cmd.arg("-NoExit");
+                    }
+                    cmd.args(["-ExecutionPolicy", "Bypass", "-File"])
+                        .arg(&c.path)
+                        .args(&entry.args);
                     cmd
                 }
                 "bat" | "cmd" => {
@@ -503,12 +567,30 @@ fn program_command(entry: &ProgramEntry) -> Result<std::process::Command, String
             let mut cmd = Command::new("sh");
             cmd.args(["-c", &c.command]);
             cmd
+        } else if matches!(
+            Path::new(&c.path).extension().and_then(|e| e.to_str()),
+            Some("sh" | "command")
+        ) {
+            let mut command = Command::new("/bin/sh");
+            command.arg(&c.path);
+            command
         } else {
             Command::new(&c.path)
         };
         cmd.args(&entry.args);
         cmd
     };
+    if !terminal {
+        child
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            child.creation_flags(0x08000000); // CREATE_NO_WINDOW; GUI children remain visible.
+        }
+    }
     let env = program_environment();
     child.env_clear().envs(env.vars).current_dir(&c.cwd);
     Ok(child)
@@ -541,9 +623,11 @@ pub(super) fn program_environment() -> toolhub_executor::SanitizedEnv {
 #[cfg(windows)]
 pub(crate) fn run_console_helper() -> bool {
     let mut args = std::env::args();
-    if args.nth(1).as_deref() != Some("--program-console") {
-        return false;
-    }
+    let terminal = match args.nth(1).as_deref() {
+        Some("--program-console") => true,
+        Some("--program-background") => false,
+        _ => return false,
+    };
     let result = args
         .next()
         .ok_or_else(|| "missing program launch data".to_string())
@@ -552,14 +636,15 @@ pub(crate) fn run_console_helper() -> bool {
             if !entry_available(&entry) {
                 return Err("程序文件或工作目录已失效".into());
             }
-            let status = program_command(&entry)?
+            let status = program_command(&entry, terminal)?
                 .status()
                 .map_err(|e| e.to_string())?;
             if !status.success() {
                 eprintln!("程序退出：{status}");
             }
             // Keep batch output visible, including a script's errors, without changing the script.
-            if entry.candidate.kind == "file"
+            if terminal
+                && entry.candidate.kind == "file"
                 && Path::new(&entry.candidate.path)
                     .extension()
                     .is_some_and(|s| s.eq_ignore_ascii_case("bat") || s.eq_ignore_ascii_case("cmd"))

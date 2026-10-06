@@ -13,7 +13,10 @@ pub mod id;
 pub mod instance;
 pub mod owner;
 pub mod path_norm;
+pub mod program_metadata;
 pub mod skill;
+pub mod skill_portability;
+pub mod task_search;
 pub mod trust;
 pub mod version;
 

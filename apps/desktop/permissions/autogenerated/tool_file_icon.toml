@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-tool-file-icon"
+description = "Enables the tool_file_icon command without any pre-configured scope."
+commands.allow = ["tool_file_icon"]
+
+[[permission]]
+identifier = "deny-tool-file-icon"
+description = "Denies the tool_file_icon command without any pre-configured scope."
+commands.deny = ["tool_file_icon"]

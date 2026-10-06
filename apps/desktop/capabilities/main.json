@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Local ToolHub window can use the RPC, version, configuration file and path bridges.",
+  "description": "Local ToolHub window can use the RPC, configuration, startup, integration and path bridges.",
   "local": true,
   "windows": [
     "main"
@@ -16,6 +16,19 @@
     "allow-reveal-path",
     "allow-scan-root-for-path",
     "allow-pick-program-path",
-    "allow-open-program-folder"
+    "allow-open-program-folder",
+    "allow-autostart-status",
+    "allow-autostart-set",
+    "allow-agent-integration",
+    "allow-tool-file-icon",
+    "allow-pick-skill-folder",
+    "allow-builtin-skill-paths",
+    "allow-agent-mcp-check",
+    "allow-market-list",
+    "allow-market-pick",
+    "allow-market-inspect",
+    "allow-market-add",
+    "allow-market-share",
+    "allow-market-export"
   ]
 }

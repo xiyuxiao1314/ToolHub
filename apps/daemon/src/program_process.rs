@@ -1,4 +1,4 @@
-//! Windows process creation with fresh console handles and a sanitized environment block.
+//! Windows program creation with explicit background/terminal mode and a sanitized environment.
 use super::programs::ProgramEntry;
 use std::path::Path;
 use windows_sys::Win32::{Foundation::CloseHandle, System::Threading::*};
@@ -43,7 +43,11 @@ fn is_gui(path: &str) -> bool {
         && u16::from_le_bytes([pe[92], pe[93]]) == 2
 }
 
-pub(super) fn spawn_console_helper(data: &str, entry: &ProgramEntry) -> Result<u32, String> {
+pub(super) fn spawn_helper(
+    data: &str,
+    entry: &ProgramEntry,
+    terminal: bool,
+) -> Result<u32, String> {
     let c = &entry.candidate;
     let direct = c.kind == "file"
         && Path::new(&c.path)
@@ -64,7 +68,11 @@ pub(super) fn spawn_console_helper(data: &str, entry: &ProgramEntry) -> Result<u
             command.push_str(&quoted(arg));
         }
     } else {
-        command.push_str(" --program-console ");
+        command.push_str(if terminal {
+            " --program-console "
+        } else {
+            " --program-background "
+        });
         command.push_str(&quoted(data));
     }
     let application: Vec<u16> = executable.encode_utf16().chain(Some(0)).collect();
@@ -86,19 +94,19 @@ pub(super) fn spawn_console_helper(data: &str, entry: &ProgramEntry) -> Result<u
         .extension()
         .is_some_and(|e| e.eq_ignore_ascii_case("lnk"));
     let flags = CREATE_UNICODE_ENVIRONMENT
-        | if shortcut {
-            CREATE_NO_WINDOW
-        } else if gui {
+        | if gui {
             0
-        } else {
+        } else if terminal && !shortcut {
             CREATE_NEW_CONSOLE
+        } else {
+            CREATE_NO_WINDOW
         };
     let startup = STARTUPINFOW {
         cb: std::mem::size_of::<STARTUPINFOW>() as u32,
         ..Default::default()
     };
     let mut process = PROCESS_INFORMATION::default();
-    // No STARTF_USESTDHANDLES: Windows assigns the new console's own input/output handles.
+    // Do not inherit the daemon handles. Terminal launches receive their own console handles.
     let success = unsafe {
         CreateProcessW(
             application.as_ptr(),

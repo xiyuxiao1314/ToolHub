@@ -55,6 +55,19 @@ impl ScannerProvider for KnownDirsProvider {
     fn roots(&self) -> Vec<String> {
         let mut roots = vec![];
         if let Some(pf) = std::env::var_os("ProgramFiles") {
+            for folder in [
+                "7-Zip",
+                "ImageMagick*",
+                "Pandoc",
+                "Tesseract-OCR",
+                "ffmpeg/bin",
+            ] {
+                roots.push(format!(
+                    "{}/{}",
+                    pf.to_string_lossy().replace('\\', "/"),
+                    folder
+                ));
+            }
             roots.push(format!(
                 "{}/Git/cmd",
                 pf.to_string_lossy().replace('\\', "/")
@@ -82,10 +95,30 @@ impl ScannerProvider for KnownDirsProvider {
                     .to_string_lossy()
                     .to_string(),
             );
+            for folder in [
+                "Pandoc",
+                "Tesseract-OCR",
+                "ffmpeg/bin",
+                "poppler/Library/bin",
+            ] {
+                roots.push(
+                    home.join("AppData/Local/Programs")
+                        .join(folder)
+                        .to_string_lossy()
+                        .to_string(),
+                );
+            }
             roots.push("/opt/homebrew/bin".into());
             roots.push("/usr/local/bin".into());
         }
-        roots.retain(|r| std::path::Path::new(r).exists());
+        roots.retain(|r| {
+            if r.contains('*') {
+                r.rsplit_once(['/', '\\'])
+                    .is_some_and(|(parent, _)| std::path::Path::new(parent).is_dir())
+            } else {
+                std::path::Path::new(r).exists()
+            }
+        });
         roots
     }
 

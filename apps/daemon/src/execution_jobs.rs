@@ -12,6 +12,7 @@ pub struct PreparedExecution {
     principal: String,
     approval_id: Option<String>,
     rpc_id: Option<Value>,
+    outputs: Vec<String>,
 }
 pub struct PendingApproval {
     pub params: Value,
@@ -21,6 +22,9 @@ pub struct PendingApproval {
     pub expires_at: chrono::DateTime<chrono::Utc>,
 }
 impl PreparedExecution {
+    pub fn id(&self) -> &str {
+        &self.operation_id
+    }
     pub fn run(&self) -> ExecutionResult {
         toolhub_executor::execute_with_pin(
             &self.request,
@@ -280,6 +284,23 @@ impl DaemonService {
         {
             return Err(invalid("invalid or running execution_id"));
         }
+        if self.running_jobs.len() >= 32 {
+            return Err(invalid("at most 32 active executions"));
+        }
+        let used: bool = self
+            .registry
+            .db
+            .conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM managed_tasks WHERE id=?1)",
+                [&operation_id],
+                |r| r.get(0),
+            )
+            .map_err(sql_err)?;
+        if used {
+            return Err(invalid("execution_id already used"));
+        }
+        let outputs = super::managed_tasks::output_declarations(params)?;
         let approval_id = params
             .get("approval_id")
             .map(|v| {
@@ -339,7 +360,13 @@ impl DaemonService {
             self.running_jobs.remove(&operation_id);
             return Err(error);
         }
+        let view = json!({"execution_id":operation_id,"instance_id":request.instance_id,"name":Path::new(&request.executable).file_name().map(|s|s.to_string_lossy()),"status":"running","started_at":chrono::Utc::now(),"cwd":request.cwd,"timeout_ms":request.timeout_ms,"artifacts":[]});
+        if let Err(e) = self.persist_task(&operation_id, principal, &view) {
+            self.running_jobs.remove(&operation_id);
+            return Err(e);
+        }
         Ok(PreparedExecution {
+            outputs,
             pin,
             request,
             context,
@@ -357,6 +384,18 @@ impl DaemonService {
         result: ExecutionResult,
     ) -> Result<Value, ProtocolError> {
         self.running_jobs.remove(&job.operation_id);
+        let artifacts = super::managed_tasks::existing_artifacts(
+            job.request.cwd.as_deref().unwrap_or(""),
+            &job.outputs,
+        );
+        let view = json!({"execution_id":job.operation_id,"instance_id":job.request.instance_id,"name":Path::new(&job.request.executable).file_name().map(|s|s.to_string_lossy()),"status":result.status.as_str(),"finished_at":chrono::Utc::now(),"executable_sha256":job.pin.hash().ok(),"exit_code":result.exit_code,"duration_ms":result.duration_ms,"artifacts":artifacts,"output_retained_in_memory":true});
+        self.persist_task(&job.operation_id, &job.principal, &view)?;
+        if self.task_results.len() >= 64 {
+            if let Some(id) = self.task_results.keys().next().cloned() {
+                self.task_results.remove(&id);
+            }
+        }
+        self.task_results.insert(job.operation_id.clone(),json!({"stdout":result.stdout.chars().take(32768).collect::<String>(),"stderr":result.stderr.chars().take(32768).collect::<String>(),"truncated":result.truncated||result.stdout.chars().count()>32768||result.stderr.chars().count()>32768}));
         let audit = toolhub_audit::AuditRecord::from_execution(
             Some(&job.principal),
             Some(job.request.instance_id.as_str()),
@@ -376,7 +415,7 @@ impl DaemonService {
             json!({"execution_id":job.operation_id,"status":result.status.as_str()}),
         )?;
         Ok(
-            json!({"execution_id":job.operation_id,"status":result.status.as_str(),"exit_code":result.exit_code,"stdout":result.stdout,"stderr":result.stderr,"duration_ms":result.duration_ms,"truncated":result.truncated,"error_code":result.error_code,"fallback_allowed":result.fallback_allowed}),
+            json!({"execution_id":job.operation_id,"artifacts":artifacts,"status":result.status.as_str(),"exit_code":result.exit_code,"stdout":result.stdout,"stderr":result.stderr,"duration_ms":result.duration_ms,"truncated":result.truncated,"error_code":result.error_code,"fallback_allowed":result.fallback_allowed}),
         )
     }
     pub(super) fn request_approval(&mut self, params: &Value) -> Result<Value, ProtocolError> {
@@ -390,6 +429,7 @@ impl DaemonService {
         let session = uuid::Uuid::new_v4().to_string();
         let mut snapshot = params.clone();
         snapshot["cwd"] = json!(request.cwd);
+        snapshot["_executable"] = json!(request.executable);
         snapshot["session_id"] = json!(session);
         let expires_at = chrono::Utc::now() + chrono::Duration::minutes(5);
         let metadata = json!({"instance_id":request.instance_id,"cwd":request.cwd.as_ref().map(|p|toolhub_audit::redact_path_for_export(p)),"args_count":request.args.len(),"request_digest":toolhub_core::execution::digest_strings(&request.args),"executable_sha256":hash});

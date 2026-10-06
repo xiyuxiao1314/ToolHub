@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-market-inspect"
+description = "Enables the market_inspect command without any pre-configured scope."
+commands.allow = ["market_inspect"]
+
+[[permission]]
+identifier = "deny-market-inspect"
+description = "Denies the market_inspect command without any pre-configured scope."
+commands.deny = ["market_inspect"]

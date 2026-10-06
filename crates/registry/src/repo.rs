@@ -860,12 +860,36 @@ impl Registry {
         self.db.conn.execute(
             "INSERT INTO skills(id, name, schema, kind, manifest_json, path)
              VALUES (?1,?2,?3,?4,?5,?6)
-             ON CONFLICT(id) DO UPDATE SET name=excluded.name, manifest_json=excluded.manifest_json",
+             ON CONFLICT(id) DO UPDATE SET name=excluded.name, schema=excluded.schema, kind=excluded.kind, manifest_json=excluded.manifest_json, path=excluded.path",
             params![id, name, schema, kind, manifest_json, path],
         )?;
         Ok(())
     }
 
+    /// Atomic no-overwrite insertion for explicitly collected market packages.
+    pub fn insert_skill_if_absent(
+        &mut self,
+        manifest: &toolhub_core::SkillManifest,
+        root: &std::path::Path,
+    ) -> RegistryResult<bool> {
+        manifest
+            .validate()
+            .map_err(|e| crate::RegistryError::Validation(e.to_string()))?;
+        for asset in [
+            &manifest.instruction_file,
+            &manifest.mcp_config,
+            &manifest.package_path,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            toolhub_core::SkillManifest::resolve_package_path(root, asset)
+                .map_err(|e| crate::RegistryError::Validation(e.to_string()))?;
+        }
+        let kind = serde_json::to_value(manifest.kind)?;
+        let content = serde_json::to_string(manifest)?;
+        Ok(self.db.conn.execute("INSERT INTO skills(id,name,schema,kind,manifest_json,path) VALUES (?1,?2,?3,?4,?5,?6) ON CONFLICT(id) DO NOTHING",params![manifest.id.as_str(),manifest.name,manifest.schema,kind.as_str(),content,root.to_str()])?==1)
+    }
     pub fn upsert_agent(
         &mut self,
         id: &str,

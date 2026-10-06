@@ -47,10 +47,7 @@ pub fn read(path: &Path) -> NativeMetadata {
 }
 /// Some PE files store version strings outside the parser's walk; scan UTF-16 keys.
 fn scan_version_fallback(b: &[u8]) -> Option<String> {
-    for key in [
-        "FileVersion",
-        "ProductVersion",
-    ] {
+    for key in ["FileVersion", "ProductVersion"] {
         let wide: Vec<u8> = key.encode_utf16().flat_map(|c| c.to_le_bytes()).collect();
         if let Some(idx) = find_subslice(b, &wide) {
             let start = idx + wide.len();

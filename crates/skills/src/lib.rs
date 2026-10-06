@@ -1,5 +1,6 @@
 //! Skill parsing and capability availability (never installs tool dependencies).
 
+pub mod bundle;
 use toolhub_core::{SkillManifest, SkillRequirement};
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -132,7 +133,13 @@ pub fn resolve_availability_with_resolver(
             satisfied: outcome.selected.is_some(),
             provider: outcome.selected.map(|c| c.instance_id),
             note: if outcome.error.is_some() {
-                Some(outcome.explanation)
+                Some(if outcome.rejected.is_empty() {
+                    outcome.explanation
+                } else {
+                    let reasons: std::collections::BTreeSet<_> = outcome.rejected.iter()
+                        .flat_map(|row| row.reasons.iter().map(|reason| serde_json::to_string(reason).unwrap_or_default())).collect();
+                    format!("provider instances found but ineligible: {}", reasons.into_iter().collect::<Vec<_>>().join(", "))
+                })
             } else {
                 None
             },
@@ -185,6 +192,7 @@ mod tests {
     #[test]
     fn missing_dependency_is_useful() {
         let skill = SkillManifest {
+            portability: None,
             schema: "toolhub.skill/v1".into(),
             id: toolhub_core::SkillId::new("x.y").unwrap(),
             name: "X".into(),

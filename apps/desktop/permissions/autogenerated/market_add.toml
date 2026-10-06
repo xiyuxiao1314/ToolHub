@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-market-add"
+description = "Enables the market_add command without any pre-configured scope."
+commands.allow = ["market_add"]
+
+[[permission]]
+identifier = "deny-market-add"
+description = "Denies the market_add command without any pre-configured scope."
+commands.deny = ["market_add"]

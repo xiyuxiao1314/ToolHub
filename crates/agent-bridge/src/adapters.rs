@@ -54,7 +54,7 @@ impl AgentRuntime {
             "owned-fixture" => {
                 command.arg("--agent-fixture");
             }
-            "opencode" => {
+            "opencode" if agent.kind == "cli" => {
                 command.arg("run").arg(format!("{}\nApproved metadata follows on stdin; use only this disclosed candidate set.",crate::discovery_task_prompt(&agent.id,&session.id)));
             }
             _ => return Err("adapter has no supported automatic launch contract".into()),
@@ -262,6 +262,12 @@ pub const KNOWN_AGENTS: &[(&str, &[&str])] = &[
     ("codex", &["codex", "codex.exe"]),
     ("claude-code", &["claude", "claude.exe"]),
     ("cursor", &["cursor", "cursor.exe"]),
+    ("mimo", &["mimocode", "mimocode.exe", "Xiaomi MiMo.exe"]),
+    ("claude-desktop", &["Claude.exe"]),
+    ("gemini-cli", &["gemini"]),
+    ("vscode", &["code"]),
+    ("copilot-cli", &["copilot"]),
+    ("devin-desktop", &["windsurf", "devin"]),
 ];
 
 fn find_on_path(names: &[&str]) -> Option<std::path::PathBuf> {
@@ -282,9 +288,11 @@ fn which_path(name: &str) -> Result<std::path::PathBuf, ()> {
         }
         #[cfg(windows)]
         {
-            let exe = dir.join(format!("{name}.exe"));
-            if exe.is_file() {
-                return Ok(exe);
+            for suffix in ["exe", "cmd", "bat", "ps1"] {
+                let exe = dir.join(format!("{name}.{suffix}"));
+                if exe.is_file() {
+                    return Ok(exe);
+                }
             }
         }
     }
@@ -303,7 +311,8 @@ impl AgentAdapter for GenericCliAdapter {
     }
 
     fn detect(&self) -> Option<DetectedAgent> {
-        let exe = find_on_path(self.names)?;
+        let exe =
+            find_on_path(self.names).or_else(|| crate::discovery::installed_executable(self.id))?;
         Some(DetectedAgent {
             id: self.id.to_string(),
             name: self.id.to_string(),
@@ -326,7 +335,8 @@ impl AgentAdapter for GenericMcpAdapter {
     }
 
     fn detect(&self) -> Option<DetectedAgent> {
-        let exe = find_on_path(self.names)?;
+        let exe =
+            find_on_path(self.names).or_else(|| crate::discovery::installed_executable(self.id))?;
         Some(DetectedAgent {
             id: self.id.to_string(),
             name: self.id.to_string(),
@@ -338,11 +348,39 @@ impl AgentAdapter for GenericMcpAdapter {
 }
 
 pub fn detect_all() -> Vec<DetectedAgent> {
+    let registered = crate::hosts::registered_installations();
     let mut out = vec![];
     for (id, names) in KNOWN_AGENTS {
-        let adapter = GenericCliAdapter { id, names };
-        if let Some(d) = adapter.detect() {
-            out.push(d);
+        let path_cli = find_on_path(names);
+        let installed = crate::discovery::installed_in(
+            id,
+            std::env::var_os("LOCALAPPDATA")
+                .map(std::path::PathBuf::from)
+                .as_deref(),
+            std::env::var_os("APPDATA")
+                .map(std::path::PathBuf::from)
+                .as_deref(),
+            std::env::var_os("USERPROFILE")
+                .or_else(|| std::env::var_os("HOME"))
+                .map(std::path::PathBuf::from)
+                .as_deref(),
+        );
+        if let Some(exe) = path_cli
+            .clone()
+            .or(installed)
+            .or_else(|| registered.get(*id).cloned())
+        {
+            let gui = matches!(
+                *id,
+                "mimo" | "cursor" | "claude-desktop" | "vscode" | "devin-desktop"
+            ) || (*id == "opencode" && path_cli.is_none());
+            out.push(DetectedAgent {
+                id: (*id).into(),
+                name: crate::hosts::profile(id).map_or(*id, |p| p.name).into(),
+                kind: if gui { "mcp" } else { "cli" }.into(),
+                executable: Some(exe.to_string_lossy().into_owned()),
+                version: None,
+            });
         }
     }
     out
@@ -379,6 +417,19 @@ mod tests {
             executable: Some(exe.to_string_lossy().into_owned()),
             version: None,
         };
+        let mut gui = agent.clone();
+        gui.id = "opencode".into();
+        gui.kind = "mcp".into();
+        assert!(runtime
+            .launch(
+                "owner",
+                &gui,
+                &session,
+                &serde_json::json!({"candidates":[]}),
+                true
+            )
+            .unwrap_err()
+            .contains("no supported automatic launch contract"));
         let disclosure = serde_json::json!({"candidates":[{"id":"synthetic","name":"fixture"}]});
         assert!(runtime
             .launch("owner", &agent, &session, &disclosure, false)

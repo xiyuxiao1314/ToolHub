@@ -8,41 +8,55 @@ export interface StatusResult { protocol_version: string; daemon: string; regist
 export interface InstanceRow { id: string; definition_id: string; name: string; version: string | null; path: string; canonical_path: string | null; environment_id: string | null; trust: string; status: string; arch: string; platform: string; }
 export interface CandidateInstance { instance_id:string; definition_id:string; name:string; version:string|null; path:string; environment:string|null; trust:string; arch:string; cwd_match:boolean; }
 export interface ResolveResult { capability:string; canonical:string; selected:CandidateInstance|null; alternatives:CandidateInstance[]; explanation:string; error:string|null; eligibility_error:'unknown_capability'|'invalid_preference'|'invalid_version_constraint'|'no_eligible_provider'|null; rejected:{candidate:CandidateInstance;reasons:string[]}[]; fallback_allowed:boolean; }
-export interface ResolveOptions { version?:string; cwd?:string; prefer_environment?:string; preferred_environment?:string; min_version?:string; require_trust?:'verified'|'known'|'user_trusted'; require_arch?:string; }
-export interface ExecuteParams { instance_id?:string; capability?:string; args:string[]; cwd?:string; approval_id?:string; session_id?:string; execution_id?:string; timeout_ms?:number; max_output_bytes?:number; stdin?:string; }
+export interface ResolveOptions { preferred_instance?:string; version?:string; cwd?:string; prefer_environment?:string; preferred_environment?:string; min_version?:string; require_trust?:'verified'|'known'|'user_trusted'; require_arch?:string; }
+export interface ExecuteParams { background?:boolean; outputs?:string[]; instance_id?:string; capability?:string; args:string[]; cwd?:string; approval_id?:string; session_id?:string; execution_id?:string; timeout_ms?:number; max_output_bytes?:number; stdin?:string; }
 export interface ExecutionResult { status:'success'|'failed'|'denied'|'expired'|'timed_out'|'cancelled'|'unavailable'|'invalid_request'; exit_code?:number; stdout:string; stderr:string; duration_ms:number; truncated:boolean; error_code?:string; fallback_allowed?:boolean; execution_id?:string; }
-export interface ApprovalRequest { request_id:string; session_id:string; expires_at:string; }
+export interface StartedExecution { status:"running"; execution_id:string; }
+export type ExecutionResponse = ExecutionResult | StartedExecution;
+export interface ApprovalRequest { request_id:string; session_id:string; expires_in_seconds:number; }
+export interface ApprovalStatus { request_id:string; session_id:string; status:"pending"|"approved"|"expired"|"denied"; approval_id:string|null; expires_at:string; }
 export interface ProgramCandidate { id:string; kind:'file'|'command'; name:string; path:string; cwd:string; command:string; evidence:string[]; }
-export interface ProgramEntry extends ProgramCandidate { args:string[]; favorite:boolean; available:boolean; launch_count:number; last_launched:string|null; }
+export interface ProgramEntry extends ProgramCandidate { metadata?:ProgramMetadata; args:string[]; favorite:boolean; available:boolean; launch_count:number; last_launched:string|null; }
 export interface ProgramSelection extends Omit<ProgramCandidate,'id'> { selection_id:string; args:string[]; favorite:boolean; }
-export interface ProgramDraft { id?:string; selection_id?:string; cwd_selection_id?:string; name:string; command:string; args:string[]; favorite:boolean; }
+export interface ProgramDraft { metadata?:ProgramMetadata; id?:string; selection_id?:string; cwd_selection_id?:string; name:string; command:string; args:string[]; favorite:boolean; }
 export interface ProgramScan { id?:string; status:'idle'|'running'|'completed'|'partial'|'cancelled'|'failed'; roots?:string[]; roots_attempted?:string[]; visited?:number; skipped?:number; unreadable?:number; current?:string; limitations?:string[]; total:number; candidates:ProgramCandidate[]; }
 export interface MethodMap {
+ 'execute.approval_status':{params:{request_id:string};result:ApprovalStatus};
+ 'agent.observed':{params:{name:string;stage:'handshake'|'call'};result:Json};
+ 'registry.prefer_instance':{params:{id:string;clear?:boolean;project?:string};result:Json};
+ 'registry.health_instance':{params:{id:string;execution_id?:string};result:Json};
+ 'execute.status':{params:{execution_id:string};result:ManagedTask};
+ 'execute.list':{params:{};result:ManagedTask[]};
+ 'program.search':{params:{query?:string};result:Json[]};
+ 'program.propose':{params:{name:string;kind:'file'|'command';cwd:string;path?:string;command?:string;args?:string[];source?:string}&Omit<ProgramMetadata,'agent_visible'>;result:Json};
+ 'program.proposals':{params:{};result:Json[]};
+ 'program.proposal_dismiss':{params:{id:string};result:Json};
  'program.list': {params:{};result:ProgramEntry[]};
  'program.scan_start': {params:{roots?:string[]};result:{id:string}};
  'program.scan_status': {params:{offset?:number;limit?:number};result:ProgramScan};
  'program.scan_cancel': {params:{};result:{cancel_requested:boolean}};
- 'program.select': {params:{candidate_ids:string[]}|{path:string;kind:'file'|'command'};result:ProgramSelection[]};
+ 'program.select': {params:{candidate_ids:string[]}|{proposal_ids:string[]}|{path:string;kind:'file'|'command'};result:ProgramSelection[]};
  'program.save': {params:{items:ProgramDraft[]};result:{saved:number}};
  'program.remove': {params:{id:string};result:{removed:boolean}};
- 'program.launch': {params:{id:string};result:{pid:number;submitted:true}};
+ 'program.launch': {params:{id:string;terminal?:boolean};result:{pid:number;submitted:true;terminal:boolean}};
  'status': { params: {}; result: StatusResult };
  'capability.list': { params: {}; result: Json[] };
  'registry.correct': { params: {id:string;trust?:'verified'|'known'|'user_trusted'|'unknown'|'blocked';name?:string}; result: Json };
 
  'ping': { params: {}; result: Json };
  'protocol.negotiate': { params: {versions:string[]}; result: Json };
- 'registry.search': { params: {query:string; include_missing?:boolean}; result: InstanceRow[] };
+ 'registry.search': { params: {query:string; include_missing?:boolean;limit?:number;offset?:number;detail?:'summary'|'full'}; result: InstanceRow[] };
  'registry.inspect_instance': { params: {id:string}; result: Json };
  'resolve.capability': { params: {capability:string}&ResolveOptions; result: ResolveResult };
  'scan.start': { params: {mode:'quick'|'full'|'custom'}; result: Json };
- 'execute.tool': { params: ExecuteParams; result: ExecutionResult };
+ 'execute.tool': { params: ExecuteParams; result: ExecutionResponse };
  'execute.approval_request': { params: ExecuteParams; result: ApprovalRequest };
  'execute.cancel': { params: {execution_id:string}; result: Json };
  'activity.list': { params: {}; result: Json[] };
  'settings.get': { params: {}; result: Json };
  'settings.set': { params: Record<string,Json>; result: Json };
- 'skill.register': { params: {path:string}; result: Json };
+ 'skill.register': { params: {path:string;if_absent?:boolean}; result: Json };
+ 'skill.preview': { params: {manifest:Json;instructions:string;cwd?:string}; result: Json };
  'skill.resolve': { params: {id:string}; result: Json };
  'skill.list': { params: {}; result: Json[] };
  'skill.inspect': { params: {id:string}; result: Json };
@@ -90,7 +104,8 @@ export declare class ToolhubClient {
  search(query:string,options?:CallOptions):Promise<InstanceRow[]>;
  resolveCapability(capability:string,opts?:ResolveOptions,options?:CallOptions):Promise<ResolveResult>;
  scan(mode?:'quick'|'full'|'custom',options?:CallOptions):Promise<Json>;
- execute(params:ExecuteParams,options?:CallOptions):Promise<ExecutionResult>;
+ execute(params:ExecuteParams & {background?:false},options?:CallOptions):Promise<ExecutionResult>;
+ execute(params:ExecuteParams,options?:CallOptions):Promise<ExecutionResponse>;
  requestApproval(params:ExecuteParams,options?:CallOptions):Promise<ApprovalRequest>;
  close():void;
 }
@@ -103,3 +118,9 @@ export interface EventStream { setEncoding?(encoding:string):unknown;on(name:str
 
 
 
+
+export interface ProgramMetadata {purpose?:string;inputs?:string[];outputs?:string[];dependencies?:string[];examples?:string[];agent_visible?:boolean}
+export interface ManagedTask {execution_id:string;status:string;artifacts?:{path:string;name:string;bytes:number}[];result?:{stdout:string;stderr:string;truncated:boolean}}
+
+export interface SkillPortability {scope:"portable"|"host_specific";platforms:("windows"|"macos"|"linux")[];inputs:string[];outputs:string[];permissions:("read_files"|"write_files"|"execute_tools"|"network_access")[];host_dependencies:string[]}
+export interface SkillCompatibility {status:"portable"|"needs_review"|"host_specific"|"unsupported_platform"|"malformed";reusable:boolean;issues:string[];assessment:string}

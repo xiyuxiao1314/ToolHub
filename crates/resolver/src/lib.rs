@@ -56,6 +56,7 @@ pub enum RejectionReason {
 
 #[derive(Debug, Clone, Default)]
 pub struct ResolvePrefs {
+    pub preferred_instances: Vec<String>,
     pub cwd: Option<String>,
     pub prefer_environment: Option<String>,
     pub min_version: Option<String>,
@@ -209,9 +210,20 @@ pub fn resolve(
     }
 
     candidates.sort_by(|a, b| {
-        score(b)
-            .partial_cmp(&score(a))
-            .unwrap_or(std::cmp::Ordering::Equal)
+        let preference_rank = |id: &str| {
+            prefs
+                .preferred_instances
+                .iter()
+                .position(|i| i == id)
+                .unwrap_or(usize::MAX)
+        };
+        preference_rank(&a.instance_id)
+            .cmp(&preference_rank(&b.instance_id))
+            .then_with(|| {
+                score(b)
+                    .partial_cmp(&score(a))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .then_with(|| match (&a.version, &b.version) {
                 (Some(a), Some(b)) => {
                     toolhub_core::compare_versions(b, a).unwrap_or(std::cmp::Ordering::Equal)
@@ -373,5 +385,32 @@ mod tests {
         let out = resolve(&reg, &req, cands, &ResolvePrefs::default());
         assert_eq!(out.selected.unwrap().instance_id, "b");
         assert!(out.error.is_none());
+    }
+    #[test]
+    fn preferred_installation_never_bypasses_eligibility() {
+        let registry = CapabilityRegistry::with_core_taxonomy();
+        let requirement = CapabilityRequirement {
+            capability: CapabilityId::new("language.python.execute").unwrap(),
+            version: None,
+            optional: false,
+        };
+        let candidates = vec![
+            inst(
+                "blocked",
+                "C:/blocked/python.exe",
+                "blocked",
+                Some("3.13"),
+                None,
+            ),
+            inst("old", "C:/old/python.exe", "known", Some("3.11"), None),
+            inst("new", "C:/new/python.exe", "known", Some("3.13"), None),
+        ];
+        let prefs = ResolvePrefs {
+            preferred_instances: vec!["blocked".into(), "old".into()],
+            ..Default::default()
+        };
+        let out = resolve(&registry, &requirement, candidates, &prefs);
+        assert_eq!(out.selected.unwrap().instance_id, "old");
+        assert_eq!(out.rejected.len(), 1);
     }
 }

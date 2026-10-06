@@ -44,8 +44,23 @@ fn dispatch(
             .prepare_execution(req, principal, controller);
         match prepared {
             Ok(job) => {
-                let result = job.run();
-                service.lock().unwrap().finish_execution(job, result)
+                if req.params["background"] == true {
+                    let id = job.id().to_string();
+                    let owned = Arc::clone(service);
+                    std::thread::spawn(move || {
+                        let result = job.run();
+                        owned.lock().unwrap().finish_execution(job, result);
+                    });
+                    JsonRpcResponse {
+                        jsonrpc: "2.0".into(),
+                        id: req.id.clone(),
+                        result: Some(serde_json::json!({"execution_id":id,"status":"running"})),
+                        error: None,
+                    }
+                } else {
+                    let result = job.run();
+                    service.lock().unwrap().finish_execution(job, result)
+                }
             }
             Err(response) => response,
         }

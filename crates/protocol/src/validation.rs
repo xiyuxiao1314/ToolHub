@@ -20,20 +20,24 @@ pub fn validate_method_params(request: &JsonRpcRequest) -> Result<(), ProtocolEr
         Method::RegistryCorrect
         | Method::InspectTool
         | Method::InspectInstance
+        | Method::PreferInstance
+        | Method::HealthInstance
         | Method::SkillInspect
         | Method::SkillResolve
         | Method::DiscoveryInspect
+        | Method::ProgramProposalDismiss
         | Method::ProgramRemove
         | Method::ProgramLaunch => &["id"],
         Method::ResolveCapability => &["capability"],
         Method::SearchTools => &["query"],
         Method::RequestApproval => &["instance_id"],
-        Method::ApproveExecution => &["request_id"],
+        Method::ApproveExecution | Method::ApprovalStatus => &["request_id"],
         Method::RevokeApproval => &["approval_id"],
         Method::DiscoveryRevoke => &["session_id"],
         Method::AgentLaunch => &["agent_id"],
+        Method::AgentObserved => &["name", "stage"],
         Method::AgentStatus | Method::AgentCancel => &["operation_id"],
-        Method::ExecuteCancel => &["execution_id"],
+        Method::ExecuteCancel | Method::ExecuteStatus => &["execution_id"],
         Method::PolicySet => &["scope", "subject", "action"],
         _ => &[],
     };
@@ -42,6 +46,20 @@ pub fn validate_method_params(request: &JsonRpcRequest) -> Result<(), ProtocolEr
             Some(value) if !value.is_empty() || *key == "query" => {}
             _ => return Err(invalid(format!("{key} must be a string"))),
         }
+    }
+    if method == Method::SkillPreview
+        && (!params.get("manifest").is_some_and(Value::is_object)
+            || !params.get("instructions").is_some_and(|v| {
+                v.as_str()
+                    .is_some_and(|s| !s.is_empty() && s.len() <= 65536)
+            }))
+    {
+        return Err(invalid(
+            "manifest object and bounded instruction text required".into(),
+        ));
+    }
+    if params.get("if_absent").is_some_and(|v| !v.is_boolean()) {
+        return Err(invalid("if_absent must be boolean".into()));
     }
     if method == Method::SkillRegister
         && !params.contains_key("path")
@@ -94,6 +112,10 @@ pub fn validate_method_params(request: &JsonRpcRequest) -> Result<(), ProtocolEr
         "format",
         "path",
         "name",
+        "stage",
+        "detail",
+        "project",
+        "preferred_instance",
     ];
     for key in strings {
         if let Some(value) = params.get(key) {
@@ -112,6 +134,24 @@ pub fn validate_method_params(request: &JsonRpcRequest) -> Result<(), ProtocolEr
                     .all(|v| v.as_str().is_some_and(|s| s.len() <= 16384))
         }) {
             return Err(invalid("args must be a bounded string array".into()));
+        }
+    }
+    if method == Method::ProgramLaunch && params.get("terminal").is_some_and(|v| !v.is_boolean()) {
+        return Err(invalid("terminal must be a boolean".into()));
+    }
+    for (key, max) in [("limit", 1000), ("offset", 100000)] {
+        if let Some(value) = params.get(key) {
+            if value
+                .as_u64()
+                .is_none_or(|v| v > max || (key == "limit" && v == 0))
+            {
+                return Err(invalid(format!("{key} out of bounds")));
+            }
+        }
+    }
+    for key in ["clear", "background"] {
+        if params.get(key).is_some_and(|v| !v.is_boolean()) {
+            return Err(invalid(format!("{key} must be boolean")));
         }
     }
     if let Some(value) = params.get("include_missing") {
@@ -150,6 +190,30 @@ pub fn validate_method_params(request: &JsonRpcRequest) -> Result<(), ProtocolEr
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn program_terminal_requires_an_explicit_boolean() {
+        for params in [
+            serde_json::json!({"id":"x"}),
+            serde_json::json!({"id":"x","terminal":true}),
+            serde_json::json!({"id":"x","terminal":false}),
+        ] {
+            assert!(
+                validate_method_params(&JsonRpcRequest::new(1, "program.launch", params)).is_ok()
+            );
+        }
+        for value in [
+            serde_json::json!("false"),
+            serde_json::json!(null),
+            serde_json::json!(1),
+        ] {
+            assert!(validate_method_params(&JsonRpcRequest::new(
+                1,
+                "program.launch",
+                serde_json::json!({"id":"x","terminal":value})
+            ))
+            .is_err());
+        }
+    }
     #[test]
     fn missing_filter_requires_an_explicit_boolean() {
         for value in [serde_json::json!(true), serde_json::json!(false)] {

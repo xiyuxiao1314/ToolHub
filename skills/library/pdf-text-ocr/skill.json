@@ -1,0 +1,41 @@
+{
+  "schema": "toolhub.skill/v1",
+  "id": "workflow.document.pdf-ocr",
+  "name": "PDF 文字提取与扫描件识别",
+  "description": "先尝试 PDF 原生文字，再对扫描页使用 OCR；说明识别局限。",
+  "kind": "instruction",
+  "instruction_file": "SKILL.md",
+  "requires": [
+    {
+      "capability": "document.pdf.text.extract"
+    }
+  ],
+  "optional": [
+    {
+      "capability": "document.pdf.render"
+    },
+    {
+      "capability": "document.ocr"
+    }
+  ],
+  "portability": {
+    "scope": "portable",
+    "platforms": [
+      "windows",
+      "macos",
+      "linux"
+    ],
+    "inputs": [
+      "用户指定的 PDF 文件和页码范围"
+    ],
+    "outputs": [
+      "带页码对应关系的文字文件和识别局限"
+    ],
+    "permissions": [
+      "read_files",
+      "write_files",
+      "execute_tools"
+    ],
+    "host_dependencies": []
+  }
+}

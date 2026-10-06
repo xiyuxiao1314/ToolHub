@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-pick-skill-folder"
+description = "Enables the pick_skill_folder command without any pre-configured scope."
+commands.allow = ["pick_skill_folder"]
+
+[[permission]]
+identifier = "deny-pick-skill-folder"
+description = "Denies the pick_skill_folder command without any pre-configured scope."
+commands.deny = ["pick_skill_folder"]
