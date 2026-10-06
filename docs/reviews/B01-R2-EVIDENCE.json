@@ -1,0 +1,222 @@
+{
+  "schema": "toolhub.review-evidence.v1",
+  "review": "B01-R2",
+  "date": "2026-09-29",
+  "verdict": "changes_required",
+  "formal_reviews_used": 2,
+  "formal_reviews_limit": 4,
+  "reviewed_head": "7a1ba39a8fb27dddffb4eb662a973c8bedf287ed",
+  "correction_head": "6df2166e0c55ec64667021e386e75ca93acb066d",
+  "correction_branch": "codex/toolhub-b01-r2-fixes",
+  "reviewed_bundle_sha256": "745b1400125cdc731f2fcf36ea089aba0bfb8c6c1f406c5e04844fd9237e9f60",
+  "correction_bundle": {
+    "name": "ToolHub-B01-R2-corrections.bundle",
+    "sha256": "21c8f94b282c3313b64748760108b89ef98d6bea091f14622237067de0aff325",
+    "bytes": 167185,
+    "complete_history_verified": true
+  },
+  "platform": "Windows x64; existing Rust/Cargo 1.95.0 and MSVC 14.44",
+  "verification": [
+    {
+      "phase": "delivered",
+      "head": "7a1ba39a8fb27dddffb4eb662a973c8bedf287ed",
+      "tests_passed": 47,
+      "tests_failed": 0,
+      "checks": [
+        {
+          "command": "cargo fmt --all -- --check",
+          "exit_code": 0,
+          "log_relative": "evidence/fmt.log",
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "command": "cargo test --workspace --offline --locked",
+          "exit_code": 0,
+          "log_relative": "evidence/tests.log",
+          "log_sha256": "4560bd748a9a845bbe5dd30dbf1236d7a88c708cf70dba140ec13b8989e8b60e"
+        },
+        {
+          "command": "cargo clippy --workspace --all-targets --offline --locked -- -D warnings",
+          "exit_code": 0,
+          "log_relative": "evidence/clippy.log",
+          "log_sha256": "89901b15be6a540df169c10e60340b9157198faf4d50a06b80db25ae6981f5c9"
+        },
+        {
+          "command": "cargo build --workspace --release --offline --locked",
+          "exit_code": 0,
+          "log_relative": "evidence/build.log",
+          "log_sha256": "5c5ef1801e4ed05a451fc9ee1f553ac1a14e25072b68e057c3ceeec80f9703f7"
+        }
+      ]
+    },
+    {
+      "phase": "corrected",
+      "head": "6df2166e0c55ec64667021e386e75ca93acb066d",
+      "tests_passed": 50,
+      "tests_failed": 0,
+      "checks": [
+        {
+          "command": "cargo fmt --all -- --check",
+          "exit_code": 0,
+          "log_relative": "evidence/corrections/fmt.log",
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "command": "cargo test --workspace --offline --locked",
+          "exit_code": 0,
+          "log_relative": "evidence/corrections/tests.log",
+          "log_sha256": "ba8eb415d119e153a57433ca5a54c57c15378fd4c4b723f39dc14d19f54327ff"
+        },
+        {
+          "command": "cargo clippy --workspace --all-targets --offline --locked -- -D warnings",
+          "exit_code": 0,
+          "log_relative": "evidence/corrections/clippy.log",
+          "log_sha256": "9dedda6bbefcc8e302212de6497e427bc70a11d085fccf5c4c1ce0547b59c930"
+        },
+        {
+          "command": "cargo build --workspace --release --offline --locked",
+          "exit_code": 0,
+          "log_relative": "evidence/corrections/build.log",
+          "log_sha256": "dcfaf80fb220772e34d421fc7aeb843a2686906450a3f1d8239a4dd7537e5b44"
+        }
+      ]
+    }
+  ],
+  "localized_corrections": [
+    "C01 atomic latest policy replacement with rollback",
+    "C02 persist before in-memory policy update and propagate database failure"
+  ],
+  "regressions": {
+    "added": 3,
+    "before_correction": "two intended failing assertions; rollback control passes",
+    "after_correction": "three pass; full workspace 50 pass"
+  },
+  "executed_observations": {
+    "named_pipe_listener": {
+      "connected": false,
+      "listener_exit_code": 1,
+      "error": "create_named_pipe failed"
+    },
+    "approval": {
+      "exact_request": "success",
+      "changed_args": "approval_invalid",
+      "replay": "approval_invalid"
+    },
+    "deadline": {
+      "single_child_deadline": {
+        "requested_ms": 20,
+        "elapsed_ms": 533,
+        "status": "timed_out"
+      },
+      "finite_grandchild_deadline": {
+        "requested_ms": 150,
+        "elapsed_ms": 1390,
+        "status": "timed_out"
+      }
+    },
+    "utf8_output_bytes": 262146,
+    "continued_ping_ok": true,
+    "data_and_protocol": "selected synthetic fixture observations and domain reports in reproduction ZIP; source/runtime distinctions in result"
+  },
+  "limitations": [
+    "No macOS compilation/host verification",
+    "No external-agent/account launch",
+    "No unauthorized-user pipe test or real credential test",
+    "Security-subagent tool content filtering stopped two turns; root source and safe runtime checks completed",
+    "Corrected policy regressions verified; baseline broad probes remain bound to reviewed head"
+  ],
+  "reproduction_package": {
+    "name": "B01-R2-REPRO.zip",
+    "sha256": "95e4c279094621d6f634a22eddeb3492a71a27dc06e99bce94079efb1a5f55a6",
+    "bytes": 42495,
+    "entries": [
+      {
+        "path": "execution-check.py",
+        "sha256": "89bc0dd526894c2bfbf6937dfdb45a35212ea24fb3fcdc90d89a53d29634c60e"
+      },
+      {
+        "path": "listener-probe.py",
+        "sha256": "08fe8aba118e9c7d7b1a4637860037dd784ee32727c902f207062c2f2770de8b"
+      },
+      {
+        "path": "run-checks.ps1",
+        "sha256": "708e617c40e0bf3f6c8c82416583e070ab1b7bd526dcf45ae098cf0ed444e7da"
+      },
+      {
+        "path": "run-focused.ps1",
+        "sha256": "e0f96e55e0e1ce32e427babe471ccdea768c909a291adc7117d3f7dafbff363c"
+      },
+      {
+        "path": "evidence/execution-results.json",
+        "sha256": "636889c82bab4805081803c0a465a9d611806c4773bd4e68e27da167b19a2604"
+      },
+      {
+        "path": "evidence/listener-results.json",
+        "sha256": "7f0a51d7a2446379eeacc95e59aee4caa237715594adc9bb808852e427835e07"
+      },
+      {
+        "path": "evidence/policy-red-all.log",
+        "sha256": "64005bfb425757afdd7299ac1b58bfdbc3c22a9badf0779052af9f6ff08bca41"
+      },
+      {
+        "path": "evidence/policy-green.log",
+        "sha256": "76110fe23a1aa52f3e744ce6cc59b5d64dacc1cd170495e122d6e063ae7e49b8"
+      },
+      {
+        "path": "protocol-probes/probe_protocol.py",
+        "sha256": "862108f03435f1f755dfed3a48c8b5a8c1319d1d5d5b006291f46e39736c3519"
+      },
+      {
+        "path": "protocol-probes/PROTOCOL-R2.md",
+        "sha256": "27668b413656a8a529ec1de245e19558a56118598d8753ac43a57f6fcfdb4080"
+      },
+      {
+        "path": "protocol-probes/PROTOCOL-PROBES.json",
+        "sha256": "2fb7fdab90f0ef0f7541d15ec94a68d8f9dacae4a95d750f7668bda21bf46e91"
+      },
+      {
+        "path": "protocol-probes/SMOKE-NEGATIVE.json",
+        "sha256": "adbb0294dcb1c21c6ca74cf4d656d771fc4b099ee739445b98da0b3a436c64fe"
+      },
+      {
+        "path": "data-probes/DATA-R2.md",
+        "sha256": "773b23b9fec290a47a197bb746a986d949a3e0478a491555f9415357a0d3fdc4"
+      },
+      {
+        "path": "data-probes/data_runtime_probe.py",
+        "sha256": "e7dca731e3aa123b28509bb847c60dd71b5800c282d952716daefd3b7b3880b8"
+      },
+      {
+        "path": "data-probes/resolver_runtime_probe.py",
+        "sha256": "933c489c7dd537661d87d8d943160aad1d017b32df2863de2720d5087f6a1016"
+      },
+      {
+        "path": "data-probes/candidate_case_probe.py",
+        "sha256": "c53d501b536bbec36591afece32e06227c766a5ca50a64ecc268d9beca0c127e"
+      },
+      {
+        "path": "data-probes/canonical_identity_probe.py",
+        "sha256": "9d22859e205b2555a7d5a78165dd55213defd059ef72598d1cf91a0893a029f7"
+      },
+      {
+        "path": "data-probes/run-9e2872cc/results.json",
+        "sha256": "181353ba85ddfb9591ae06ecab6edbb8dbdce7431f9d9d42700bd3191eaf1bc9"
+      },
+      {
+        "path": "data-probes/resolver-917310f4/results.json",
+        "sha256": "5786c1521e263ff1037d468167d9df3192ec75c7128aaf5804640ad345cf98b8"
+      },
+      {
+        "path": "data-probes/candidate-6d728f65/results.json",
+        "sha256": "3490298f63cb1a5defe3e77015fc746d44316a4d8e904810c0208b47f90c27cc"
+      },
+      {
+        "path": "data-probes/identity-976cffc6/results.json",
+        "sha256": "3d31217d565bee2ed5dc433948fd99bde6399fbbb3797dcb9f9a4539fabac8a3"
+      }
+    ]
+  },
+  "next_step": "Owner decision on remaining batch/review allocation; concrete combined B01/B02 proposal not dispatched; no fifth review automatically",
+  "implementation_merged_to_main": false,
+  "remote_push_or_release": false
+}
