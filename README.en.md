@@ -10,7 +10,7 @@
     <img alt="Beta status" src="https://img.shields.io/badge/status-beta-orange" />
   </p>
   <p><a href="README.md">简体中文</a> | <strong>English</strong></p>
-  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.1">Download v0.3.0-beta.1</a> · <a href="#connect-an-ai-agent">Agent setup</a> · <a href="#build-from-source">Build from source</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">Report an issue</a></p>
+  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.1">Download v0.3.0-beta.1</a> · <a href="#screenshots">Screenshots</a> · <a href="#connect-an-ai-agent">Agent setup</a> · <a href="#build-from-source">Build from source</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">Report an issue</a></p>
 </div>
 
 ## Why ToolHub?
@@ -20,6 +20,34 @@ When you ask an agent to compress a video, process a PDF or run a project, it ma
 ToolHub organizes local tools into a searchable catalog: their paths, versions, environments, capabilities and availability. People use the desktop interface; agents query the same catalog through local MCP or the CLI. Applications you create can be added to the program shelf. Reusable procedures can be saved as Skills, and capability packages combine those procedures with their tool dependencies for sharing.
 
 ToolHub reuses existing tools. Discovery does not require an AI service, and ToolHub does not automatically download FFmpeg, install language runtimes or clean up your computer. Agents still need their own instructions to use ToolHub; it cannot force every agent to change how it selects tools.
+
+## Screenshots
+
+These screenshots show the **v0.3.0-beta.1 Windows release** with an independent demonstration dataset. The desktop UI is currently in Simplified Chinese. Click an image to view it at full size.
+
+### Tool catalog
+
+Group installations by tool, browse categories, search and paginate, then inspect an instance's version, path, environment and trust status.
+
+![ToolHub tool catalog with grouped installations, pagination and Git instance details](docs/images/tools.png)
+
+### Program shelf
+
+Keep file and command launch entries together with their working directories, favorites, background launch and folder actions. The project entries shown here are demonstration examples.
+
+![ToolHub program shelf with file and command entries, favorites and working directories](docs/images/programs.png)
+
+### Portable Skill library
+
+Inspect reusable procedures, inputs and outputs, supported platforms, declared permissions and local tool dependencies before copying instructions to an agent.
+
+![ToolHub Skill library showing a media workflow, portability declarations and dependency checks](docs/images/skills.png)
+
+### Capability package market
+
+Browse bundled packages, preview procedures and dependency results, then add them to your Skill library with confirmation or copy/export them for sharing.
+
+![ToolHub capability market with categories, a media workflow and local dependency inspection](docs/images/market.png)
 
 ## Current features
 
