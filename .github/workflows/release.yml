@@ -42,7 +42,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: rust-${{ matrix.platform }}-${{ hashFiles('Cargo.lock') }}-1
+          key: rust-${{ matrix.platform }}-${{ hashFiles('Cargo.lock') }}-release-2
       - name: Frontend
         run: |
           npm ci --prefix apps/desktop/ui
