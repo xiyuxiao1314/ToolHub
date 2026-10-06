@@ -425,7 +425,15 @@ mod tests {
     #[test]
     fn custom_scan_records_provider_and_root() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("tool.exe"), b"finite fixture").unwrap();
+        let file = dir
+            .path()
+            .join(if cfg!(windows) { "tool.exe" } else { "tool" });
+        std::fs::write(&file, b"finite fixture").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
         let report = run_scan(
             ScanMode::Quick,
             Some(vec![dir.path().to_string_lossy().into_owned()]),
@@ -434,6 +442,11 @@ mod tests {
             report.coverage.roots_attempted.len(),
             1,
             "custom roots must not repeat through unrelated providers"
+        );
+        assert_eq!(
+            report.candidates.len(),
+            1,
+            "native executable fixture must be discovered"
         );
         assert_eq!(
             report.candidates[0].metadata["scanner_scope"]["provider"],

@@ -137,7 +137,7 @@ ToolHub 提供 **本地 stdio MCP**，任何实现兼容 MCP 的客户端都可�
 }
 ```
 
-macOS 的 command 改为 `/Applications/ToolHub.app/Contents/MacOS/toolhub`。CLI 和 daemon 必须保持配对；Agent 的只读查询不要求桌面窗口一直打开，交互审批则需要桌面。
+macOS 的 command 改为 `/Applications/ToolHub.app/Contents/MacOS/toolhub`。CLI 和 daemon 必须保持配对。桌面用户应配置桌面包里的 CLI；不要同时用另一个目录的 CLI-only 包启动同一用户服务，服务会检查配对 daemon 的路径与身份。Agent 的只读查询不要求桌面窗口一直打开，交互审批则需要桌面。
 
 ### Codex TOML
 
@@ -225,7 +225,7 @@ toolhub_bin='/Applications/ToolHub.app/Contents/MacOS/toolhub'
 
 技术栈：Rust / Tokio / SQLite 核心，Tauri 2 桌面，React / TypeScript 前端，独立 stdio MCP 网关与 TypeScript SDK。
 
-要求：Rust 1.88+（推荐当前 stable）、Node.js 22+、对应平台的原生开发工具。Windows 安装 Visual Studio C++ Build Tools 和 WebView2；macOS 安装 Xcode Command Line Tools。详见 [Tauri 官方前置条件](https://v2.tauri.app/start/prerequisites/)。
+要求：Rust 1.90+（推荐当前 stable）、Node.js 22+、对应平台的原生开发工具。Windows 安装 Visual Studio C++ Build Tools 和 WebView2；macOS 安装 Xcode Command Line Tools。详见 [Tauri 官方前置条件](https://v2.tauri.app/start/prerequisites/)。
 
 ```sh
 git clone https://github.com/xiyuxiao1314/ToolHub.git

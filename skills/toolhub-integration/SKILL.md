@@ -11,7 +11,7 @@ description: 在本机任务需要已有命令行工具、运行环境或实用�
 
 本流程适用于支持本地 stdio MCP 的客户端，不限定 Codex 或 MiMo。Claude Code、Claude Desktop、Cursor、Gemini CLI、Copilot 使用的配置通常为 mcpServers；VS Code 用户格式为 servers；OpenCode / MiMo 使用 mcp 的本地 command 数组；Codex 使用 TOML 的 mcp_servers。以当前宿主文档和实际配置为准，保留其他服务、凭据和权限。ToolHub 接入说明提供各客户端模板。没有 Skills 功能时将本文用作任务指引，不复制其他宿主的专属 Skills。
 
-使用本机连接信息中的 CLI 绝对路径，不假定 `toolhub.exe` 在 PATH。MCP 使用 stdio，command 是可执行文件，args 是 `["mcp", "serve"]`。按宿主格式合并配置并保留其他服务。CLI 和 `toolhubd.exe` 放在同一目录，桌面无需一直打开。
+使用本机连接信息中的 CLI 绝对路径，不假定 `toolhub.exe` 在 PATH。MCP 使用 stdio，command 是可执行文件，args 是 `["mcp", "serve"]`。按宿主格式合并配置并保留其他服务。CLI 和配对 daemon 放在同一目录（Windows 为 `toolhub.exe` / `toolhubd.exe`，macOS 为 `toolhub` / `toolhubd`）。桌面用户使用桌面包内 CLI；Mac 的标准路径是 `/Applications/ToolHub.app/Contents/MacOS/toolhub`。桌面无需一直打开。
 
 MiMo / mimocode 使用用户目录下 `.config/mimocode/mimocode.jsonc` 的 `mcp.toolhub`：`{"type":"local","command":["<本机 CLI 绝对路径>","mcp","serve"],"enabled":true}`。它的 command 是数组，不使用通用 JSON 的 command 字符串与 args 分离格式；合并时保留 provider 和其他 MCP 服务。ToolHub 列表分别显示本机检测、配置与历史握手/调用；客户端自报名称只是显示记录，不授予权限。
 
@@ -38,17 +38,19 @@ CLI 不提供 propose_program；缺少 MCP 时向用户提供入口信息，不�
 
 CLI 对应查询：`--json inspect <实例 ID>`、`--json resolve media.video.transcode`；执行：`--json exec <实例 ID> -- <逐项参数>`，需要工作目录时使用 `--cwd`。查询没有可用结果时，可请用户在 ToolHub 扫描或添加实际路径，不自动安装。
 
+macOS beta 暂不支持身份绑定的工具执行与执行审批，`execute_tool` / `request_execution_approval` 明确返回 unavailable；发现、Skill 查询和程序提交仍可用。报告平台限制，不修改策略或伪造批准。宿主允许直接调用已查询的本机工具时，仍须遵守原有任务授权和宿主 shell 权限，不把 ToolHub 的策略拒绝当作绕过理由。
+
 ## 提交自己创建的应用入口
 
 完成用户要求的应用、验证启动入口后，可通过 MCP 提交元数据。提交不会运行命令，也不会正式收录。入口放在持久项目目录，避免临时构建、依赖缓存或系统安装目录；不要提交所有中间产物。来源备注说明实际 Agent，不声称扫描证明作者身份。
 
-文件入口支持 exe/bat/cmd/ps1/lnk，提供存在的绝对文件路径和工作目录，参数为数组：
+Windows 文件入口支持 exe/bat/cmd/ps1/lnk；macOS 支持可执行文件、.sh/.command，暂不支持 .app 整体入口。提供所在平台真实存在的绝对文件路径和工作目录，参数为数组。以下为 Windows 示例：
 
 ```json
 {"name":"用户应用","kind":"file","path":"D:\\项目\\应用\\start.cmd","cwd":"D:\\项目\\应用","args":[],"source":"创建该应用的 Agent"}
 ```
 
-命令入口提供存在的绝对工作目录和单行 Windows CMD 命令，命令参数写在 command 内：
+命令入口提供存在的绝对工作目录和所在平台的单行命令（Windows 使用 CMD 语法，macOS 使用 sh 语法），命令参数写在 command 内。以下为 Windows 路径示例；Mac 应改为 /Users 等真实路径：
 
 ```json
 {"name":"用户应用","kind":"command","cwd":"D:\\项目\\应用","command":"npm run start","source":"创建该应用的 Agent"}
