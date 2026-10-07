@@ -159,7 +159,7 @@ impl DaemonService {
             .db
             .conn
             .query_row(
-                "SELECT owner,session_id,status,expires_at FROM execution_requests WHERE id=?1",
+                "SELECT owner,session_id,status,expires_at,params_json FROM execution_requests WHERE id=?1",
                 [id],
                 |r| {
                     Ok((
@@ -167,6 +167,7 @@ impl DaemonService {
                         r.get::<_, String>(1)?,
                         r.get::<_, String>(2)?,
                         r.get::<_, String>(3)?,
+                        r.get::<_, String>(4)?,
                     ))
                 },
             )
@@ -176,6 +177,8 @@ impl DaemonService {
         if row.0 != self.peer_principal() && !self.is_admin() {
             return Err(ProtocolError::denied("approval belongs to another caller"));
         }
+        let auto_approved =
+            serde_json::from_str::<Value>(&row.4).map_err(json_err)?["auto_approved"] == true;
         let approval = self.approvals.values().find(|a| {
             a.agent_id.as_str() == row.0
                 && a.session_id == row.1
@@ -194,7 +197,7 @@ impl DaemonService {
             status = "expired"
         }
         Ok(
-            json!({"request_id":id,"session_id":row.1,"status":status,"approval_id":approval.map(|a|&a.approval_id),"expires_at":row.3}),
+            json!({"request_id":id,"session_id":row.1,"status":status,"auto_approved":auto_approved,"approval_id":if status == "approved" { approval.map(|a|&a.approval_id) } else { None },"expires_at":row.3}),
         )
     }
 }

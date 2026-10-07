@@ -227,7 +227,8 @@ impl DaemonService {
         };
         let revision = self.registry.revision().map_err(db_err)?;
         let digest = toolhub_core::execution::digest_strings(&[
-            "authorization-revision/v2".into(),
+            "authorization-revision/v3".into(),
+            self.auto_approve_execution()?.to_string(),
             revision.to_string(),
             serde_json::to_string(&self.policy.rules).map_err(json_err)?,
             serde_json::to_string(&context).map_err(json_err)?,
@@ -307,7 +308,7 @@ impl DaemonService {
             return Err(invalid("execution_id already used"));
         }
         let outputs = super::managed_tasks::output_declarations(params)?;
-        let approval_id = params
+        let mut approval_id = params
             .get("approval_id")
             .map(|v| {
                 v.as_str()
@@ -315,14 +316,23 @@ impl DaemonService {
                     .ok_or_else(|| invalid("approval_id must be string"))
             })
             .transpose()?;
-        if decision.action == PolicyAction::Ask {
+        let mut session_id = params["session_id"].as_str().map(str::to_owned);
+        if decision.action == PolicyAction::Ask
+            && approval_id.is_none()
+            && self.auto_approve_execution()?
+        {
+            let issued = self.request_approval(params)?;
+            approval_id = issued["approval_id"].as_str().map(str::to_owned);
+            session_id = issued["session_id"].as_str().map(str::to_owned);
+        }
+        if decision.action == PolicyAction::Ask || approval_id.is_some() {
             let id = approval_id.as_deref().ok_or_else(|| {
                 ProtocolError::denied("approval_required: submit execute.approval_request")
             })?;
             let approval = self.approvals.get(id).ok_or_else(|| {
                 ProtocolError::new(ErrorCode::ApprovalInvalid, "unknown approval")
             })?;
-            if approval.session_id != text(params, "session_id")? {
+            if Some(approval.session_id.as_str()) != session_id.as_deref() {
                 return Err(ProtocolError::new(
                     ErrorCode::ApprovalInvalid,
                     "execution session mismatch",
@@ -455,7 +465,13 @@ impl DaemonService {
             "execution approval requested",
             json!({"request_id":id}),
         )?;
-        Ok(json!({"request_id":id,"session_id":session,"expires_in_seconds":300}))
+        if self.auto_approve_execution()? {
+            self.issue_pending_approval(&id, true)
+        } else {
+            Ok(
+                json!({"request_id":id,"session_id":session,"status":"pending","auto_approved":false,"expires_in_seconds":300}),
+            )
+        }
     }
     pub(super) fn approve_pending(&mut self, params: &Value) -> Result<Value, ProtocolError> {
         if !self.is_admin() {
@@ -463,7 +479,17 @@ impl DaemonService {
                 "verified desktop controller required",
             ));
         }
-        let id = text(params, "request_id")?;
+        let existing = self.approval_status(params)?;
+        if existing["status"] == "approved" {
+            return Ok(existing);
+        }
+        self.issue_pending_approval(text(params, "request_id")?, false)
+    }
+    pub(super) fn issue_pending_approval(
+        &mut self,
+        id: &str,
+        automatic: bool,
+    ) -> Result<Value, ProtocolError> {
         let row=self.registry.db.conn.query_row("SELECT owner,session_id,params_json,expires_at,status FROM execution_requests WHERE id=?1",[id],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?))).optional().map_err(sql_err)?.ok_or_else(||ProtocolError::new(ErrorCode::NotFound,"approval request not found"))?;
         if row.4 != "pending"
             || chrono::DateTime::parse_from_rfc3339(&row.3)
@@ -530,7 +556,9 @@ impl DaemonService {
                     &approval.expires_at.to_rfc3339(),
                 )
                 .map_err(db_err)?;
-            self.registry.db.conn.execute("UPDATE execution_requests SET status='approved' WHERE id=?1 AND status='pending'",[id]).map_err(sql_err)?;
+            let mut metadata: Value = serde_json::from_str(&row.2).map_err(json_err)?;
+            metadata["auto_approved"] = json!(automatic);
+            self.registry.db.conn.execute("UPDATE execution_requests SET status='approved',params_json=?2 WHERE id=?1 AND status='pending'",rusqlite::params![id,metadata.to_string()]).map_err(sql_err)?;
             Ok::<(), ProtocolError>(())
         })();
         if result.is_err() {
@@ -547,13 +575,23 @@ impl DaemonService {
             .execute_batch("RELEASE issue_approval")
             .map_err(sql_err)?;
         self.pending_approvals.remove(id);
+        self.approvals
+            .insert(approval.approval_id.clone(), approval.clone());
         self.event(
-            "approval.issued",
-            "bound approval issued",
-            json!({"request_id":id}),
+            if automatic {
+                "approval.auto_issued"
+            } else {
+                "approval.issued"
+            },
+            if automatic {
+                "execution automatically approved"
+            } else {
+                "bound approval issued"
+            },
+            json!({"request_id":id,"auto_approved":automatic}),
         )?;
         Ok(
-            json!({"approval_id":approval.approval_id,"request_id":id,"session_id":row.1,"expires_in_seconds":300}),
+            json!({"approval_id":approval.approval_id,"request_id":id,"session_id":row.1,"status":"approved","auto_approved":automatic,"expires_in_seconds":300}),
         )
     }
     pub(super) fn cancel_execution(&mut self, params: &Value) -> Result<Value, ProtocolError> {

@@ -76,7 +76,7 @@ enum Commands {
     Approve {
         request_id: String,
     },
-    /// Submit an execution for review by the desktop controller
+    /// Request exact-invocation approval (automatic by default; desktop review when disabled)
     RequestApproval {
         instance_id: String,
         #[arg(long)]

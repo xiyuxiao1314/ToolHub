@@ -3,6 +3,8 @@ use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use toolhub_protocol::{JsonRpcRequest, JsonRpcResponse, ProtocolError};
+#[cfg(windows)]
+mod background_child;
 mod client;
 mod platform;
 pub use client::RpcClient;

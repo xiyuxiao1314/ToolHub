@@ -11,7 +11,7 @@ pub const META_TOOLS: &[(&str, &str)] = &[
     ("cancel_task", "Cancel own running execution"),
     (
         "request_execution_approval",
-        "Request desktop user approval for an exact invocation",
+        "Request exact-invocation approval; automatic by default, desktop review when disabled",
     ),
     (
         "search_programs",
@@ -96,7 +96,7 @@ pub fn tool_specs() -> Vec<McpToolSpec> {
         },
         McpToolSpec {
             name: "execute_tool",
-            description: "Execute a resolved tool under policy and approval",
+            description: "Execute a resolved trusted tool under policy. Automatic approval is enabled by default: you may call directly without approval_id. If approval_required is returned, submit request_execution_approval. Supplied approval_id/session_id remain one-use and exactly bound; never retry an invalid approval as unapproved execution.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -133,7 +133,7 @@ pub fn tool_specs() -> Vec<McpToolSpec> {
     let mut approval_schema = execution.input_schema.clone();
     approval_schema["required"] = json!([]);
     approval_schema["properties"]["request_id"] = json!({"type":"string","description":"Poll this existing approval request; provide this field alone"});
-    specs.push(McpToolSpec{name:"request_execution_approval",description:"Submit an exact invocation for user review in the desktop. Approval is one-use and bound to executable hash, args, cwd, caller and policy; this does not execute it. After user approval, poll this same tool with request_id alone to retrieve your one-use approval_id and session_id.",input_schema:approval_schema});
+    specs.push(McpToolSpec{name:"request_execution_approval",description:"Request approval for an exact invocation without executing it. With automatic approval enabled (default), returns status=approved, approval_id and session_id immediately for trusted tools allowed by policy; continue execute_tool with the same parameters. When disabled, returns pending for desktop review; poll with request_id alone. Approval is one-use and binds executable hash, args, cwd, caller and policy. Unknown/blocked tools and deny rules cannot be auto-approved.",input_schema:approval_schema});
     for spec in &mut specs {
         spec.input_schema["additionalProperties"] = json!(false);
     }

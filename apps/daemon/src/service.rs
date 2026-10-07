@@ -1043,3 +1043,7 @@ mod final_regressions {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "approval_tests.rs"]
+mod approval_tests;

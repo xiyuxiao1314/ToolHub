@@ -97,6 +97,10 @@ MCP search_skills / inspect_skill 用于查询，不能代替注册。注册成�
 
 有重复流程时先 search_skills，再 inspect_skill 查看实际说明和依赖状态。Skill 是任务指导，不能授权执行。新程序 propose_program 还可以声明 purpose、inputs、outputs、dependencies（能力 ID）、examples。程序信息可选由用户分享给 Agent 后通过 search_programs 查找；普通 Agent 无权自动选择、保存或启动程序条目。
 
-需要执行批准时 request_execution_approval 提交准确 instance_id、参数数组、cwd 与超时，提醒用户到任务页确认，批准前不运行。后台 execute_tool(background=true, outputs=[工作目录下的相对输出路径]) 返回 execution_id，用 get_task 查询实际状态，用户取消时 cancel_task。只在终态 success 且输出验证通过时报告完成。最长 300 秒；原始输出只在 daemon 内存中短期保留。工具升级或权限变化可能使旧批准失效，需重新请求。
+ToolHub 设置中的“自动批准工具执行”默认开启，后台服务决定当前实际状态。核对用户任务、工具与参数后，可直接调用 execute_tool；已信任且策略未拒绝的工具会自动获得本次批准并执行，桌面无需打开。不能因旧版指引中的“批准前不运行”预先停下，应先获取 ToolHub 实际结果。自动批准不授权用户任务以外的操作，不改变宿主自身权限；未知/已阻止的工具、拒绝规则和不支持的平台仍会返回具体原因，不能绕过。
 
-用户在任务页批准后，以 request_id 单独调用 request_execution_approval 查询审批状态，取得一次性 approval_id 与 session_id，再用完全相同的参数调用 execute_tool。pending 状态继续等待；expired 需重新提交；不要自行创建批准。
+若 execute_tool 返回 approval_required，或希望先请求凭证，用 request_execution_approval 提交准确 instance_id、参数数组、cwd 与超时。返回 status=approved 且带 approval_id/session_id 时，立即用完全相同的参数及凭证继续 execute_tool，无需再向用户确认或调用桌面批准接口。旧版返回 request_id 但没有 status/凭证时，先用 request_id 单独查询一次，不能把提交成功当作批准。
+
+只有实际 status=pending 才通知用户到 ToolHub 任务页批准。可以继续无关工作；不要无期限轮询或伪造批准。用户确认后用 request_id 单独查询，取得批准凭证再执行。expired 或 ApprovalInvalid 时先核对工具、参数及策略变化，仍在用户原任务授权内可重新提交一次；持续拒绝则报告原因，不循环重试或丢弃无效凭证来绕过检查。程序 propose_program 的勾选收录规则与此设置无关。
+
+后台 execute_tool(background=true, outputs=[工作目录下的相对输出路径]) 返回 execution_id，用 get_task 查询实际状态，用户取消时 cancel_task。只在终态 success 且输出验证通过时报告完成。最长 300 秒；原始输出只在 daemon 内存中短期保留。批准凭证一次性绑定调用者、工具文件、参数和工作目录；工具、权限或自动批准设置变化后需重新请求。
