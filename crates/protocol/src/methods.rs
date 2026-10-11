@@ -2,6 +2,18 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Method {
+    ArtifactRoots,
+    ArtifactRootAdd,
+    ArtifactRootDisable,
+    ArtifactList,
+    ArtifactInspect,
+    ArtifactRegister,
+    ArtifactComplete,
+    ArtifactReview,
+    ArtifactUpdate,
+    ArtifactRecycle,
+    ArtifactForget,
+    ArtifactScan,
     Ping,
     Negotiate,
     Status,
@@ -77,6 +89,18 @@ pub enum Method {
 }
 
 pub const METHOD_NAMES: &[(&str, Method)] = &[
+    ("artifact.roots", Method::ArtifactRoots),
+    ("artifact.root_add", Method::ArtifactRootAdd),
+    ("artifact.root_disable", Method::ArtifactRootDisable),
+    ("artifact.list", Method::ArtifactList),
+    ("artifact.inspect", Method::ArtifactInspect),
+    ("artifact.register", Method::ArtifactRegister),
+    ("artifact.complete", Method::ArtifactComplete),
+    ("artifact.review", Method::ArtifactReview),
+    ("artifact.update", Method::ArtifactUpdate),
+    ("artifact.recycle", Method::ArtifactRecycle),
+    ("artifact.forget", Method::ArtifactForget),
+    ("artifact.scan", Method::ArtifactScan),
     ("ping", Method::Ping),
     ("protocol.negotiate", Method::Negotiate),
     ("status", Method::Status),

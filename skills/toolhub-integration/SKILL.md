@@ -1,6 +1,6 @@
 ---
 name: toolhub-integration
-description: 在本机任务需要已有命令行工具、运行环境或实用程序（如 FFmpeg、FFprobe、7-Zip、ImageMagick、Pandoc、OCR）时，先通过 ToolHub 查询路径与能力，再按权限调用；完成用户应用后向 ToolHub 提交待确认的启动入口。也用于配置 ToolHub MCP 和检查工具依赖。
+description: 在本机任务需要已有命令行工具、运行环境或实用程序（如 FFmpeg、FFprobe、7-Zip、ImageMagick、Pandoc、OCR）时，先通过 ToolHub 查询路径与能力，再按权限调用；完成用户应用后向 ToolHub 提交待确认的启动入口。也用于配置 ToolHub MCP、检查工具依赖，以及用户启用后按任务登记和整理产物。
 ---
 
 # ToolHub 接入
@@ -15,7 +15,7 @@ description: 在本机任务需要已有命令行工具、运行环境或实用�
 
 MiMo / mimocode 使用用户目录下 `.config/mimocode/mimocode.jsonc` 的 `mcp.toolhub`：`{"type":"local","command":["<本机 CLI 绝对路径>","mcp","serve"],"enabled":true}`。它的 command 是数组，不使用通用 JSON 的 command 字符串与 args 分离格式；合并时保留 provider 和其他 MCP 服务。ToolHub 列表分别显示本机检测、配置与历史握手/调用；客户端自报名称只是显示记录，不授予权限。
 
-配置接入时，完成 initialize / initialized，再检查 tools/list 和一次 search_tools。网关提供十二个固定元工具：`search_tools`、`resolve_capability`、`inspect_tool`、`list_environments`、`execute_tool`、`search_skills`、`inspect_skill`、`propose_program`、`search_programs`、`request_execution_approval`、`get_task`、`cancel_task`。配置已写入、服务已连接和工具可执行是三个不同状态；报告实测状态。
+配置接入时，完成 initialize / initialized，再检查 tools/list 和一次 search_tools。网关提供十六个固定元工具：`search_tools`、`resolve_capability`、`inspect_tool`、`list_environments`、`execute_tool`、`search_skills`、`inspect_skill`、`propose_program`、`search_programs`、`request_execution_approval`、`get_task`、`cancel_task`、`register_artifact_package`、`list_artifact_packages`、`complete_artifact_package`、`review_artifact_package`。配置已写入、服务已连接和工具可执行是三个不同状态；报告实测状态。
 
 无 MCP 时，将 `$toolhub` 设为本机 CLI 路径，使用结构化查询：
 
@@ -97,6 +97,28 @@ MCP search_skills / inspect_skill 用于查询，不能代替注册。注册成�
 
 有重复流程时先 search_skills，再 inspect_skill 查看实际说明和依赖状态。Skill 是任务指导，不能授权执行。新程序 propose_program 还可以声明 purpose、inputs、outputs、dependencies（能力 ID）、examples。程序信息可选由用户分享给 Agent 后通过 search_programs 查找；普通 Agent 无权自动选择、保存或启动程序条目。
 
-需要执行批准时 request_execution_approval 提交准确 instance_id、参数数组、cwd 与超时，提醒用户到任务页确认，批准前不运行。后台 execute_tool(background=true, outputs=[工作目录下的相对输出路径]) 返回 execution_id，用 get_task 查询实际状态，用户取消时 cancel_task。只在终态 success 且输出验证通过时报告完成。最长 300 秒；原始输出只在 daemon 内存中短期保留。工具升级或权限变化可能使旧批准失效，需重新请求。
+ToolHub 设置中的“自动批准工具执行”默认开启，后台服务决定当前实际状态。核对用户任务、工具与参数后，可直接调用 execute_tool；已信任且策略未拒绝的工具会自动获得本次批准并执行，桌面无需打开。不能因旧版指引中的“批准前不运行”预先停下，应先获取 ToolHub 实际结果。自动批准不授权用户任务以外的操作，不改变宿主自身权限；未知/已阻止的工具、拒绝规则和不支持的平台仍会返回具体原因，不能绕过。
 
-用户在任务页批准后，以 request_id 单独调用 request_execution_approval 查询审批状态，取得一次性 approval_id 与 session_id，再用完全相同的参数调用 execute_tool。pending 状态继续等待；expired 需重新提交；不要自行创建批准。
+若 execute_tool 返回 approval_required，或希望先请求凭证，用 request_execution_approval 提交准确 instance_id、参数数组、cwd 与超时。返回 status=approved 且带 approval_id/session_id 时，立即用完全相同的参数及凭证继续 execute_tool，无需再向用户确认或调用桌面批准接口。旧版返回 request_id 但没有 status/凭证时，先用 request_id 单独查询一次，不能把提交成功当作批准。
+
+只有实际 status=pending 才通知用户到 ToolHub 任务页批准。可以继续无关工作；不要无期限轮询或伪造批准。用户确认后用 request_id 单独查询，取得批准凭证再执行。expired 或 ApprovalInvalid 时先核对工具、参数及策略变化，仍在用户原任务授权内可重新提交一次；持续拒绝则报告原因，不循环重试或丢弃无效凭证来绕过检查。程序 propose_program 的勾选收录规则与此设置无关。
+
+后台 execute_tool(background=true, outputs=[工作目录下的相对输出路径]) 返回 execution_id，用 get_task 查询实际状态，用户取消时 cancel_task。只在终态 success 且输出验证通过时报告完成。最长 300 秒；原始输出只在 daemon 内存中短期保留。批准凭证一次性绑定调用者、工具文件、参数和工作目录；工具、权限或自动批准设置变化后需重新请求。
+
+
+## 按任务管理产物
+
+用户启用产物管理、要求整理工作文件时，使用以下 MCP 流程；不要把登记当成新的删除授权。仅登记当前任务中自己创建、用途明确的测试脚本、临时输出或备份。正式交付、程序入口、源码、配置、凭据和依赖应保留。包是文件清单，文件保持原目录；每包 1–128 个明确相对文件路径，不能登记通配符或整个目录。
+
+1. `register_artifact_package`：提供真实 `name`、`task`、绝对任务目录 `root`、相对 `files` 数组及 `source`。一次性验证文件可用并记录指纹。未指定 `priority` 时默认 high；低为一次性临时文件，中为需要用途/依赖判断的文件，高为需要人工决定的文件。用户选择的管理目录外可以登记，但不会自动清理；继续任务，不必等待添加目录。
+2. 任务成功完成并确认文件不再需要后，调用 `complete_artifact_package(id, no_longer_needed=true, reason)`。低优先级在启用范围内等待 5 分钟后自动进入回收站，Agent 无需停下等待；中优先级返回 needs_review 是正常待判断状态；高优先级保留。
+3. 中优先级先 `list_artifact_packages(id=包 ID)` 获取完整文件清单与历史；不用 id 时返回分页摘要（limit 默认 20，offset 分页），再核对清单、状态与真实任务上下文。检查当前使用、项目/程序/Skill 引用；实际确认无用且依赖检查完成，才能 `review_artifact_package(id, decision="recycle", unused=true, dependencies_checked=true, reason=实际理由)`。不确定时 decision="retain"。这个接口记录 Agent 判断，不是 ToolHub 内置模型；不要仅凭名称判断。
+4. 普通 Agent 无权改管理范围、降低已登记的优先级、撤销人工保留或删除高优先级包。ToolHub 会再次检查指纹、已知引用和自己的运行任务；它不能穷尽其他应用的文件引用。文件改变、权限/占用或回收站不可用时会暂缓，不能改用直接删除或修改数据库绕过。用户可在撤销期内保留，回收后从系统回收站还原。
+
+示例参数（替换为当前任务真实文件；不登记本文示例路径）：
+
+```json
+{"name":"界面回归临时文件","task":"本次界面回归已生成的中间记录","root":"D:\\项目\\任务","files":["test_smoke.log","backup.old"],"priority":"low","source":"当前 Agent"}
+```
+
+只报告 ToolHub 返回的真实状态：scheduled 表示等待回收，trashed 才表示已回收，blocked/partial 需查看错误。登记、扫描和任务标记都不是即时永久删除。

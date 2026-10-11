@@ -1,3 +1,4 @@
+import Artifacts from './Artifacts'
 import ToolsList from './ToolsList'
 import ManagedTasks from './ManagedTasks'
 import Skills from './Skills'
@@ -16,11 +17,12 @@ async function rpc(method: string, params: Json = {}): Promise<any> {
   return invoke('rpc', { method, params })
 }
 
-type PageId = 'tools' | 'programs' | 'agents' | 'envs' | 'skills' | 'market' | 'tasks' | 'settings'
+type PageId = 'artifacts' | 'tools' | 'programs' | 'agents' | 'envs' | 'skills' | 'market' | 'tasks' | 'settings'
 
 const NAV: { id: PageId; label: string; icon: string }[] = [
   { id: 'tools', label: '工具', icon: '🧰' },
   { id: 'programs', label: '程序', icon: '🚀' },
+  { id: 'artifacts', label: '产物', icon: '📦' },
   { id: 'agents', label: '智能体', icon: '🤖' },
   { id: 'envs', label: '环境', icon: '🧩' },
   { id: 'skills', label: 'Skill 库', icon: '📚' },
@@ -221,7 +223,7 @@ export default function App() {
   const searchRef = useRef<HTMLInputElement>(null)
   const contentRef = useRef<HTMLElement>(null)
 
-  const notify = (msg: string) => setToast(msg)
+  const notify = useCallback((msg: string) => setToast(msg), [])
   const fail = (e: any) => {
     const msg = String(e?.message ?? e)
     setError(msg)
@@ -434,12 +436,26 @@ export default function App() {
     }
   }
 
+  const toggleAutoApproval = async () => {
+    if (!serverSettings || busy) return
+    setBusy(true)
+    try {
+      const latest = { ...await rpc('settings.get', {}) }
+      delete latest.versions
+      const enabled = latest.auto_approve_execution !== true
+      const saved = await rpc('settings.set', { settings: { ...latest, auto_approve_execution: enabled } })
+      setServerSettings(asRecord(saved))
+      notify(saved.auto_approve_execution ? '已开启自动批准，Agent 可直接继续执行' : '已关闭自动批准，后续请求需在任务页确认')
+    } catch (e) { fail(e) } finally { setBusy(false) }
+  }
+
   const resetSettings = async () => {
     setBusy(true)
     try {
       await rpc('settings.set', {
         settings: {
           scan_mode: 'quick',
+          auto_approve_execution: true,
           scan_roots: [],
           resolver_preferences: {},
           privacy: { redact_exports: true },
@@ -626,6 +642,7 @@ export default function App() {
         )}
 
         {page === 'programs' && <Programs notify={notify} />}
+        {page === 'artifacts' && <Artifacts notify={notify} />}
 
         {page === 'tools' && (
           <>
@@ -735,7 +752,7 @@ export default function App() {
                         打开位置
                       </button>
                     </div>
-                    <div className="program-actions"><button className="btn" disabled={selected.status !== 'available'} onClick={() => void rpc('registry.prefer_instance',{id:selected.id,clear:selected.preferred===true}).then(()=>refresh('默认路径已保存，执行仍需权限')).catch(fail)}>{selected.preferred?'取消默认路径':'设为默认路径'}</button><button className="btn" onClick={() => void rpc('registry.health_instance',{id:selected.id}).then(result=>refresh(result.path_exists?'文件可读取，尚未执行验证':'路径已失效')).catch(fail)}>检查文件</button><button className="btn" disabled={selected.status !== 'available'} onClick={() => void invoke<string|null>('pick_program_path',{directory:true}).then(project=>project&&rpc('registry.prefer_instance',{id:selected.id,project})).then(()=>notify('项目默认路径已保存')).catch(fail)}>设为项目默认</button>{trustLevel(selected.trust)==='unknown'&&<button className="btn" onClick={()=>void rpc('registry.correct',{id:selected.id,trust:'user_trusted'}).then(()=>refresh('已信任此路径；执行仍需本次批准')).catch(fail)}>信任此路径</button>}{detailData?.version_probe_args&&<button className="btn" disabled={!pinnedExecutionSupported||trustLevel(selected.trust)==='unknown'||selected.status!=='available'} title={!pinnedExecutionSupported?'macOS 预览版暂不支持身份绑定执行':undefined} onClick={()=>void (async()=>{try{const params={instance_id:selected.id,args:detailData.version_probe_args,cwd:selected.path.slice(0,Math.max(selected.path.lastIndexOf('/'),selected.path.lastIndexOf('\\'))),timeout_ms:10000};const requested=await rpc('execute.approval_request',params);const approval=await rpc('execute.approve',{request_id:requested.request_id});const result=await rpc('execute.tool',{...params,approval_id:approval.approval_id,session_id:approval.session_id});if(result.status==='success')await rpc('registry.health_instance',{id:selected.id,execution_id:result.execution_id});await refresh(result.status==='success'?'版本检查运行成功':'版本检查：'+result.status)}catch(e){fail(e)}})()}>执行版本检查（本次授权）</button>}</div>
+                    <div className="program-actions"><button className="btn" disabled={selected.status !== 'available'} onClick={() => void rpc('registry.prefer_instance',{id:selected.id,clear:selected.preferred===true}).then(()=>refresh('默认路径已保存，执行仍需权限')).catch(fail)}>{selected.preferred?'取消默认路径':'设为默认路径'}</button><button className="btn" onClick={() => void rpc('registry.health_instance',{id:selected.id}).then(result=>refresh(result.path_exists?'文件可读取，尚未执行验证':'路径已失效')).catch(fail)}>检查文件</button><button className="btn" disabled={selected.status !== 'available'} onClick={() => void invoke<string|null>('pick_program_path',{directory:true}).then(project=>project&&rpc('registry.prefer_instance',{id:selected.id,project})).then(()=>notify('项目默认路径已保存')).catch(fail)}>设为项目默认</button>{trustLevel(selected.trust)==='unknown'&&<button className="btn" onClick={()=>void rpc('registry.correct',{id:selected.id,trust:'user_trusted'}).then(()=>refresh('已信任此路径；后续执行遵循自动批准设置')).catch(fail)}>信任此路径</button>}{detailData?.version_probe_args&&<button className="btn" disabled={!pinnedExecutionSupported||trustLevel(selected.trust)==='unknown'||selected.status!=='available'} title={!pinnedExecutionSupported?'macOS 预览版暂不支持身份绑定执行':undefined} onClick={()=>void (async()=>{try{const params={instance_id:selected.id,args:detailData.version_probe_args,cwd:selected.path.slice(0,Math.max(selected.path.lastIndexOf('/'),selected.path.lastIndexOf('\\'))),timeout_ms:10000};const requested=await rpc('execute.approval_request',params);const approval=await rpc('execute.approve',{request_id:requested.request_id});const result=await rpc('execute.tool',{...params,approval_id:approval.approval_id,session_id:approval.session_id});if(result.status==='success')await rpc('registry.health_instance',{id:selected.id,execution_id:result.execution_id});await refresh(result.status==='success'?'版本检查运行成功':'版本检查：'+result.status)}catch(e){fail(e)}})()}>执行版本检查（本次授权）</button>}</div>
                     {selected.health && <p className="muted">文件检查：{selected.health.path_exists?'可读取':'失效'} · {new Date(selected.health.checked_at).toLocaleString()} · {selected.health.execution_tested?'已执行验证':'尚未执行验证'}</p>}
                     <div className="tabs">
                       <button className={`tab ${detailTab === 'overview' ? 'active' : ''}`} onClick={() => setDetailTab('overview')}>
@@ -1028,6 +1045,16 @@ export default function App() {
                 <StartupSetting notify={notify} />
                 <div className="setting-row">
                   <div>
+                    <h3>自动批准工具执行</h3>
+                    <div className="muted">默认开启，Agent 调用已信任工具时自动批准，无需等待桌面确认。拒绝规则仍生效；程序收录仍需勾选。</div>
+                    {!pinnedExecutionSupported && <div className="muted">当前平台预览版暂不支持受控工具执行。</div>}
+                  </div>
+                  <button aria-label="自动批准工具执行" aria-pressed={serverSettings?.auto_approve_execution === true}
+                    className={`switch ${serverSettings?.auto_approve_execution === true ? 'on' : ''}`}
+                    disabled={busy || !serverSettings} onClick={() => void toggleAutoApproval()}><i /></button>
+                </div>
+                <div className="setting-row">
+                  <div>
                     <h3>默认扫描模式</h3>
                     <div className="muted">用于「扫描本机」按钮和启动自动扫描。</div>
                   </div>
@@ -1071,7 +1098,7 @@ export default function App() {
                 <div className="setting-row">
                   <div>
                     <h3>工具默认权限</h3>
-                    <div className="muted">适用于无更具体规则的工具；具体工具和命令规则优先。</div>
+                    <div className="muted">适用于无更具体规则的工具；具体规则优先。“询问我”在自动批准开启时自动确认，关闭后由你确认。</div>
                   </div>
                   <select
                     className="select"

@@ -6,8 +6,8 @@ mod startup_diagnostics;
 #[cfg(windows)]
 mod windows_startup_task;
 use file_icon::tool_file_icon;
-mod integration;
 mod installation;
+mod integration;
 mod market;
 use market::{market_add, market_export, market_inspect, market_list, market_pick, market_share};
 #[cfg(target_os = "macos")]
@@ -15,7 +15,9 @@ mod macos;
 mod program_picker;
 use autostart::{autostart_set, autostart_status};
 use integration::{agent_integration, agent_mcp_check};
-use program_picker::{builtin_skill_paths, pick_program_path, pick_skill_folder};
+use program_picker::{
+    builtin_skill_paths, pick_artifact_path, pick_program_path, pick_skill_folder,
+};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
@@ -217,6 +219,32 @@ fn open_program_folder(path: String) -> Result<String, String> {
     Ok(folder.to_string_lossy().into())
 }
 
+#[tauri::command]
+fn open_recycle_bin() -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        std::process::Command::new("explorer.exe")
+            .arg("shell:RecycleBinFolder")
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("/usr/bin/open")
+            .arg(
+                dirs::home_dir()
+                    .ok_or("Home directory unavailable")?
+                    .join(".Trash"),
+            )
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        return Err("System Trash is unavailable".into());
+    }
+    Ok(())
+}
 fn main() {
     let login_launch = std::env::args_os().any(|arg| arg == "--autostart");
     if login_launch {
@@ -252,7 +280,9 @@ fn main() {
             pick_program_path,
             pick_skill_folder,
             builtin_skill_paths,
-            open_program_folder
+            open_program_folder,
+            pick_artifact_path,
+            open_recycle_bin
         ])
         .run(tauri::generate_context!());
     if let Err(error) = result {

@@ -49,3 +49,14 @@ Package instructions remain untrusted data. Imports read bounded confined files;
 ## Preview platform execution boundary
 
 Windows keeps a non-writable executable handle through launch; Linux launches the held descriptor through `/proc/self/fd`. macOS preview does not yet provide an equivalent identity-preserving launch. Its managed tool execution and execution approvals return Unavailable before consuming an approval or starting a task. The executor also rejects pinned launches directly; it never retries an unpinned path. Discovery, portable Skills, MCP queries and explicit user program launches remain separate supported workflows.
+
+## Owner-approved automatic execution mode (2026-10-07)
+
+The owner requested default-on automatic approval to avoid disconnected Agent tasks waiting for desktop confirmation. This replaces the interactive wait for eligible execution requests, not tool trust or effective policy checks. Only the verified desktop can change the persistent boolean. Explicit opt-out is retained across restart and older settings imports. Discovered unknown/blocked files still cannot run, and Deny is never converted to Allow.
+
+Automatic approval is server-issued and still binds the authenticated caller, executable hash/canonical path, args, stdin, cwd, sanitized environment, timeout and current authorization revision. It is consumed once and audited through the existing pinned execution pipeline. Disabling/re-enabling the setting invalidates previous grants and expires pending requests atomically; failed saves leave authority unchanged. A caller-supplied invalid grant is never silently renewed. The setting supplies ToolHub approval within a user's task, not approval for unrelated operations or a way around Agent-host permissions. Metadata and Skill text cannot modify it. Program collection still requires user selection and save, and macOS preview still rejects controlled execution.
+
+
+## Explicit task-artifact cleanup
+
+Artifact management is a separate user-selected scope and does not change read-only tool discovery. Only explicitly registered regular files can recycle. High priority and manual retention require the verified desktop; low/medium automatic cleanup requires task completion, no-longer-needed, selected scope and a five-minute grace. Medium additionally records an Agent usage/dependency assertion; it is not a built-in model or proof of all external references. Native recycle-only failure preserves unprocessed files, never falls back to permanent deletion. See [artifact lifecycle](docs/development/ARTIFACTS.md) for limits and interruption handling.

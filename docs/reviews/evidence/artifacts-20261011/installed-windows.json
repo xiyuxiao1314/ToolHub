@@ -1,0 +1,14 @@
+{
+  "checks": [
+    "installed desktop uses production registry",
+    "existing programs and Skills remain present",
+    "enabled login startup points to new installation",
+    "desktop copied Skill includes artifact workflow and actual CLI path",
+    "installed MCP exposes all sixteen tools",
+    "no historical cleanup directories enabled automatically",
+    "real task package survives upgrade with accurate summary and complete manifest",
+    "installed artifact page renders with no errors"
+  ],
+  "errors": [],
+  "success": true
+}

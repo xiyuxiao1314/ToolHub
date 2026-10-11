@@ -27,18 +27,15 @@ impl RpcClient {
         if let Ok(stream) = LocalStream::connect(daemon) {
             return Ok(stream);
         }
-        let mut command = std::process::Command::new(daemon);
-        command
+        #[cfg(windows)]
+        let mut child = super::background_child::BackgroundChild::spawn(daemon)?;
+        #[cfg(not(windows))]
+        let mut child = std::process::Command::new(daemon)
             .arg("--listen")
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null());
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x08000000);
-        }
-        let mut child = command.spawn()?;
+            .stderr(std::process::Stdio::null())
+            .spawn()?;
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
             if let Ok(mut stream) = LocalStream::connect(daemon) {

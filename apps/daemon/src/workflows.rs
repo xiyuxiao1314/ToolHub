@@ -2,47 +2,48 @@ use super::execution_jobs::{invalid, policy_action, policy_scope, text};
 use super::*;
 
 pub(super) fn is_extended(name: &str) -> bool {
-    matches!(
-        name,
-        "protocol.negotiate"
-            | "capability.list"
-            | "registry.correct"
-            | "scan.cancel"
-            | "import.report"
-            | "execute.approval_request"
-            | "execute.approvals"
-            | "skill.register"
-            | "settings.get"
-            | "settings.set"
-            | "resource.list"
-            | "resource.activate"
-            | "resource.rollback"
-            | "update.verify"
-            | "update.apply"
-            | "update.cancel"
-            | "agent.launch"
-            | "agent.status"
-            | "agent.cancel"
-            | "credentials.set"
-            | "credentials.clear"
-            | "credentials.status"
-            | "credentials.session"
-            | "events.subscribe"
-            | "events.poll"
-            | "events.unsubscribe"
-            | "program.search"
-            | "program.propose"
-            | "program.proposals"
-            | "program.proposal_dismiss"
-            | "program.list"
-            | "program.scan_start"
-            | "program.scan_status"
-            | "program.scan_cancel"
-            | "program.select"
-            | "program.save"
-            | "program.remove"
-            | "program.launch"
-    )
+    name.starts_with("artifact.")
+        || matches!(
+            name,
+            "protocol.negotiate"
+                | "capability.list"
+                | "registry.correct"
+                | "scan.cancel"
+                | "import.report"
+                | "execute.approval_request"
+                | "execute.approvals"
+                | "skill.register"
+                | "settings.get"
+                | "settings.set"
+                | "resource.list"
+                | "resource.activate"
+                | "resource.rollback"
+                | "update.verify"
+                | "update.apply"
+                | "update.cancel"
+                | "agent.launch"
+                | "agent.status"
+                | "agent.cancel"
+                | "credentials.set"
+                | "credentials.clear"
+                | "credentials.status"
+                | "credentials.session"
+                | "events.subscribe"
+                | "events.poll"
+                | "events.unsubscribe"
+                | "program.search"
+                | "program.propose"
+                | "program.proposals"
+                | "program.proposal_dismiss"
+                | "program.list"
+                | "program.scan_start"
+                | "program.scan_status"
+                | "program.scan_cancel"
+                | "program.select"
+                | "program.save"
+                | "program.remove"
+                | "program.launch"
+        )
 }
 impl DaemonService {
     pub(super) fn correct_instance(&mut self, params: &Value) -> Result<Value, ProtocolError> {
@@ -107,6 +108,7 @@ impl DaemonService {
     ) -> Result<Value, ProtocolError> {
         match name {
             name if name.starts_with("program.") => self.dispatch_program(name, params),
+            name if name.starts_with("artifact.") => self.dispatch_artifact(name, params),
             "scan.cancel" => self.cancel_scan(params),
             "capability.list" => {
                 let registry = self.resources.capabilities();
@@ -411,8 +413,23 @@ impl DaemonService {
         )?;
         Ok(json!({"ok":true}))
     }
+    pub(super) fn auto_approve_execution(&mut self) -> Result<bool, ProtocolError> {
+        let settings = self
+            .registry
+            .get_setting("user_preferences")
+            .map_err(db_err)?;
+        match settings
+            .as_ref()
+            .and_then(|s| s.get("auto_approve_execution"))
+        {
+            None => Ok(true),
+            Some(Value::Bool(enabled)) => Ok(*enabled),
+            Some(_) => Err(invalid("auto_approve_execution must be boolean")),
+        }
+    }
     fn settings(&mut self) -> Result<Value, ProtocolError> {
         let mut settings=self.registry.get_setting("user_preferences").map_err(db_err)?.unwrap_or_else(||json!({"scan_mode":"quick","scan_roots":[],"resolver_preferences":{},"privacy":{"redact_exports":true}}));
+        settings["auto_approve_execution"] = json!(self.auto_approve_execution()?);
         settings["versions"] = json!({"app":env!("CARGO_PKG_VERSION"),"core":env!("CARGO_PKG_VERSION"),"protocol":toolhub_protocol::PROTOCOL_VERSION,"resources":self.resources.list().iter().map(|p|p.version.clone()).collect::<Vec<_>>()});
         Ok(settings)
     }
@@ -425,10 +442,21 @@ impl DaemonService {
         for key in object.keys() {
             if !matches!(
                 key.as_str(),
-                "scan_mode" | "scan_roots" | "resolver_preferences" | "privacy" | "extensions"
+                "scan_mode"
+                    | "scan_roots"
+                    | "resolver_preferences"
+                    | "privacy"
+                    | "extensions"
+                    | "auto_approve_execution"
             ) {
                 return Err(invalid("unsupported or secret setting"));
             }
+        }
+        if settings
+            .get("auto_approve_execution")
+            .is_some_and(|v| !v.is_boolean())
+        {
+            return Err(invalid("auto_approve_execution must be boolean"));
         }
         if let Some(mode) = settings.get("scan_mode") {
             if !matches!(mode.as_str(), Some("quick" | "full" | "custom")) {
@@ -489,10 +517,35 @@ impl DaemonService {
                     .map_err(|_| invalid("invalid scanner extension"))?;
             }
         }
-        self.registry
-            .set_setting("user_preferences", settings)
-            .map_err(db_err)?;
-        self.event("settings", "nonsecret preferences saved", json!({}))?;
+        // Preserve an explicit opt-out when older clients/imports omit the new setting.
+        let previous_auto = self.auto_approve_execution()?;
+        let mut saved = settings.clone();
+        let enabled = saved["auto_approve_execution"]
+            .as_bool()
+            .unwrap_or(previous_auto);
+        saved["auto_approve_execution"] = json!(enabled);
+        let encoded = serde_json::to_string(&saved).map_err(json_err)?;
+        let tx = self.registry.db.conn.transaction().map_err(sql_err)?;
+        tx.execute("INSERT INTO settings(key,value_json) VALUES('user_preferences',?1) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json", [encoded]).map_err(sql_err)?;
+        if enabled != previous_auto {
+            tx.execute(
+                "UPDATE execution_requests SET status='expired' WHERE status IN ('pending','approved')",
+                [],
+            )
+            .map_err(sql_err)?;
+            // Turning the setting off/on must not resurrect earlier one-use grants.
+            tx.execute(
+                "UPDATE authorization_revision SET revision=revision+1 WHERE id=1",
+                [],
+            )
+            .map_err(sql_err)?;
+        }
+        tx.commit().map_err(sql_err)?;
+        self.event(
+            "settings",
+            "nonsecret preferences saved",
+            json!({"auto_approve_execution":enabled}),
+        )?;
         self.settings()
     }
     pub(super) fn register_skill(&mut self, params: &Value) -> Result<Value, ProtocolError> {
