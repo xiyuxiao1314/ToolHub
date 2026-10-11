@@ -710,7 +710,7 @@ export default function App() {
                     {!prefs.showHidden && inventoryCounts.unavailable > 0 && ` 已隐藏 ${inventoryCounts.unavailable} 个不可用实例。`}
                   </div>
                 </div>
-                <ToolsList key={JSON.stringify([query.trim(), cat, prefs.showHidden, grouped])} items={shown} grouped={grouped} selected={selected} onSelect={setSelected} loading={loading} tags={toolTags} tagClass={tagClass} trustLabel={trustLabel} badge={item => <StatusBadge text={item.status === 'available' ? '已安装' : item.status === 'missing' ? '不可用' : String(item.status ?? '未知')} tone={item.status === 'available' ? 'ok' : 'warn'} />} />
+                <ToolsList key={JSON.stringify([query.trim(), cat, prefs.showHidden, grouped])} items={shown} grouped={grouped} selected={selected} onSelect={setSelected} loading={loading} tags={toolTags} tagClass={tagClass} trustLabel={trustLabel} badge={item => <StatusBadge text={item.status === 'available' ? '已安装' : item.status === 'extension_disabled' ? '扩展已停用' : item.status === 'missing' ? '不可用' : String(item.status ?? '未知')} tone={item.status === 'available' ? 'ok' : 'warn'} />} />
               </div>
 
               <aside className="card card-pad">
@@ -727,7 +727,7 @@ export default function App() {
                         </h2>
                         <div className="muted">{String(selected.definition_id ?? '')}</div>
                         <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <StatusBadge text={selected.status === 'available' ? '已安装' : String(selected.status ?? '')} />
+                          <StatusBadge text={selected.status === 'available' ? '已安装' : selected.status === 'extension_disabled' ? '扩展已停用' : String(selected.status ?? '')} />
                           <StatusBadge text={trustLabel(selected.trust)} tone={trustLevel(selected.trust) === 'known' ? 'ok' : 'muted'} />
                         </div>
                       </div>

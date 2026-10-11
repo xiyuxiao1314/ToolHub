@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-extension-export"
+description = "Enables the extension_export command without any pre-configured scope."
+commands.allow = ["extension_export"]
+
+[[permission]]
+identifier = "deny-extension-export"
+description = "Denies the extension_export command without any pre-configured scope."
+commands.deny = ["extension_export"]

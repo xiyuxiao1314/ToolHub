@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-extension-pick"
+description = "Enables the extension_pick command without any pre-configured scope."
+commands.allow = ["extension_pick"]
+
+[[permission]]
+identifier = "deny-extension-pick"
+description = "Denies the extension_pick command without any pre-configured scope."
+commands.deny = ["extension_pick"]

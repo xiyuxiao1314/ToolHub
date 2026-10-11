@@ -11,7 +11,7 @@ foreach ($binaryName in @('toolhub.exe','toolhubd.exe','toolhub-desktop.exe')) {
 }
 New-Item -ItemType Directory -Path $packagePath -Force | Out-Null
 foreach ($binaryName in @('toolhub.exe','toolhubd.exe','toolhub-desktop.exe')) { Copy-Item -LiteralPath (Join-Path $binaryRoot $binaryName) -Destination $packagePath }
-foreach ($assetName in @('schemas','resources','skills')) { if (Test-Path -LiteralPath (Join-Path $projectRoot $assetName)) { Copy-Item -LiteralPath (Join-Path $projectRoot $assetName) -Destination (Join-Path $packagePath $assetName) -Recurse } }
+foreach ($assetName in @('schemas','resources','skills','extensions')) { if (Test-Path -LiteralPath (Join-Path $projectRoot $assetName)) { Copy-Item -LiteralPath (Join-Path $projectRoot $assetName) -Destination (Join-Path $packagePath $assetName) -Recurse } }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install-local.ps1') -Destination $packagePath
 Copy-Item -LiteralPath (Join-Path $projectRoot 'docs\development\PACKAGE.md') -Destination (Join-Path $packagePath 'README.md')
 $versionOutput = & (Join-Path $packagePath 'toolhub.exe') '--version'

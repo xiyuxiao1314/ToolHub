@@ -16,6 +16,9 @@ pub fn validate_method_params(request: &JsonRpcRequest) -> Result<(), ProtocolEr
             .as_object()
             .ok_or_else(|| invalid("named object params required".into()))?
     };
+    if request.method.starts_with("extension.") {
+        return validate_extension(&request.method, params);
+    }
     if request.method.starts_with("artifact.") {
         return validate_artifact(&request.method, params);
     }
@@ -365,4 +368,51 @@ mod artifact_validation_tests {
         ))
         .is_ok());
     }
+}
+
+fn validate_extension(
+    method: &str,
+    p: &serde_json::Map<String, Value>,
+) -> Result<(), ProtocolError> {
+    let fail = || ProtocolError::new(ErrorCode::InvalidParams, "invalid extension parameters");
+    let keys: &[&str] = match method {
+        "extension.list" => &[],
+        "extension.preview" => &["package"],
+        "extension.install" => &["package", "digest", "expected_digest", "source"],
+        "extension.set_enabled" => &["id", "enabled", "expected_digest"],
+        "extension.remove" | "extension.rollback" => &["id", "expected_digest"],
+        _ => return Err(fail()),
+    };
+    if p.keys().any(|k| !keys.contains(&k.as_str())) {
+        return Err(fail());
+    }
+    if keys.contains(&"package")
+        && !p
+            .get("package")
+            .is_some_and(|v| v.is_object() && v.to_string().len() <= 262144)
+    {
+        return Err(fail());
+    }
+    for key in ["id", "digest", "expected_digest", "source"] {
+        if p.get(key).is_some_and(|v| {
+            !v.as_str().is_some_and(|s| {
+                !s.is_empty() && s.len() <= 256 && !s.chars().any(char::is_control)
+            })
+        }) {
+            return Err(fail());
+        }
+    }
+    if keys.contains(&"id") && !p.contains_key("id") {
+        return Err(fail());
+    }
+    if keys.contains(&"enabled") && !p.get("enabled").is_some_and(Value::is_boolean) {
+        return Err(fail());
+    }
+    if method == "extension.install" && !p.contains_key("digest") {
+        return Err(fail());
+    }
+    if keys.contains(&"id") && !p.contains_key("expected_digest") {
+        return Err(fail());
+    }
+    Ok(())
 }

@@ -9,6 +9,8 @@ use file_icon::tool_file_icon;
 mod installation;
 mod integration;
 mod market;
+mod extensions;
+use extensions::{extension_catalog, extension_pick, extension_export};
 use market::{market_add, market_export, market_inspect, market_list, market_pick, market_share};
 #[cfg(target_os = "macos")]
 mod macos;
@@ -264,6 +266,9 @@ fn main() {
             autostart_set,
             agent_integration,
             agent_mcp_check,
+            extension_catalog,
+            extension_pick,
+            extension_export,
             market_list,
             market_pick,
             market_inspect,

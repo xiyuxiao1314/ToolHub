@@ -23,13 +23,16 @@ license_cache.mkdir()
 collect(root,license_cache)
 
 def copy_assets(destination, desktop=True):
-    for name in ['schemas','resources','skills']:
+    for name in ['schemas','resources','skills','extensions']:
         source=root/name
         if source.is_dir(): shutil.copytree(source,destination/name)
     for name in ['LICENSE','NOTICE','README.md','README.en.md']:
         shutil.copy2(root/name,destination/name)
     (destination/'docs/development').mkdir(parents=True,exist_ok=True)
-    shutil.copy2(root/'docs/development/ARTIFACTS.md',destination/'docs/development/ARTIFACTS.md')
+    for doc in ['ARTIFACTS.md','EXTENSIONS.md']:
+        shutil.copy2(root/'docs/development'/doc,destination/'docs/development'/doc)
+    (destination/'docs/images').mkdir(parents=True,exist_ok=True)
+    shutil.copy2(root/'docs/images/extensions-manager.png',destination/'docs/images/extensions-manager.png')
     shutil.copytree(license_cache/'THIRD-PARTY-LICENSES',destination/'THIRD-PARTY-LICENSES')
     shutil.copy2(license_cache/'DEPENDENCIES.json',destination/'DEPENDENCIES.json')
     shutil.copy2(root/'docs/releases'/('v'+version+'.md'),destination/'RELEASE-NOTES.md')

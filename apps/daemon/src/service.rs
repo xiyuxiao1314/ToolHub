@@ -11,6 +11,8 @@ mod agent_diagnostics;
 mod artifacts;
 #[path = "execution_jobs.rs"]
 mod execution_jobs;
+#[path = "extensions.rs"]
+mod extensions;
 #[path = "inventory.rs"]
 mod inventory;
 #[path = "managed_tasks.rs"]
@@ -295,7 +297,7 @@ impl DaemonService {
                     .ok_or_else(|| {
                         ProtocolError::new(ErrorCode::InvalidParams, "capability required")
                     })?;
-                let reg = self.resources.capabilities();
+                let reg = self.extension_capabilities()?;
                 let canonical = reg
                     .canonical_of(cap)
                     .ok_or_else(|| {
@@ -619,8 +621,74 @@ impl DaemonService {
     ) -> Result<(), ProtocolError> {
         let mut instances = Vec::new();
         let mut candidates = Vec::new();
+        let extension_rules = self
+            .extension_packages(true)?
+            .into_iter()
+            .flat_map(|(p, _, _)| p.rules())
+            .collect::<Vec<_>>();
         for cand in &report.candidates {
-            let rec = toolhub_recognizer::recognize_with_resources(cand, &self.resources);
+            let rec = self.recognize_extensions(cand, &extension_rules)?;
+            if rec.ambiguity.as_deref() == Some("existing native record retained") {
+                let key = toolhub_recognizer::stable_instance_id(
+                    cand.canonical_path.as_deref().unwrap_or(&cand.path),
+                );
+                let row = self
+                    .registry
+                    .get_instance(&key)
+                    .map_err(db_err)?
+                    .ok_or_else(|| {
+                        ProtocolError::new(
+                            ErrorCode::NotFound,
+                            "preserved native record disappeared",
+                        )
+                    })?;
+                let (origin, owner, trust): (String, String, String) = self
+                    .registry
+                    .db
+                    .conn
+                    .query_row(
+                        "SELECT origin_json,owner_json,trust_json FROM tool_instances WHERE id=?1",
+                        [&key],
+                        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                    )
+                    .map_err(sql_err)?;
+                let capabilities = self
+                    .registry
+                    .capabilities_for_definition(&row.definition_id)
+                    .map_err(db_err)?;
+                instances.push(toolhub_registry::ScanInstanceInput {
+                    instance: UpsertInstanceInput {
+                        id: row.id,
+                        definition_id: row.definition_id,
+                        definition_name: row.name,
+                        version: row.version,
+                        platform: row.platform,
+                        arch: row.arch,
+                        path: row.path,
+                        canonical_path: row.canonical_path,
+                        environment_id: row.environment_id,
+                        origin_json: origin,
+                        owner_json: owner,
+                        trust_json: trust,
+                        status: row.status,
+                        capabilities,
+                    },
+                    evidence: vec![],
+                    interfaces: vec![],
+                    provider: "custom".into(),
+                    root: report
+                        .coverage
+                        .scopes
+                        .iter()
+                        .find(|scope| {
+                            toolhub_core::normalize_path(&cand.path)
+                                .starts_with(&toolhub_core::normalize_path(&scope.root))
+                        })
+                        .map(|s| s.root.clone())
+                        .unwrap_or_default(),
+                });
+                continue;
+            }
             if let (Some(def), Some(inst)) = (rec.definition.as_ref(), rec.instance.as_ref()) {
                 let env_id = self.env_graph.ensure_detected(&inst.path);
                 let owner = toolhub_environment::attribute_owner(&inst.path);

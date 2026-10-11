@@ -219,6 +219,24 @@
           "markdownDescription": "Enables the default_export_path_string command without any pre-configured scope."
         },
         {
+          "description": "Enables the extension_catalog command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-extension-catalog",
+          "markdownDescription": "Enables the extension_catalog command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the extension_export command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-extension-export",
+          "markdownDescription": "Enables the extension_export command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the extension_pick command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-extension-pick",
+          "markdownDescription": "Enables the extension_pick command without any pre-configured scope."
+        },
+        {
           "description": "Enables the market_add command without any pre-configured scope.",
           "type": "string",
           "const": "allow-market-add",
@@ -355,6 +373,24 @@
           "type": "string",
           "const": "deny-default-export-path-string",
           "markdownDescription": "Denies the default_export_path_string command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the extension_catalog command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-extension-catalog",
+          "markdownDescription": "Denies the extension_catalog command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the extension_export command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-extension-export",
+          "markdownDescription": "Denies the extension_export command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the extension_pick command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-extension-pick",
+          "markdownDescription": "Denies the extension_pick command without any pre-configured scope."
         },
         {
           "description": "Denies the market_add command without any pre-configured scope.",

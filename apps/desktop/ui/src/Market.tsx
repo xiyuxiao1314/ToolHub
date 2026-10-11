@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { copyText } from './AgentHelp'
+import Extensions from './Extensions'
 
 type Requirement = { requirement: { capability: string; version?: string }; satisfied: boolean; provider?: string; note?: string }
 type Entry = { key: string; digest: string; source: string; bundle: { version: string; category: string; tags: string[]; author: string; license: string; instructions: string; manifest: any }; compatibility: { reusable: boolean; status: string; issues: string[] }; dependencies?: { status: string; requires: Requirement[]; optional: Requirement[] }; collection?: { status: string }; checkError?: string }
@@ -10,7 +11,12 @@ const permissions: Record<string, string> = { read_files: '读取文件', write_
 const icons: Record<string, string> = { media: '▶', document: '≡', archive: '▣', data: '⌗', general: '↗' }
 const labels: Record<string, string> = { available: '依赖齐备', missing_capabilities: '依赖待处理', unsupported_platform: '当前平台不适用', needs_review: '声明待核对', host_specific: '宿主专属', malformed: '格式有误' }
 
-export default function Market({ notify, onLibrary, onTools, onAddTool }: { notify: (message: string) => void; onLibrary: () => void; onTools: () => void; onAddTool: () => void }) {
+type MarketProps = { notify: (message: string) => void; onLibrary: () => void; onTools: () => void; onAddTool: () => void }
+export default function Market(props: MarketProps) {
+  const [tab, setTab] = useState<'skills' | 'extensions'>('skills')
+  return <><div className="extension-tabs" role="tablist" aria-label="市场分类"><button role="tab" aria-selected={tab === 'skills'} className={'chip ' + (tab === 'skills' ? 'active' : '')} onClick={() => setTab('skills')}>能力包目录</button><button role="tab" aria-selected={tab === 'extensions'} className={'chip ' + (tab === 'extensions' ? 'active' : '')} onClick={() => setTab('extensions')}>扩展管理</button></div>{tab === 'skills' ? <CapabilityMarket {...props}/> : <Extensions notify={props.notify} onTools={props.onTools} onLibrary={props.onLibrary}/>}</>
+}
+function CapabilityMarket({ notify, onLibrary, onTools, onAddTool }: MarketProps) {
   const [entries, setEntries] = useState<Entry[]>([])
   const [detail, setDetail] = useState<Entry | null>(null)
   const [selected, setSelected] = useState('')

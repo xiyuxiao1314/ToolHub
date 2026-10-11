@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+toolhub-recognizer = { workspace = true }
 toolhub-resolver = { workspace = true }
 toolhub-core = { workspace = true }
 serde = { workspace = true }

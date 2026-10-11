@@ -1,6 +1,7 @@
 //! Skill parsing and capability availability (never installs tool dependencies).
 
 pub mod bundle;
+pub mod extension;
 use toolhub_core::{SkillManifest, SkillRequirement};
 
 #[derive(Debug, Clone, serde::Serialize)]

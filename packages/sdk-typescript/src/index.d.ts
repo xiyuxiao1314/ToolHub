@@ -20,7 +20,21 @@ export interface ProgramEntry extends ProgramCandidate { metadata?:ProgramMetada
 export interface ProgramSelection extends Omit<ProgramCandidate,'id'> { selection_id:string; args:string[]; favorite:boolean; }
 export interface ProgramDraft { metadata?:ProgramMetadata; id?:string; selection_id?:string; cwd_selection_id?:string; name:string; command:string; args:string[]; favorite:boolean; }
 export interface ProgramScan { id?:string; status:'idle'|'running'|'completed'|'partial'|'cancelled'|'failed'; roots?:string[]; roots_attempted?:string[]; visited?:number; skipped?:number; unreadable?:number; current?:string; limitations?:string[]; total:number; candidates:ProgramCandidate[]; }
+export interface ExtensionPackage {
+ schema:'toolhub.extension/v1'; id:string; name:string; version:string; description:string;
+ author:string; license:string; platforms:('windows'|'macos'|'linux')[]; min_toolhub_version:string;
+ recognition?:{schema:'toolhub.resource/v1';name:string;version:string;kind:'recognition';capabilities:string[];tools:{definition_id:string;name:string;vendor:string;file_names:string[];path_substrings?:string[];capabilities:string[]}[]};
+ skills?:Json[];
+}
+export interface ExtensionRecord {package:ExtensionPackage;digest:string;enabled:boolean;source:string;can_rollback:boolean;installed_at:string;updated_at:string;}
+export interface ExtensionPreview {package:ExtensionPackage;digest:string;compatible:boolean;conflict:string|null;installed_digest:string|null;dependencies:Json[];permissions:string[];instruction_authority:false;}
 export interface MethodMap {
+ 'extension.list':{params:{};result:ExtensionRecord[]};
+ 'extension.preview':{params:{package:ExtensionPackage};result:ExtensionPreview};
+ 'extension.install':{params:{package:ExtensionPackage;digest:string;expected_digest?:string;source?:'local'|'builtin'};result:Json};
+ 'extension.set_enabled':{params:{id:string;enabled:boolean;expected_digest:string};result:Json};
+ 'extension.remove':{params:{id:string;expected_digest:string};result:Json};
+ 'extension.rollback':{params:{id:string;expected_digest:string};result:Json};
  'execute.approval_status':{params:{request_id:string};result:ApprovalStatus};
  'agent.observed':{params:{name:string;stage:'handshake'|'call'};result:Json};
  'registry.prefer_instance':{params:{id:string;clear?:boolean;project?:string};result:Json};
@@ -129,7 +143,21 @@ export type ArtifactPriority = 'low'|'medium'|'high';
 export interface ArtifactRoot { id:string; path:string; enabled:boolean; }
 export interface ArtifactFile { relative_path:string; bytes:number; sha256:string; modified_ns:string; status:'present'|'trashed'|'released'; error:string|null; }
 export interface ArtifactPackage { id:string; name:string; task:string; source:string; owner:string; root:string; priority:ArtifactPriority; retained:boolean; status:'active'|'scheduled'|'needs_review'|'retained'|'awaiting_scope'|'recycling'|'trashed'|'blocked'|'partial'|'released'; files:ArtifactFile[]; completed:boolean; no_longer_needed:boolean; cleanup_after:number|null; reason:string; reviewer:string|null; created_at:string; updated_at:string; }
+export interface ExtensionPackage {
+ schema:'toolhub.extension/v1'; id:string; name:string; version:string; description:string;
+ author:string; license:string; platforms:('windows'|'macos'|'linux')[]; min_toolhub_version:string;
+ recognition?:{schema:'toolhub.resource/v1';name:string;version:string;kind:'recognition';capabilities:string[];tools:{definition_id:string;name:string;vendor:string;file_names:string[];path_substrings?:string[];capabilities:string[]}[]};
+ skills?:Json[];
+}
+export interface ExtensionRecord {package:ExtensionPackage;digest:string;enabled:boolean;source:string;can_rollback:boolean;installed_at:string;updated_at:string;}
+export interface ExtensionPreview {package:ExtensionPackage;digest:string;compatible:boolean;conflict:string|null;installed_digest:string|null;dependencies:Json[];permissions:string[];instruction_authority:false;}
 export interface MethodMap {
+ 'extension.list':{params:{};result:ExtensionRecord[]};
+ 'extension.preview':{params:{package:ExtensionPackage};result:ExtensionPreview};
+ 'extension.install':{params:{package:ExtensionPackage;digest:string;expected_digest?:string;source?:'local'|'builtin'};result:Json};
+ 'extension.set_enabled':{params:{id:string;enabled:boolean;expected_digest:string};result:Json};
+ 'extension.remove':{params:{id:string;expected_digest:string};result:Json};
+ 'extension.rollback':{params:{id:string;expected_digest:string};result:Json};
  'artifact.roots':{params:{};result:ArtifactRoot[]};
  'artifact.root_add':{params:{path:string};result:ArtifactRoot[]};
  'artifact.root_disable':{params:{id:string};result:{disabled:boolean}};

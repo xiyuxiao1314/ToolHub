@@ -534,6 +534,13 @@ pub fn recognize_with_resources(
     candidate: &ScanCandidate,
     store: &resources::ResourceStore,
 ) -> RecognitionResult {
+    recognize_with_rules(candidate, &store.rules())
+}
+
+pub fn recognize_with_rules(
+    candidate: &ScanCandidate,
+    rules: &[resources::ResourceTool],
+) -> RecognitionResult {
     if is_shell_completion_path(&candidate.path)
         || is_directory_install_location(candidate)
         || is_windows_store_alias(candidate)
@@ -548,11 +555,13 @@ pub fn recognize_with_resources(
         };
     }
     let file = candidate.file_name.as_deref().unwrap_or("");
-    let Some(rule) = store
-        .rules()
-        .into_iter()
-        .find(|r| r.file_names.iter().any(|n| n.eq_ignore_ascii_case(file)))
-    else {
+    let Some(rule) = rules.iter().cloned().find(|r| {
+        r.file_names.iter().any(|n| n.eq_ignore_ascii_case(file))
+            && (r.path_substrings.is_empty()
+                || r.path_substrings
+                    .iter()
+                    .any(|p| candidate.path.to_lowercase().contains(&p.to_lowercase())))
+    }) else {
         return recognize(candidate);
     };
     let native = native_metadata::read(Path::new(&candidate.path));

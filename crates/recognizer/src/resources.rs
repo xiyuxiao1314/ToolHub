@@ -35,7 +35,7 @@ pub fn load_package(path: &Path) -> Result<ResourcePackage, ResourceError> {
     Ok(pkg)
 }
 
-fn validate(pkg: &ResourcePackage) -> Result<(), ResourceError> {
+pub fn validate(pkg: &ResourcePackage) -> Result<(), ResourceError> {
     if pkg.schema != "toolhub.resource/v1" {
         return Err(ResourceError::Incompatible(pkg.schema.clone()));
     }

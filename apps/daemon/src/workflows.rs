@@ -2,7 +2,8 @@ use super::execution_jobs::{invalid, policy_action, policy_scope, text};
 use super::*;
 
 pub(super) fn is_extended(name: &str) -> bool {
-    name.starts_with("artifact.")
+    name.starts_with("extension.")
+        || name.starts_with("artifact.")
         || matches!(
             name,
             "protocol.negotiate"
@@ -107,11 +108,12 @@ impl DaemonService {
         params: &Value,
     ) -> Result<Value, ProtocolError> {
         match name {
+            name if name.starts_with("extension.") => self.dispatch_extension(name, params),
             name if name.starts_with("program.") => self.dispatch_program(name, params),
             name if name.starts_with("artifact.") => self.dispatch_artifact(name, params),
             "scan.cancel" => self.cancel_scan(params),
             "capability.list" => {
-                let registry = self.resources.capabilities();
+                let registry = self.extension_capabilities()?;
                 Ok(json!(registry
                     .list_canonical()
                     .into_iter()
@@ -588,6 +590,15 @@ impl DaemonService {
                 }
             }
         }
+        if self
+            .extension_packages(false)?
+            .iter()
+            .any(|(p, _, _)| p.skills.iter().any(|s| s.manifest.id == parsed.id))
+        {
+            return Err(invalid(
+                "Skill ID belongs to an extension; existing content preserved",
+            ));
+        }
         let root = source.as_ref().and_then(|s| s.parent());
         let instructions = Self::read_skill_instructions(&parsed, root);
         let compatibility =
@@ -639,6 +650,16 @@ impl DaemonService {
     }
     pub(super) fn resolve_skill(&mut self, params: &Value) -> Result<Value, ProtocolError> {
         let id = text(params, "id")?;
+        if let Some((owner, bundle)) = self.extension_skill(id)? {
+            let mut view = self.skill_view(
+                &bundle.manifest,
+                json!(bundle.manifest),
+                Some(bundle.instructions.clone()),
+                params,
+            )?;
+            view["extension_id"] = json!(owner);
+            return Ok(view);
+        }
         let row = self
             .registry
             .list_skills()
@@ -685,7 +706,7 @@ impl DaemonService {
     ) -> Result<Value, ProtocolError> {
         let id = skill.id.as_str();
         let mut providers = BTreeMap::new();
-        let capabilities = self.resources.capabilities();
+        let capabilities = self.extension_capabilities()?;
         for requirement in skill.requires.iter().chain(&skill.optional) {
             let cap = capabilities
                 .canonical_of(requirement.capability.as_str())
@@ -763,6 +784,14 @@ impl DaemonService {
                     json!({"status":"malformed","reusable":false,"issues":["历史条目格式不完整"]}),
                 );
             list.push(json!({"id":id,"name":name,"schema":schema,"manifest":m,"compatibility":compatibility}));
+        }
+        for (owner, bundle) in self.extension_skills()? {
+            let manifest = &bundle.manifest;
+            let view = self.resolve_skill(&json!({"id":manifest.id}))?;
+            list.push(
+                json!({"id":manifest.id,"name":manifest.name,"schema":manifest.schema,
+                "manifest":manifest,"compatibility":view["compatibility"],"extension_id":owner}),
+            );
         }
         Ok(json!(list))
     }

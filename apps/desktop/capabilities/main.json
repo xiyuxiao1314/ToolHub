@@ -29,6 +29,9 @@
     "allow-market-inspect",
     "allow-market-add",
     "allow-market-share",
-    "allow-market-export"
+    "allow-market-export",
+    "allow-extension-catalog",
+    "allow-extension-pick",
+    "allow-extension-export"
   ]
 }

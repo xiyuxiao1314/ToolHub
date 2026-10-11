@@ -892,3 +892,16 @@ pre { max-width: 100%; overflow: auto; }
 .tool-browser .tool-group .tool-item { flex-shrink: 0; }
 .tool-browser .tool-group { margin-bottom: 0; }
 .tool-browser .tool-groups { display: flex; flex-direction: column; gap: 10px; }
+
+/* Declarative extension management follows the existing market layout. */
+.extension-tabs { display:flex; gap:8px; padding:20px 28px 0; }
+.extension-manage { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 20px; }
+.extension-remove { color:#c83540; }
+.extension-digest { display:block; overflow-wrap:anywhere; font-size:11px; color:var(--muted); }
+.extension-rule { border-bottom:1px solid var(--line); padding:12px 0; }
+.extension-skill { border:1px solid var(--line); border-radius:12px; padding:14px; margin:12px 0; }
+.extension-skill summary { cursor:pointer; font-weight:600; }
+.extension-instructions { white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; line-height:1.7; max-height:360px; overflow:auto; background:var(--bg); padding:12px; border-radius:8px; }
+.extension-confirm { width:min(520px,calc(100vw - 48px)); margin:auto; }
+
+.extension-modal-overlay { position:fixed; inset:0; z-index:1000; display:flex; padding:24px; background:rgba(15,23,42,.42); }

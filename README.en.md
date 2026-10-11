@@ -106,6 +106,8 @@ A shared Skill describes a procedure that different agents can understand, such 
 
 The market is currently a local catalog shipped with the application. You can import, preview, add and share `.toolhub-skill.json` packages. Bundled packages cover media processing, image conversion/OCR, PDF text/OCR, document conversion, archive extraction and CSV checks. There is no online community index, account system, paid content or automatic dependency installation yet.
 
+The development version adds declarative extensions: preview/import, install, enable/disable, update, rollback and uninstall. Independent JSON recognition rules and portable Skills add capabilities without source changes. See [extension development and usage](docs/development/EXTENSIONS.md).
+
 ## Downloads and platform support
 
 The current open-source preview is **v0.3.0-beta.2**. Download files from the Assets section of [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.2).

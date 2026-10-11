@@ -10,6 +10,12 @@ client.call('unknown.method',{});
 // @ts-expect-error args are string array
 client.execute({instance_id:'fixture',args:[42]});
 void resolve;void execute;
+client.call('extension.list',{}).then(rows=>{const enabled:boolean=rows[0].enabled;void enabled;});
+client.call('extension.set_enabled',{id:'community.blender',enabled:false,expected_digest:'fixture'});
+// @ts-expect-error extension changes must pin the current digest
+client.call('extension.set_enabled',{id:'community.blender',enabled:false});
+// @ts-expect-error enabled is boolean
+client.call('extension.set_enabled',{id:'community.blender',enabled:'false',expected_digest:'fixture'});
 
 const background = client.execute({instance_id:"fixture",args:[],background:true});
 background.then(result => { if(result.status === "running") { const id:string=result.execution_id;void id; } });

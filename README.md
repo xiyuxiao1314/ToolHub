@@ -114,6 +114,8 @@ Windows 的“自动批准工具执行”默认开启：已信任且策略允许
 
 市场当前是随应用发布的本地能力包目录，可导入、预览、收录和分享 `.toolhub-skill.json`。内置包涉及媒体压缩/探测、音频提取、图片转换、PDF 文本/OCR、文档转换、归档解压和 CSV 数据检查。市场尚无在线社区索引、账号、付费内容或自动安装依赖。
 
+开发版新增声明式扩展管理：导入、预览、安装、启停、版本更新、回滚与卸载，使用独立 JSON 识别规则和通用 Skill 扩展能力，无需修改源码。参见 [扩展开发与使用说明](docs/development/EXTENSIONS.md)。
+
 ## 下载与平台支持
 
 当前开源预览版为 **v0.3.0-beta.2**。所有文件在 [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.2) 的 Assets 中下载。

@@ -75,6 +75,7 @@ pub struct ToolInstance {
 #[serde(rename_all = "snake_case")]
 pub enum InstanceStatus {
     Available,
+    ExtensionDisabled,
     Missing,
     Blocked,
     Unknown,
