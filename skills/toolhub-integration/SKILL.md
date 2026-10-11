@@ -15,7 +15,7 @@ description: 在本机任务需要已有命令行工具、运行环境或实用�
 
 MiMo / mimocode 使用用户目录下 `.config/mimocode/mimocode.jsonc` 的 `mcp.toolhub`：`{"type":"local","command":["<本机 CLI 绝对路径>","mcp","serve"],"enabled":true}`。它的 command 是数组，不使用通用 JSON 的 command 字符串与 args 分离格式；合并时保留 provider 和其他 MCP 服务。ToolHub 列表分别显示本机检测、配置与历史握手/调用；客户端自报名称只是显示记录，不授予权限。
 
-配置接入时，完成 initialize / initialized，再检查 tools/list 和一次 search_tools。网关提供十二个固定元工具：`search_tools`、`resolve_capability`、`inspect_tool`、`list_environments`、`execute_tool`、`search_skills`、`inspect_skill`、`propose_program`、`search_programs`、`request_execution_approval`、`get_task`、`cancel_task`。配置已写入、服务已连接和工具可执行是三个不同状态；报告实测状态。
+配置接入时，完成 initialize / initialized，再检查 tools/list 和一次 search_tools。网关提供十六个固定元工具：`search_tools`、`resolve_capability`、`inspect_tool`、`list_environments`、`execute_tool`、`search_skills`、`inspect_skill`、`propose_program`、`search_programs`、`request_execution_approval`、`get_task`、`cancel_task`、`register_artifact_package`、`list_artifact_packages`、`complete_artifact_package`、`review_artifact_package`。配置已写入、服务已连接和工具可执行是三个不同状态；报告实测状态。
 
 无 MCP 时，将 `$toolhub` 设为本机 CLI 路径，使用结构化查询：
 

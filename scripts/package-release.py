@@ -26,8 +26,10 @@ def copy_assets(destination, desktop=True):
     for name in ['schemas','resources','skills']:
         source=root/name
         if source.is_dir(): shutil.copytree(source,destination/name)
-    for name in ['LICENSE','NOTICE','README.md']:
+    for name in ['LICENSE','NOTICE','README.md','README.en.md']:
         shutil.copy2(root/name,destination/name)
+    (destination/'docs/development').mkdir(parents=True,exist_ok=True)
+    shutil.copy2(root/'docs/development/ARTIFACTS.md',destination/'docs/development/ARTIFACTS.md')
     shutil.copytree(license_cache/'THIRD-PARTY-LICENSES',destination/'THIRD-PARTY-LICENSES')
     shutil.copy2(license_cache/'DEPENDENCIES.json',destination/'DEPENDENCIES.json')
     shutil.copy2(root/'docs/releases'/('v'+version+'.md'),destination/'RELEASE-NOTES.md')
@@ -73,13 +75,13 @@ else:
             target=iconset/f'icon_{size}x{size}{"@2x" if scale==2 else ""}.png'
             subprocess.run(['sips','-z',str(size*scale),str(size*scale),str(root/'apps/desktop/icons/icon.png'),'--out',str(target)],check=True,stdout=subprocess.DEVNULL)
     subprocess.run(['iconutil','-c','icns',str(iconset),'-o',str(resources/'ToolHub.icns')],check=True)
-    info={'CFBundleName':'ToolHub','CFBundleDisplayName':'ToolHub','CFBundleIdentifier':'dev.toolhub.desktop','CFBundleExecutable':'toolhub-desktop','CFBundlePackageType':'APPL','CFBundleShortVersionString':version.split('-')[0],'CFBundleVersion':version.split('-')[0],'CFBundleIconFile':'ToolHub.icns','LSMinimumSystemVersion':'13.0','NSHighResolutionCapable':True,'NSAppleEventsUsageDescription':'ToolHub opens Terminal at a directory you select.'}
+    info={'CFBundleName':'ToolHub','CFBundleDisplayName':'ToolHub','CFBundleIdentifier':'dev.toolhub.desktop','CFBundleExecutable':'toolhub-desktop','CFBundlePackageType':'APPL','CFBundleShortVersionString':version.split('-')[0],'CFBundleVersion':version.split('-')[0],'CFBundleIconFile':'ToolHub.icns','LSMinimumSystemVersion':'13.0','NSHighResolutionCapable':True,'NSAppleEventsUsageDescription':'ToolHub opens Terminal at a directory you select and moves explicitly approved task files to Finder Trash.'}
     (app/'Contents/Info.plist').write_bytes(plistlib.dumps(info))
     for name in ['toolhubd','toolhub']: subprocess.run(['codesign','--force','--sign','-',str(executable/name)],check=True)
     subprocess.run(['codesign','--force','--sign','-',str(app)],check=True)
     subprocess.run(['codesign','--verify','--deep','--strict',str(app)],check=True)
     # Include explicit install/help documents outside the application too.
-    for name in ['LICENSE','README.md']: shutil.copy2(root/name,folder/name)
+    for name in ['LICENSE','README.md','README.en.md']: shutil.copy2(root/name,folder/name)
     assets.append(zip_folder(folder,'ToolHub-v'+version+'-'+opts.platform+'.zip'))
     image_source=output/'dmg-content'
     image_source.mkdir()

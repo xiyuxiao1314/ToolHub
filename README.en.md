@@ -10,7 +10,7 @@
     <img alt="Beta status" src="https://img.shields.io/badge/status-beta-orange" />
   </p>
   <p><a href="README.md">简体中文</a> | <strong>English</strong></p>
-  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.1">Download v0.3.0-beta.1</a> · <a href="#screenshots">Screenshots</a> · <a href="#connect-an-ai-agent">Agent setup</a> · <a href="#build-from-source">Build from source</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">Report an issue</a></p>
+  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.2">Download v0.3.0-beta.2</a> · <a href="#screenshots">Screenshots</a> · <a href="#connect-an-ai-agent">Agent setup</a> · <a href="#build-from-source">Build from source</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">Report an issue</a></p>
 </div>
 
 ## Why ToolHub?
@@ -19,11 +19,11 @@ When you ask an agent to compress a video, process a PDF or run a project, it ma
 
 ToolHub organizes local tools into a searchable catalog: their paths, versions, environments, capabilities and availability. People use the desktop interface; agents query the same catalog through local MCP or the CLI. Applications you create can be added to the program shelf. Reusable procedures can be saved as Skills, and capability packages combine those procedures with their tool dependencies for sharing.
 
-ToolHub reuses existing tools. Discovery does not require an AI service, and ToolHub does not automatically download FFmpeg, install language runtimes or clean up your computer. Agents still need their own instructions to use ToolHub; it cannot force every agent to change how it selects tools.
+ToolHub reuses existing tools. Discovery does not require an AI service, and ToolHub does not automatically download FFmpeg or install language runtimes. Tool discovery stays read-only; artifact cleanup follows your selected management scope and priority rules. Agents still need their own instructions to use ToolHub; it cannot force every agent to change how it selects tools.
 
 ## Screenshots
 
-These screenshots show the **v0.3.0-beta.1 Windows release** with an independent demonstration dataset. The desktop UI is currently in Simplified Chinese. Click an image to view it at full size.
+The tool, program, Skill and market screenshots show the **v0.3.0-beta.1 Windows release**. The new Artifacts page comes from native Windows validation. All screenshots use independent demonstration or disposable test data. The desktop UI is currently in Simplified Chinese. Click an image to view it at full size.
 
 ### Tool catalog
 
@@ -49,6 +49,12 @@ Browse bundled packages, preview procedures and dependency results, then add the
 
 ![ToolHub capability market with categories, a media workflow and local dependency inspection](docs/images/market.png)
 
+### Artifact packages
+
+Group temporary files, test records and backups by task, decide retention by priority, and inspect recycling results and review reasons. All files shown are disposable validation fixtures.
+
+![ToolHub Artifacts page with priority tiers, management scope and system Recycle Bin results](docs/images/artifacts.png)
+
 ## Current features
 
 | Module | Implemented features |
@@ -56,13 +62,14 @@ Browse bundled packages, preview procedures and dependency results, then add the
 | Tools | Local discovery; search by name, path or task; capability resolution; version and environment details; availability checks; preferred path selection |
 | Tool list | Group by tool or show individual installations; category filters; 6 / 12 / 24 items per page; saved page-size preferences |
 | Utilities | Recognize media, document and automation tools such as FFmpeg, FFprobe, 7-Zip, ImageMagick, Pandoc, Tesseract and Poppler |
+| Artifacts | Task-based file packages, read-only scans of selected directories, checkbox collection, low/medium/high priorities, a five-minute cancellation period, system Trash and cleanup history |
 | Program shelf | File or command launch entries, working directories, arguments, favorites, background launch, folder opening and invalid-path indicators |
 | Agent proposals | Submit application launch entries over MCP to a pending list; users select and review them before adding them |
 | Agents | Host detection, configured connections and historical handshakes/calls; setup templates and MCP connection checks |
 | Environments | Inspect tool environments, duplicate installations and runtimes; no automatic deletion or merging |
 | Skill library | Import reusable procedures; check platform, host and local tool dependencies; search and inspect through MCP |
 | Market | Eight bundled capability packages; preview instructions and dependencies; add with explicit confirmation; import/export for sharing |
-| Tasks and approvals | Policy-controlled tool execution, pending approvals, background task status/cancellation and activity records |
+| Tasks and approvals | Policy-controlled tool execution, default-on automatic approval setting, pending approvals, background task status/cancellation and activity records |
 | Settings | Configuration import/export and display options; Windows current-user login startup settings and diagnostics |
 
 Different installation paths count as separate instances of the same tool. Categories such as CLI and Runtime overlap, so their counts cannot be added to obtain the total.
@@ -83,6 +90,16 @@ After creating an application, it proposes a launch entry
 The user selects, reviews and adds it to the program shelf
 ```
 
+### Task artifact packages
+
+The Artifacts page groups explicitly registered task files without moving them. Users choose managed directories and select read-only scan candidates; imported leftovers default to high priority. Four bounded MCP tools register/list packages, mark tasks complete, and submit medium-priority reviews. Low-priority files recycle only after successful completion and an explicit no-longer-needed declaration, followed by a five-minute cancellation period. Medium adds an Agent dependency/usage review; high and manually retained packages require a human decision.
+
+Cleanup goes to the system Recycle Bin/Trash with no permanent-delete fallback. Changed files, known ToolHub references and detected usage block cleanup. Filename matches do not establish Agent provenance or disposability. Windows native recycling is tested; the macOS Finder adapter requires native validation. This feature is included in the v0.3.0-beta.2 release assets. See [artifact lifecycle and API](docs/development/ARTIFACTS.md).
+
+### Automatic execution approval
+
+On Windows, automatic tool execution approval is enabled by default. Trusted tools allowed by policy can execute the exact arguments submitted for the task without keeping the desktop open. Turn it off in Settings to require actual approval. Unknown/blocked tools, deny rules and host permissions still apply. Program entries still require user selection; artifact scopes and human retention are separate. Controlled tool execution on macOS remains unavailable.
+
 ### Portable Skills and the market
 
 A shared Skill describes a procedure that different agents can understand, such as compressing video with an existing FFmpeg installation. It declares inputs, outputs, platforms, tool dependencies and permissions. ToolHub does not scan and register every agent's private Skills, or treat a host-specific image generator, browser or plugin API as available to all agents.
@@ -91,14 +108,14 @@ The market is currently a local catalog shipped with the application. You can im
 
 ## Downloads and platform support
 
-The first open-source preview is **v0.3.0-beta.1**. Download files from the Assets section of [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.1).
+The current open-source preview is **v0.3.0-beta.2**. Download files from the Assets section of [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.2).
 
 | Your system | Recommended download | Notes |
 | --- | --- | --- |
-| Windows 10 / 11, 64-bit | `ToolHub-v0.3.0-beta.1-windows-x64.zip` | Desktop, CLI, daemon and capability packages; native maintainer-host verification |
-| Mac, Apple Silicon (M series) | `ToolHub-v0.3.0-beta.1-macos-arm64.dmg` | macOS 13+; preview support; ZIP also available |
-| Mac, Intel | `ToolHub-v0.3.0-beta.1-macos-x64.dmg` | macOS 13+; preview support; ZIP also available |
-| CLI / MCP only | `ToolHub-CLI-v0.3.0-beta.1-<platform>.zip` | CLI and paired daemon; no desktop approval interface |
+| Windows 10 / 11, 64-bit | `ToolHub-v0.3.0-beta.2-windows-x64.zip` | Desktop, CLI, daemon and capability packages; native maintainer-host verification |
+| Mac, Apple Silicon (M series) | `ToolHub-v0.3.0-beta.2-macos-arm64.dmg` | macOS 13+; preview support; ZIP also available |
+| Mac, Intel | `ToolHub-v0.3.0-beta.2-macos-x64.dmg` | macOS 13+; preview support; ZIP also available |
+| CLI / MCP only | `ToolHub-CLI-v0.3.0-beta.2-<platform>.zip` | CLI and paired daemon; no desktop approval interface |
 | Checksums | `SHA256SUMS.txt` | Compare SHA-256 values to check download integrity |
 
 Windows and macOS share code, data models and MCP interfaces, with the following platform differences:
@@ -112,6 +129,7 @@ Windows and macOS share code, data models and MCP interfaces, with the following
 | Open a terminal in a tool directory | CMD | Terminal; macOS may request permission to control Terminal |
 | Interactive program launch in a terminal | Supported | Not supported yet; use background launch or run it in a terminal yourself |
 | Controlled tool execution / execution approvals (CLI, MCP) | Supported | Not supported yet; executable identity pinning is not implemented, with no fallback to ordinary path execution |
+| Artifact lifecycle and recycling | Native Windows Recycle Bin validated | Finder Trash adapter; physical Mac interactions unverified |
 | Login startup and native EXE icon extraction | Supported | Not supported yet |
 | Default project program scan scope | Local fixed/removable disks, excluding system and dependency directories | User home directory; project directories can be selected explicitly |
 
@@ -292,7 +310,7 @@ scripts/                 Local installation, verification and native release pac
 docs/                    Design, implementation notes and historical development/verification records
 ```
 
-The [system design](docs/design/TOOLHUB_SYSTEM_DESIGN.md) describes the full product direction, including goals not yet implemented. This README and the [release notes](docs/releases/v0.3.0-beta.1.md) describe the current feature set. Linked design and release documents are currently in Chinese or mixed languages.
+The [system design](docs/design/TOOLHUB_SYSTEM_DESIGN.md) describes the full product direction, including goals not yet implemented. This README and the [release notes](docs/releases/v0.3.0-beta.2.md) describe the current feature set. Linked design and release documents are currently in Chinese or mixed languages.
 
 ## Known limitations and next steps
 
@@ -307,10 +325,3 @@ Open an [Issue](https://github.com/xiyuxiao1314/ToolHub/issues) or Pull Request.
 ## License
 
 ToolHub source code is licensed under the [MIT License](LICENSE). Third-party dependencies retain their respective licenses. ToolHub packages do not bundle discovered software such as FFmpeg, Python or Node.js, or grant redistribution rights for it. See [NOTICE](NOTICE) for brand assets and third-party dependency information.
-
-
-### Task artifact packages (local development build)
-
-The Artifacts page groups explicitly registered task files without moving them. Users choose managed directories and select read-only scan candidates; imported leftovers default to high priority. Four bounded MCP tools register/list packages, mark tasks complete, and submit medium-priority reviews. Low-priority files recycle only after successful completion and an explicit no-longer-needed declaration, followed by a five-minute cancellation period. Medium adds an Agent dependency/usage review; high and manually retained packages require a human decision.
-
-Cleanup goes to the system Recycle Bin/Trash with no permanent-delete fallback. Changed files, known ToolHub references and detected usage block cleanup. Filename matches do not establish Agent provenance or disposability. Windows native recycling is tested; the macOS Finder adapter requires native validation. This feature is not in the v0.3.0-beta.1 release assets. See [artifact lifecycle and API](docs/development/ARTIFACTS.md).

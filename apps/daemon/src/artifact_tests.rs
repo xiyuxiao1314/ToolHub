@@ -133,9 +133,10 @@ fn auth_traversal_protected_paths_and_reference_checks() {
             &json!({"id":id,"no_longer_needed":true,"reason":"test"})
         )
         .is_err());
+    let absolute = dir.path().join("other.txt");
     for p in [
         "../other.txt",
-        "C:\\Windows\\file.txt",
+        absolute.to_str().unwrap(),
         "node_modules/file.txt",
         ".git/config",
     ] {
