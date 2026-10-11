@@ -198,7 +198,7 @@ VS Code uses a `servers` structure; its template is available in the desktop int
 
 [toolhub-integration/SKILL.md](skills/toolhub-integration/SKILL.md) contains general integration instructions. Hosts with Skill support can install it in their own Skill directory; other hosts can use it as task instructions. Fill in your local installation path and ask the agent to search for tools or resolve capabilities, inspect actual instances, and use them under its permissions. After creating an application, it should submit a pending launch entry.
 
-The gateway exposes 12 fixed meta-tools rather than a separate MCP tool for every installed application:
+The gateway exposes 16 fixed meta-tools rather than a separate MCP tool for every installed application:
 
 | Purpose | MCP tools |
 | --- | --- |
@@ -206,6 +206,7 @@ The gateway exposes 12 fixed meta-tools rather than a separate MCP tool for ever
 | Execution and approval | `execute_tool`, `request_execution_approval` |
 | Background tasks | `get_task`, `cancel_task` |
 | Portable Skills | `search_skills`, `inspect_skill` |
+| Task artifacts | `register_artifact_package`, `list_artifact_packages`, `complete_artifact_package`, `review_artifact_package` |
 | Project applications | `propose_program`, `search_programs` |
 
 Host names and historical observations are for display and do not grant execution permissions. `propose_program` only submits a declaration; it does not add, launch or trust a program. Sharing program information with an agent does not authorize its execution.
@@ -306,3 +307,10 @@ Open an [Issue](https://github.com/xiyuxiao1314/ToolHub/issues) or Pull Request.
 ## License
 
 ToolHub source code is licensed under the [MIT License](LICENSE). Third-party dependencies retain their respective licenses. ToolHub packages do not bundle discovered software such as FFmpeg, Python or Node.js, or grant redistribution rights for it. See [NOTICE](NOTICE) for brand assets and third-party dependency information.
+
+
+### Task artifact packages (local development build)
+
+The Artifacts page groups explicitly registered task files without moving them. Users choose managed directories and select read-only scan candidates; imported leftovers default to high priority. Four bounded MCP tools register/list packages, mark tasks complete, and submit medium-priority reviews. Low-priority files recycle only after successful completion and an explicit no-longer-needed declaration, followed by a five-minute cancellation period. Medium adds an Agent dependency/usage review; high and manually retained packages require a human decision.
+
+Cleanup goes to the system Recycle Bin/Trash with no permanent-delete fallback. Changed files, known ToolHub references and detected usage block cleanup. Filename matches do not establish Agent provenance or disposability. Windows native recycling is tested; the macOS Finder adapter requires native validation. This feature is not in the v0.3.0-beta.1 release assets. See [artifact lifecycle and API](docs/development/ARTIFACTS.md).

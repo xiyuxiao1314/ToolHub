@@ -23,6 +23,7 @@ toolhub-ipc = { workspace = true }
 toolhub-mcp = { workspace = true }
 toolhub-skills = { workspace = true }
 toolhub-agent-bridge = { workspace = true }
+sha2 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 rusqlite = { workspace = true }
@@ -39,3 +40,6 @@ tempfile = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_Security"] }
+
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_System_Com", "Win32_UI_Shell", "Win32_UI_Shell_Common"] }
+windows-core = "0.62.2"

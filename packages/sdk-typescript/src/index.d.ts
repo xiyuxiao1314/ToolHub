@@ -124,3 +124,24 @@ export interface ManagedTask {execution_id:string;status:string;artifacts?:{path
 
 export interface SkillPortability {scope:"portable"|"host_specific";platforms:("windows"|"macos"|"linux")[];inputs:string[];outputs:string[];permissions:("read_files"|"write_files"|"execute_tools"|"network_access")[];host_dependencies:string[]}
 export interface SkillCompatibility {status:"portable"|"needs_review"|"host_specific"|"unsupported_platform"|"malformed";reusable:boolean;issues:string[];assessment:string}
+
+export type ArtifactPriority = 'low'|'medium'|'high';
+export interface ArtifactRoot { id:string; path:string; enabled:boolean; }
+export interface ArtifactFile { relative_path:string; bytes:number; sha256:string; modified_ns:string; status:'present'|'trashed'|'released'; error:string|null; }
+export interface ArtifactPackage { id:string; name:string; task:string; source:string; owner:string; root:string; priority:ArtifactPriority; retained:boolean; status:'active'|'scheduled'|'needs_review'|'retained'|'awaiting_scope'|'recycling'|'trashed'|'blocked'|'partial'|'released'; files:ArtifactFile[]; completed:boolean; no_longer_needed:boolean; cleanup_after:number|null; reason:string; reviewer:string|null; created_at:string; updated_at:string; }
+export interface MethodMap {
+ 'artifact.roots':{params:{};result:ArtifactRoot[]};
+ 'artifact.root_add':{params:{path:string};result:ArtifactRoot[]};
+ 'artifact.root_disable':{params:{id:string};result:{disabled:boolean}};
+ 'artifact.list':{params:{query?:string;limit?:number;offset?:number};result:ArtifactSummary[]};
+ 'artifact.inspect':{params:{id:string};result:{package:ArtifactPackage;events:{at:string;kind:string;data:Json}[]}};
+ 'artifact.register':{params:{name:string;task:string;root:string;files:string[];priority?:ArtifactPriority;source?:string};result:{id:string;package:ArtifactPackage;auto_scope:boolean;note:string}};
+ 'artifact.complete':{params:{id:string;no_longer_needed:true;reason:string};result:ArtifactPackage};
+ 'artifact.review':{params:{id:string;decision:'retain'|'recycle';reason:string;unused?:boolean;dependencies_checked?:boolean};result:ArtifactPackage};
+ 'artifact.update':{params:{id:string;priority?:ArtifactPriority;retained?:boolean};result:ArtifactPackage};
+ 'artifact.recycle':{params:{id:string;confirmed:true};result:ArtifactPackage};
+ 'artifact.forget':{params:{id:string};result:ArtifactPackage};
+ 'artifact.scan':{params:{root_id:string};result:{root:string;root_id:string;files:{relative_path:string;bytes:number;evidence:string}[];visited:number;skipped:number;unreadable:number;truncated:boolean;limitations:string}};
+}
+
+export interface ArtifactSummary extends Omit<ArtifactPackage,'files'|'owner'> { files:[]; file_count:number; bytes:number; remaining_bytes:number; auto_scope:boolean; }

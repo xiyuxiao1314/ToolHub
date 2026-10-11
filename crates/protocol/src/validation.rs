@@ -16,6 +16,9 @@ pub fn validate_method_params(request: &JsonRpcRequest) -> Result<(), ProtocolEr
             .as_object()
             .ok_or_else(|| invalid("named object params required".into()))?
     };
+    if request.method.starts_with("artifact.") {
+        return validate_artifact(&request.method, params);
+    }
     let required: &[&str] = match method {
         Method::RegistryCorrect
         | Method::InspectTool
@@ -248,5 +251,118 @@ mod tests {
                 validate_method_params(&JsonRpcRequest::new(1, "execute.tool", params)).is_err()
             );
         }
+    }
+}
+
+fn validate_artifact(
+    method: &str,
+    p: &serde_json::Map<String, Value>,
+) -> Result<(), ProtocolError> {
+    let bad = |s: &str| ProtocolError::new(ErrorCode::InvalidParams, s);
+    let (allowed, required): (&[&str], &[&str]) = match method {
+        "artifact.roots" => (&[], &[]),
+        "artifact.root_add" => (&["path"], &["path"]),
+        "artifact.root_disable" | "artifact.inspect" | "artifact.forget" => (&["id"], &["id"]),
+        "artifact.list" => (&["query", "limit", "offset"], &[]),
+        "artifact.register" => (
+            &["name", "task", "source", "root", "files", "priority"],
+            &["name", "task", "root", "files"],
+        ),
+        "artifact.complete" => (
+            &["id", "no_longer_needed", "reason"],
+            &["id", "no_longer_needed", "reason"],
+        ),
+        "artifact.review" => (
+            &["id", "decision", "reason", "unused", "dependencies_checked"],
+            &["id", "decision", "reason"],
+        ),
+        "artifact.update" => (&["id", "priority", "retained"], &["id"]),
+        "artifact.recycle" => (&["id", "confirmed"], &["id", "confirmed"]),
+        "artifact.scan" => (&["root_id"], &["root_id"]),
+        _ => return Err(bad("Unknown artifact method")),
+    };
+    if p.keys().any(|k| !allowed.contains(&k.as_str()))
+        || required.iter().any(|k| !p.contains_key(*k))
+    {
+        return Err(bad("Unexpected or missing artifact argument"));
+    }
+    for (k, v) in p {
+        if [
+            "confirmed",
+            "retained",
+            "no_longer_needed",
+            "unused",
+            "dependencies_checked",
+        ]
+        .contains(&k.as_str())
+        {
+            if !v.is_boolean() {
+                return Err(bad("Artifact assertion must be boolean"));
+            }
+        } else if k == "limit" || k == "offset" {
+            if !v.as_u64().is_some_and(|n| {
+                if k == "limit" {
+                    n > 0 && n <= 20
+                } else {
+                    n <= 1000
+                }
+            }) {
+                return Err(bad("Artifact page bounds invalid"));
+            }
+        } else if k == "files" {
+            if !v.as_array().is_some_and(|a| {
+                !a.is_empty()
+                    && a.len() <= 128
+                    && a.iter()
+                        .all(|v| v.as_str().is_some_and(|s| !s.is_empty() && s.len() <= 4096))
+            }) {
+                return Err(bad("Choose 1–128 explicit bounded file paths"));
+            }
+        } else if !v
+            .as_str()
+            .is_some_and(|s| s.len() <= 4096 && (k == "query" || !s.trim().is_empty()))
+        {
+            return Err(bad("Artifact argument must be a bounded string"));
+        }
+    }
+    if p.get("priority")
+        .is_some_and(|v| !matches!(v.as_str(), Some("low" | "medium" | "high")))
+    {
+        return Err(bad("Invalid artifact priority"));
+    }
+    if p.get("decision")
+        .is_some_and(|v| !matches!(v.as_str(), Some("retain" | "recycle")))
+    {
+        return Err(bad("Invalid artifact decision"));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod artifact_validation_tests {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn artifact_contract_rejects_unknown_fields_and_non_boolean_assertions() {
+        for p in [
+            json!({"id":"a","no_longer_needed":"true","reason":"done"}),
+            json!({"id":"a","no_longer_needed":true,"reason":"done","root":"other"}),
+        ] {
+            assert!(
+                validate_method_params(&JsonRpcRequest::new(1, "artifact.complete", p)).is_err()
+            );
+        }
+        assert!(validate_method_params(&JsonRpcRequest::new(
+            1,
+            "artifact.register",
+            json!({"name":"a","task":"b","root":"D:/task","files":[]})
+        ))
+        .is_err());
+        assert!(validate_method_params(&JsonRpcRequest::new(
+            1,
+            "artifact.register",
+            json!({"name":"a","task":"b","root":"D:/task","files":["test.txt"],"priority":"low"})
+        ))
+        .is_ok());
     }
 }

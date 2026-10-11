@@ -7,7 +7,7 @@ pub async fn pick_program_path(
     #[cfg(windows)]
     {
         let owner = window.hwnd().map_err(|e| e.to_string())?.0 as usize;
-        tauri::async_runtime::spawn_blocking(move || pick(owner, directory, false, false))
+        tauri::async_runtime::spawn_blocking(move || pick(owner, directory, false, false, false))
             .await
             .map_err(|e| e.to_string())?
     }
@@ -41,6 +41,7 @@ fn pick(
     directory: bool,
     skill: bool,
     bundle: bool,
+    artifact: bool,
 ) -> Result<Option<String>, String> {
     use windows::{
         core::w,
@@ -74,7 +75,13 @@ fn pick(
             };
         dialog.SetOptions(options).map_err(|e| e.to_string())?;
         dialog
-            .SetTitle(if bundle {
+            .SetTitle(if artifact {
+                if directory {
+                    w!("选择产物管理目录")
+                } else {
+                    w!("选择产物文件")
+                }
+            } else if bundle {
                 w!("选择 ToolHub 通用能力包 JSON 文件")
             } else if skill {
                 w!("选择含 skill.json 和 SKILL.md 的技能目录")
@@ -87,12 +94,16 @@ fn pick(
         if !directory {
             dialog
                 .SetFileTypes(&[COMDLG_FILTERSPEC {
-                    pszName: if bundle {
+                    pszName: if artifact {
+                        w!("所有产物文件")
+                    } else if bundle {
                         w!("ToolHub 能力包")
                     } else {
                         w!("程序与启动文件")
                     },
-                    pszSpec: if bundle {
+                    pszSpec: if artifact {
+                        w!("*.*")
+                    } else if bundle {
                         w!("*.toolhub-skill.json;*.json")
                     } else {
                         w!("*.exe;*.bat;*.cmd;*.lnk;*.ps1")
@@ -121,7 +132,7 @@ pub async fn pick_skill_folder(window: tauri::WebviewWindow) -> Result<Option<St
     #[cfg(windows)]
     {
         let owner = window.hwnd().map_err(|e| e.to_string())?.0 as usize;
-        tauri::async_runtime::spawn_blocking(move || pick(owner, true, true, false))
+        tauri::async_runtime::spawn_blocking(move || pick(owner, true, true, false, false))
             .await
             .map_err(|e| e.to_string())?
     }
@@ -159,7 +170,7 @@ pub async fn pick_bundle_file(window: tauri::WebviewWindow) -> Result<Option<Str
     #[cfg(windows)]
     {
         let owner = window.hwnd().map_err(|e| e.to_string())?.0 as usize;
-        tauri::async_runtime::spawn_blocking(move || pick(owner, false, false, true))
+        tauri::async_runtime::spawn_blocking(move || pick(owner, false, false, true, false))
             .await
             .map_err(|e| e.to_string())?
     }
@@ -259,5 +270,41 @@ pub async fn save_bundle_file(
             let _ = name;
             Err("当前平台暂不支持能力包导出选择器".into())
         }
+    }
+}
+
+/// Pick a specific task folder or regular artifact file using the native dialog.
+#[tauri::command]
+pub async fn pick_artifact_path(
+    window: tauri::WebviewWindow,
+    directory: bool,
+) -> Result<Option<String>, String> {
+    #[cfg(windows)]
+    {
+        let owner = window.hwnd().map_err(|e| e.to_string())?.0 as usize;
+        tauri::async_runtime::spawn_blocking(move || pick(owner, directory, false, false, true))
+            .await
+            .map_err(|e| e.to_string())?
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = window;
+        tauri::async_runtime::spawn_blocking(move || {
+            crate::macos::choose(
+                if directory { "folder" } else { "file" },
+                if directory {
+                    "选择产物管理目录"
+                } else {
+                    "选择产物文件"
+                },
+            )
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        let _ = (window, directory);
+        Err("当前平台暂不支持产物选择器".into())
     }
 }

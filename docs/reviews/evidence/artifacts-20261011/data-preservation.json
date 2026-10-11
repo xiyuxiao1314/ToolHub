@@ -1,0 +1,11 @@
+{
+  "success": true,
+  "checks": [
+    "program_entries: 5 original rows preserved exactly",
+    "skills: 2 original rows preserved exactly",
+    "tool_instances: 44 original IDs preserved",
+    "registry migration 6 applied",
+    "automatic cleanup directories remain user-selected only",
+    "real task debug package registered; all four files preserved"
+  ]
+}

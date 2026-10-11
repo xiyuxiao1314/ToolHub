@@ -1,0 +1,22 @@
+{
+  "checks": [
+    "empty page requires native root selection",
+    "native scan is read-only and requires checkbox selection",
+    "selected scan candidates collect as high-priority package",
+    "MCP exposes sixteen bounded tools",
+    "MCP low completion schedules grace without waiting",
+    "MCP obtains full file manifest by package ID",
+    "medium review requires actual usage/dependency assertions",
+    "MCP cannot recycle high priority",
+    "real package pagination advances",
+    "desktop retention cancels automatic cleanup",
+    "Agent instructions copy in real WebView",
+    "daemon timer recycles low/medium, protects changed/retained/high files",
+    "human high-priority recycle confirmation and cancel work",
+    "ordinary CLI cannot change high-priority retention",
+    "release old registration preserves changed file",
+    "real native page has no renderer errors"
+  ],
+  "errors": [],
+  "success": true
+}

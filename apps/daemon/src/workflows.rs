@@ -2,47 +2,48 @@ use super::execution_jobs::{invalid, policy_action, policy_scope, text};
 use super::*;
 
 pub(super) fn is_extended(name: &str) -> bool {
-    matches!(
-        name,
-        "protocol.negotiate"
-            | "capability.list"
-            | "registry.correct"
-            | "scan.cancel"
-            | "import.report"
-            | "execute.approval_request"
-            | "execute.approvals"
-            | "skill.register"
-            | "settings.get"
-            | "settings.set"
-            | "resource.list"
-            | "resource.activate"
-            | "resource.rollback"
-            | "update.verify"
-            | "update.apply"
-            | "update.cancel"
-            | "agent.launch"
-            | "agent.status"
-            | "agent.cancel"
-            | "credentials.set"
-            | "credentials.clear"
-            | "credentials.status"
-            | "credentials.session"
-            | "events.subscribe"
-            | "events.poll"
-            | "events.unsubscribe"
-            | "program.search"
-            | "program.propose"
-            | "program.proposals"
-            | "program.proposal_dismiss"
-            | "program.list"
-            | "program.scan_start"
-            | "program.scan_status"
-            | "program.scan_cancel"
-            | "program.select"
-            | "program.save"
-            | "program.remove"
-            | "program.launch"
-    )
+    name.starts_with("artifact.")
+        || matches!(
+            name,
+            "protocol.negotiate"
+                | "capability.list"
+                | "registry.correct"
+                | "scan.cancel"
+                | "import.report"
+                | "execute.approval_request"
+                | "execute.approvals"
+                | "skill.register"
+                | "settings.get"
+                | "settings.set"
+                | "resource.list"
+                | "resource.activate"
+                | "resource.rollback"
+                | "update.verify"
+                | "update.apply"
+                | "update.cancel"
+                | "agent.launch"
+                | "agent.status"
+                | "agent.cancel"
+                | "credentials.set"
+                | "credentials.clear"
+                | "credentials.status"
+                | "credentials.session"
+                | "events.subscribe"
+                | "events.poll"
+                | "events.unsubscribe"
+                | "program.search"
+                | "program.propose"
+                | "program.proposals"
+                | "program.proposal_dismiss"
+                | "program.list"
+                | "program.scan_start"
+                | "program.scan_status"
+                | "program.scan_cancel"
+                | "program.select"
+                | "program.save"
+                | "program.remove"
+                | "program.launch"
+        )
 }
 impl DaemonService {
     pub(super) fn correct_instance(&mut self, params: &Value) -> Result<Value, ProtocolError> {
@@ -107,6 +108,7 @@ impl DaemonService {
     ) -> Result<Value, ProtocolError> {
         match name {
             name if name.starts_with("program.") => self.dispatch_program(name, params),
+            name if name.starts_with("artifact.") => self.dispatch_artifact(name, params),
             "scan.cancel" => self.cancel_scan(params),
             "capability.list" => {
                 let registry = self.resources.capabilities();

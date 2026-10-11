@@ -127,6 +127,16 @@ fn main() -> anyhow::Result<()> {
         None
     };
     let service = Arc::new(Mutex::new(DaemonService::open(&registry_path())?));
+    service.lock().unwrap().artifact_recover_interrupted()?;
+    if listen {
+        let owned = Arc::clone(&service);
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_secs(10));
+            if let Err(error) = owned.lock().unwrap().artifact_cleanup_tick() {
+                tracing::warn!(code=?error.code,"Artifact cleanup tick failed");
+            }
+        });
+    }
     if listen {
         return listen_loop(service);
     }

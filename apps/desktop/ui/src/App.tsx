@@ -1,3 +1,4 @@
+import Artifacts from './Artifacts'
 import ToolsList from './ToolsList'
 import ManagedTasks from './ManagedTasks'
 import Skills from './Skills'
@@ -16,11 +17,12 @@ async function rpc(method: string, params: Json = {}): Promise<any> {
   return invoke('rpc', { method, params })
 }
 
-type PageId = 'tools' | 'programs' | 'agents' | 'envs' | 'skills' | 'market' | 'tasks' | 'settings'
+type PageId = 'artifacts' | 'tools' | 'programs' | 'agents' | 'envs' | 'skills' | 'market' | 'tasks' | 'settings'
 
 const NAV: { id: PageId; label: string; icon: string }[] = [
   { id: 'tools', label: '工具', icon: '🧰' },
   { id: 'programs', label: '程序', icon: '🚀' },
+  { id: 'artifacts', label: '产物', icon: '📦' },
   { id: 'agents', label: '智能体', icon: '🤖' },
   { id: 'envs', label: '环境', icon: '🧩' },
   { id: 'skills', label: 'Skill 库', icon: '📚' },
@@ -221,7 +223,7 @@ export default function App() {
   const searchRef = useRef<HTMLInputElement>(null)
   const contentRef = useRef<HTMLElement>(null)
 
-  const notify = (msg: string) => setToast(msg)
+  const notify = useCallback((msg: string) => setToast(msg), [])
   const fail = (e: any) => {
     const msg = String(e?.message ?? e)
     setError(msg)
@@ -640,6 +642,7 @@ export default function App() {
         )}
 
         {page === 'programs' && <Programs notify={notify} />}
+        {page === 'artifacts' && <Artifacts notify={notify} />}
 
         {page === 'tools' && (
           <>

@@ -4015,6 +4015,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "toolhub-agent-bridge",
  "toolhub-audit",
@@ -4033,6 +4034,8 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "windows",
+ "windows-core",
  "windows-sys 0.61.2",
 ]
 

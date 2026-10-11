@@ -198,7 +198,7 @@ VS Code 使用 `servers` 结构；桌面接入说明内有对应模板。配置�
 
 [toolhub-integration/SKILL.md](skills/toolhub-integration/SKILL.md) 是通用接入指引。支持 Skill 的宿主可把它安装在自己的 Skill 目录，不支持 Skill 的宿主可把它作为任务指引。填写本机安装路径后，要求 Agent：先搜索工具或解析能力，检查实例，再按权限使用；完成应用后提交待确认入口。
 
-网关公开 12 个固定元工具，避免把每个软件都展开成一个 MCP 工具：
+网关公开 16 个固定元工具，避免把每个软件都展开成一个 MCP 工具：
 
 | 用途 | MCP 工具 |
 | --- | --- |
@@ -206,6 +206,7 @@ VS Code 使用 `servers` 结构；桌面接入说明内有对应模板。配置�
 | 执行与审批 | `execute_tool`、`request_execution_approval` |
 | 后台任务 | `get_task`、`cancel_task` |
 | 通用 Skill | `search_skills`、`inspect_skill` |
+| 产物包 | `register_artifact_package`、`list_artifact_packages`、`complete_artifact_package`、`review_artifact_package` |
 | 项目应用 | `propose_program`、`search_programs` |
 
 宿主名称与历史记录用于显示，不能授予执行权限。`propose_program` 只提交声明，不会保存、启动或信任该程序；共享给 Agent 的程序信息也不等于执行授权。
@@ -306,3 +307,18 @@ docs/                 系统设计、实现说明、历史开发与验证记录
 ## 许可证
 
 ToolHub 源码以 [MIT License](LICENSE) 开源。第三方依赖保持各自许可证；ToolHub 发布包不附带 FFmpeg、Python、Node.js 等被发现的软件，也不授予它们的再分发权。品牌资源和第三方依赖说明见 [NOTICE](NOTICE)。
+
+
+### 产物包（本机开发版）
+
+新增“产物”导航，以任务为单位登记测试脚本、临时输出和备份。选择管理目录后只读扫描历史残留，勾选才收录，默认高优先级。Agent 可通过四个固定 MCP 接口登记、查询、标记完成和提交中优先级判断。
+
+| 优先级 | 清理条件 |
+|---|---|
+| 低 | 任务成功完成，明确标记不再需要；等待 5 分钟后自动回收 |
+| 中 | 完成后由接入的 Agent 检查用途和依赖，提交理由；等待 5 分钟后回收 |
+| 高 | 人工保留或手动移入回收站，Agent 不能降级或删除 |
+
+自动清理只在用户选定且启用的管理目录内进行；人工保留优先。所有清理调用系统回收站，不提供永久删除或失败后的删除兜底。文件改变、已知引用或占用会暂缓。扫描不能证明 Agent 来源，也不能代替依赖判断。Windows 已做真实回收站验证；macOS Finder 适配仍需原机验证。此功能尚未包含在 v0.3.0-beta.1 发布包中。
+
+完整流程和接口见 [产物管理](docs/development/ARTIFACTS.md)。
