@@ -13,8 +13,16 @@ fn connection_info(cli: &Path) -> Result<Value, String> {
         "$toolhub = '{}'\n& $toolhub --json status\n& $toolhub --json search python",
         cli_path.replace('\'', "''")
     );
-    let local = format!("# ToolHub 接入\n\n## 本机连接信息\n\nCLI：`{cli_path}`\n\n```powershell\n{check}\n```\n\n通用 MCP 配置（按宿主格式合并）：\n\n```json\n{config_text}\n```\n\nMiMo / mimocode 配置（~/.config/mimocode/mimocode.jsonc，合并 mcp.toolhub）：\n\n```json\n{mimo_config}\n```\n");
-    let skill = SKILL.replacen("# ToolHub 接入\n", &local, 1);
+    let local = format!("# ToolHub 接入\n\nCLI：`{cli_path}`\n");
+    let template = SKILL.replace("\r\n", "\n");
+    let mut skill = template.replacen("# ToolHub 接入\n", &local, 1);
+    let reference_root =
+        crate::installation::asset_root(cli)?.join("skills/toolhub-integration/references");
+    for name in ["setup", "execution", "programs", "skills", "artifacts"] {
+        let path = reference_root.join(format!("{name}.md"));
+        let path = path.to_string_lossy().replace('\\', "/");
+        skill = skill.replace(&format!("(references/{name}.md)"), &format!("(<{path}>)"));
+    }
     let codex_config = format!(
         "[mcp_servers.toolhub]\ncommand = {}\nargs = [\"mcp\", \"serve\"]\n",
         serde_json::to_string(cli_path).map_err(|e| e.to_string())?
@@ -76,6 +84,22 @@ pub fn agent_integration() -> Result<Value, String> {
 mod tests {
     use super::*;
     #[test]
+    fn generated_reference_paths_use_the_actual_packaged_resource_root() {
+        for path in [
+            Path::new("/opt/toolhub/toolhub"),
+            Path::new("/Applications/Tool Hub.app/Contents/MacOS/toolhub"),
+        ] {
+            let info = connection_info(path).unwrap();
+            let markdown = info["skill_markdown"].as_str().unwrap();
+            let resources = crate::installation::asset_root(path).unwrap();
+            for name in ["setup", "execution", "programs", "skills", "artifacts"] {
+                let target =
+                    resources.join(format!("skills/toolhub-integration/references/{name}.md"));
+                assert!(markdown.contains(&target.to_string_lossy().replace('\\', "/")));
+            }
+        }
+    }
+    #[test]
     fn configuration_preserves_unicode_spaces_and_shell_quotes() {
         let path = Path::new("C:\\Agent's 项目\\Tool Hub\\toolhub.exe");
         let info = connection_info(path).unwrap();
@@ -100,8 +124,10 @@ mod tests {
         assert_eq!(mimo["mcp"]["toolhub"]["type"], "local");
         let markdown = info["skill_markdown"].as_str().unwrap();
         assert!(markdown.starts_with("---\nname: toolhub-integration\n"));
-        assert!(markdown.contains(info["mcp_config"].as_str().unwrap()));
-        assert!(markdown.contains("普通 Agent 无权自动选择、保存或启动程序条目"));
+        assert!(!markdown.contains(info["mcp_config"].as_str().unwrap()));
+        assert!(markdown.chars().count() < 2500);
+        assert!(markdown.contains("references/execution.md"));
+        assert!(markdown.contains("普通 Agent 不能伪造桌面选择或直接改 SQLite"));
         assert!(info["bootstrap_prompt"]
             .as_str()
             .unwrap()

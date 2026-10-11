@@ -108,6 +108,8 @@ The market is currently a local catalog shipped with the application. You can im
 
 The development version adds declarative extensions: preview/import, install, enable/disable, update, rollback and uninstall. Independent JSON recognition rules and portable Skills add capabilities without source changes. See [extension development and usage](docs/development/EXTENSIONS.md).
 
+The development gateway defaults to five search summaries and loads full details on demand. Daily Agent instructions are separated from setup and advanced reference material. See [MCP context footprint](docs/development/MCP-CONTEXT.md) for measurements and limits.
+
 ## Downloads and platform support
 
 The current open-source preview is **v0.3.0-beta.2**. Download files from the Assets section of [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.2).
