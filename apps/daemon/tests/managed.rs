@@ -38,8 +38,18 @@ fn authenticated_controller_and_shared_reconnect_and_frame_recovery() {
             .spawn()
             .unwrap(),
     );
-    // Exercise the desktop's simultaneous startup connections before waiting for readiness.
-    // Requests remain read-only, and every worker has a bounded response timeout.
+    // This fixture pins the test executable as controller. Wait for its owned
+    // daemon before clients can auto-start a different daemon with the default
+    // desktop controller image. Otherwise startup scheduling changes the authority
+    // under test, particularly on macOS. Keep all concurrent RPC checks bounded.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut stream = loop {
+        if let Ok(stream) = LocalStream::connect(&daemon) {
+            break stream;
+        }
+        assert!(Instant::now() < deadline, "service readiness");
+        std::thread::sleep(Duration::from_millis(20));
+    };
     let barrier = std::sync::Arc::new(std::sync::Barrier::new(10));
     let workers: Vec<_> = (0..10)
         .map(|_| {
@@ -53,19 +63,8 @@ fn authenticated_controller_and_shared_reconnect_and_frame_recovery() {
         })
         .collect();
     for worker in workers {
-        assert!(
-            worker.join().unwrap().is_ok(),
-            "concurrent cold-start request"
-        );
+        assert!(worker.join().unwrap().is_ok(), "concurrent startup request");
     }
-    let deadline = Instant::now() + Duration::from_secs(5);
-    let mut stream = loop {
-        if let Ok(stream) = LocalStream::connect(&daemon) {
-            break stream;
-        }
-        assert!(Instant::now() < deadline, "service readiness");
-        std::thread::sleep(Duration::from_millis(20));
-    };
     stream.set_timeout(Duration::from_secs(2)).unwrap();
     stream.write_all(&1u32.to_be_bytes()).unwrap();
     stream.write_all(b"{").unwrap();
@@ -84,12 +83,12 @@ fn authenticated_controller_and_shared_reconnect_and_frame_recovery() {
     assert_eq!(null.id, Some(serde_json::Value::Null));
     assert!(null.result.is_some());
     let mut first = RpcClient::connect_or_start(&daemon).unwrap();
-    assert!(first
+    first
         .call(
             "policy.set",
-            json!({"scope":"tool","subject":"fixture","action":"deny"})
+            json!({"scope":"tool","subject":"fixture","action":"deny"}),
         )
-        .is_ok());
+        .expect("owned fixture must authenticate its pinned controller");
     let session = first
         .call("discovery.start", json!({"agent_id":"owned.fixture"}))
         .unwrap();
