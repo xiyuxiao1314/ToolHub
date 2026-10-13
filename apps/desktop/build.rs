@@ -8,6 +8,7 @@ fn main() {
             "agent_integration",
             "agent_mcp_check",
             "extension_catalog",
+            "extension_view_url",
             "extension_pick",
             "extension_export",
             "market_list",

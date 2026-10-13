@@ -26,6 +26,8 @@ mod program_proposals;
 pub(crate) mod programs;
 #[path = "scan_jobs.rs"]
 mod scan_jobs;
+#[path = "workbench.rs"]
+mod workbench;
 #[path = "workflows.rs"]
 mod workflows;
 use workflows::{json_err, sql_err};
@@ -117,7 +119,7 @@ impl DaemonService {
             .unwrap_or(Path::new("."))
             .join("toolhub-resources");
         let resources = toolhub_recognizer::resources::ResourceStore::open(&resource_dir)?;
-        Ok(Self {
+        let mut service = Self {
             registry,
             policy,
             sessions,
@@ -138,7 +140,11 @@ impl DaemonService {
             seq: AtomicU64::new(1),
             registry_path: path.to_string_lossy().to_string(),
             programs: programs::ProgramRuntime::default(),
-        })
+        };
+        service
+            .ensure_workbench()
+            .map_err(|e| anyhow::anyhow!(e.message))?;
+        Ok(service)
     }
 
     pub fn peer_principal(&self) -> String {
@@ -192,6 +198,9 @@ impl DaemonService {
             }
         }
         if let Err(error) = toolhub_protocol::validate_method_params(req) {
+            return error_response(req.id.clone(), &error);
+        }
+        if let Err(error) = self.require_feature(&req.method) {
             return error_response(req.id.clone(), &error);
         }
         if req.method == "protocol.negotiate" || workflows::is_extended(&req.method) {

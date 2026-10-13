@@ -6,11 +6,13 @@ mod startup_diagnostics;
 #[cfg(windows)]
 mod windows_startup_task;
 use file_icon::tool_file_icon;
+mod extension_frame;
+mod extensions;
 mod installation;
 mod integration;
 mod market;
-mod extensions;
-use extensions::{extension_catalog, extension_pick, extension_export};
+use extension_frame::{extension_view_url, FrameServer};
+use extensions::{extension_catalog, extension_export, extension_pick};
 use market::{market_add, market_export, market_inspect, market_list, market_pick, market_share};
 #[cfg(target_os = "macos")]
 mod macos;
@@ -253,6 +255,7 @@ fn main() {
         startup_diagnostics::record("process_started", None);
     }
     let result = tauri::Builder::default()
+        .manage(FrameServer::default())
         .setup(move |_app| {
             if login_launch {
                 startup_diagnostics::record("window_created", None);
@@ -267,6 +270,7 @@ fn main() {
             agent_integration,
             agent_mcp_check,
             extension_catalog,
+            extension_view_url,
             extension_pick,
             extension_export,
             market_list,

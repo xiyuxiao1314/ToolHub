@@ -55,6 +55,14 @@ Group temporary files, test records and backups by task, decide retention by pri
 
 ![ToolHub Artifacts page with priority tiers, management scope and system Recycle Bin results](docs/images/artifacts.png)
 
+### Extension workbench (local development build)
+
+Seven optional first-party features plus independently imported pages and themes. These screenshots are from an isolated v0.3.0-beta.3 Windows acceptance instance; this build has not been published to GitHub.
+
+![Extension workbench: first-party feature lifecycle and appearance recovery](docs/images/extension-workbench.png)
+
+![Graphite theme with top navigation and compact density](docs/images/extension-theme.png)
+
 ## Current features
 
 | Module | Implemented features |
@@ -106,7 +114,9 @@ A shared Skill describes a procedure that different agents can understand, such 
 
 The market is currently a local catalog shipped with the application. You can import, preview, add and share `.toolhub-skill.json` packages. Bundled packages cover media processing, image conversion/OCR, PDF text/OCR, document conversion, archive extraction and CSV checks. There is no online community index, account system, paid content or automatic dependency installation yet.
 
-The development version adds declarative extensions: preview/import, install, enable/disable, update, rollback and uninstall. Independent JSON recognition rules and portable Skills add capabilities without source changes. See [extension development and usage](docs/development/EXTENSIONS.md).
+The local beta.3 development build is an extension workbench. Tools, programs, artifacts, environments, Skills, the capability market and tasks are seven default-enabled official feature extensions, with install, disable, uninstall, local edits and rollback. User data survives removal. Independent v2 packages add navigation and isolated HTML/CSS/JavaScript pages, or change theme, layout and density. Agent connectivity, permissions and recovery stay in the kernel. See [extension contracts and development](docs/development/EXTENSIONS.md).
+
+This workbench is not yet published as a GitHub Release; downloads remain beta.2. Frontend plugins use a limited SDK without direct program launch or file cleanup. Arbitrary native/background plugin runtimes are not supported.
 
 The development gateway defaults to five search summaries and loads full details on demand. Daily Agent instructions are separated from setup and advanced reference material. See [MCP context footprint](docs/development/MCP-CONTEXT.md) for measurements and limits.
 

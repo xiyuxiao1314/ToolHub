@@ -13,7 +13,7 @@ const labels: Record<string, string> = { available: '依赖齐备', missing_capa
 
 type MarketProps = { notify: (message: string) => void; onLibrary: () => void; onTools: () => void; onAddTool: () => void }
 export default function Market(props: MarketProps) {
-  const [tab, setTab] = useState<'skills' | 'extensions'>('skills')
+  const [tab, setTab] = useState<'skills' | 'extensions'>('extensions')
   return <><div className="extension-tabs" role="tablist" aria-label="市场分类"><button role="tab" aria-selected={tab === 'skills'} className={'chip ' + (tab === 'skills' ? 'active' : '')} onClick={() => setTab('skills')}>能力包目录</button><button role="tab" aria-selected={tab === 'extensions'} className={'chip ' + (tab === 'extensions' ? 'active' : '')} onClick={() => setTab('extensions')}>扩展管理</button></div>{tab === 'skills' ? <CapabilityMarket {...props}/> : <Extensions notify={props.notify} onTools={props.onTools} onLibrary={props.onLibrary}/>}</>
 }
 function CapabilityMarket({ notify, onLibrary, onTools, onAddTool }: MarketProps) {

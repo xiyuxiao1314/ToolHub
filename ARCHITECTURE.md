@@ -2,7 +2,7 @@
 
 ## Source and status
 
-The [full system design](docs/design/TOOLHUB_SYSTEM_DESIGN.md) defines the intended product. This document records its architecture baseline; no module is implemented yet.
+The [full system design](docs/design/TOOLHUB_SYSTEM_DESIGN.md) defines the intended product. This document records the original architecture baseline and subsequent owner-approved implemented changes.
 
 ## Core flow
 
@@ -48,3 +48,11 @@ Freeze shared domain and protocol contracts before parallel implementation consu
 ## Owner-approved Programs extension (2026-10-03)
 
 Project launch entries are separate from recognized ToolInstances. The scanner exposes read-only entrypoint candidates; the daemon owns cancellable background discovery, selection grants, atomic SQLite persistence and explicit controller-only launches. Desktop owns the native file/folder picker and user selection/editor flow. Migration 003 adds program_entries without changing tool or agent authorization. A Windows console helper assigns fresh input/output handles and keeps batch output visible. The protocol and SDK add program.* methods atomically; ordinary agents cannot call these methods. This owner-requested extension expands the desktop's personal launch workflow beyond the original tool inventory baseline.
+
+## Owner-approved extension-first workbench (2026-10-13)
+
+The kernel retains identity/MCP, registry storage, authorization/execution/audit, extension lifecycle and recovery. Seven first-party workbench modules contribute navigation and lazily loaded UI; explicit module gates control feature queries without deleting underlying records. Native service implementations remain compiled Rust modules, not unloadable DLLs. First-use package seeding is one-time and transactional.
+
+Versioned v2 packages can contribute interactive frontend documents, bounded theme/layout tokens and dependencies in addition to v1 recognition/portable Skills. Third-party documents are served from an on-demand session-only loopback origin and sandboxed opaque iframe with their own CSP. This origin has no Tauri native ACL. A fixed SDK bridge binds messages to the frame/session/package digest and dispatches only declared methods as an ordinary extension principal.
+
+Official page adapters reside under `apps/desktop/ui/src/official`, kernel shell/loader under `workbench`, manifests under `extensions/official`. Existing Programs/Artifacts/Skills/Market components are loaded through the same official feature registry. Arbitrary native executable plugins, online catalogs and privileged layout code are excluded from this implemented contract. See the authoritative extension guide and schema.

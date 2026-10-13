@@ -1,0 +1,38 @@
+{
+  "schema": "toolhub.extension/v2",
+  "id": "community.graphite",
+  "name": "石墨工作台",
+  "version": "1.0.0",
+  "description": "深色主题与紧凑布局，支持左侧、右侧和顶部导航。",
+  "author": "ToolHub examples",
+  "license": "MIT",
+  "platforms": [
+    "windows",
+    "macos",
+    "linux"
+  ],
+  "min_toolhub_version": "0.3.0-beta.3",
+  "theme": {
+    "colors": {
+      "bg": "#11151d",
+      "panel": "#1b2230",
+      "panel-soft": "#232d3f",
+      "ink": "#eef2f8",
+      "ink-2": "#ccd5e3",
+      "muted": "#9daec7",
+      "line": "#334159",
+      "accent": "#5c91fa",
+      "accent-soft": "#243c63",
+      "ok": "#56d69b",
+      "ok-soft": "#163f31",
+      "warn": "#f2bf72",
+      "warn-soft": "#49351c",
+      "danger": "#ff8888",
+      "danger-soft": "#512626"
+    },
+    "layout": "left",
+    "density": "compact",
+    "sidebar_width": 224,
+    "radius": 12
+  }
+}

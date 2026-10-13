@@ -14,6 +14,12 @@ foreach ($binaryName in @('toolhub.exe','toolhubd.exe','toolhub-desktop.exe')) {
 foreach ($assetName in @('schemas','resources','skills','extensions')) { if (Test-Path -LiteralPath (Join-Path $projectRoot $assetName)) { Copy-Item -LiteralPath (Join-Path $projectRoot $assetName) -Destination (Join-Path $packagePath $assetName) -Recurse } }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'install-local.ps1') -Destination $packagePath
 Copy-Item -LiteralPath (Join-Path $projectRoot 'docs\development\PACKAGE.md') -Destination (Join-Path $packagePath 'README.md')
+$guidePath = Join-Path $packagePath 'docs\development'
+New-Item -ItemType Directory -Path $guidePath -Force | Out-Null
+foreach ($guideName in @('EXTENSIONS.md','ARTIFACTS.md')) { Copy-Item -LiteralPath (Join-Path $projectRoot ('docs\development\' + $guideName)) -Destination $guidePath }
+$imagePath = Join-Path $packagePath 'docs\images'
+New-Item -ItemType Directory -Path $imagePath -Force | Out-Null
+foreach ($imageName in @('extension-workbench.png','extension-theme.png')) { Copy-Item -LiteralPath (Join-Path $projectRoot ('docs\images\' + $imageName)) -Destination $imagePath }
 $versionOutput = & (Join-Path $packagePath 'toolhub.exe') '--version'
 if ($LASTEXITCODE -ne 0) { throw 'CLI version check failed' }
 @{schema='toolhub.package/v1';build_id=$BuildId;version=$versionOutput;configuration=$Configuration;created_at=(Get-Date).ToUniversalTime().ToString('o');unsigned=$true;binaries=@('toolhub.exe','toolhubd.exe','toolhub-desktop.exe')} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $packagePath 'package.json') -Encoding utf8NoBOM

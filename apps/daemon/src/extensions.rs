@@ -1,4 +1,4 @@
-//! Persistent declarative extensions. No plugin code or dependency installer is loaded.
+//! Persistent versioned extensions; frontend payloads are opaque to the daemon.
 use super::execution_jobs::{invalid, text};
 use super::*;
 use sha2::{Digest, Sha256};
@@ -125,6 +125,7 @@ impl DaemonService {
         Ok(rec)
     }
     fn check_extension_conflicts(&mut self, p: &ExtensionPackage) -> Result<(), ProtocolError> {
+        self.check_workbench_dependencies(p)?;
         let rules = p.rules();
         let skills = self.registry.list_skills().map_err(db_err)?;
         for skill in &p.skills {
@@ -206,6 +207,9 @@ impl DaemonService {
         method: &str,
         params: &Value,
     ) -> Result<Value, ProtocolError> {
+        if matches!(method, "extension.preferences" | "extension.invoke") {
+            return self.dispatch_workbench(method, params);
+        }
         if method == "extension.list" {
             let mut list = vec![];
             for (p, digest, enabled) in self.extension_packages(false)? {
@@ -238,7 +242,7 @@ impl DaemonService {
                 return Ok(
                     json!({"package":p,"digest":digest,"compatible":compatible,"conflict":conflict,
                     "installed_digest":old.as_ref().map(|(_,d,_)|d),"dependencies":dependencies,
-                    "permissions":["discover","inspect"],"instruction_authority":false}),
+                    "permissions":p.permissions,"instruction_authority":false}),
                 );
             }
             self.require_controller()?;
@@ -307,6 +311,8 @@ impl DaemonService {
                     .ok_or_else(|| invalid("enabled must be boolean"))?;
                 if enabled {
                     self.check_extension_conflicts(&old.0)?;
+                } else {
+                    self.check_workbench_dependents(id)?;
                 }
                 self.save_extension(&old.0, &old.1, "local", enabled, Some(&old), true)?;
                 Ok(json!({"enabled":enabled,"id":id,"rescan_required":enabled}))
@@ -341,6 +347,10 @@ impl DaemonService {
                 )
             }
             "extension.remove" => {
+                self.check_workbench_dependents(id)?;
+                if old.0.host_module.as_deref() == Some("artifacts") {
+                    self.pause_artifact_extension()?;
+                }
                 let tx = self.registry.db.conn.transaction().map_err(sql_err)?;
                 tx.execute("UPDATE tool_instances SET status='extension_disabled' WHERE status='available' AND definition_id IN (SELECT definition_id FROM extension_definitions WHERE extension_id=?1)",[id]).map_err(sql_err)?;
                 tx.execute("DELETE FROM extension_packages WHERE id=?1", [id])
@@ -379,6 +389,9 @@ impl DaemonService {
         old: Option<&StoredPackage>,
         state_only: bool,
     ) -> Result<(), ProtocolError> {
+        if p.host_module.as_deref() == Some("artifacts") && !enabled {
+            self.pause_artifact_extension()?;
+        }
         let rules = p.rules();
         let previous_rules = old.map(|(o, _, _)| o.rules()).unwrap_or_default();
         let restore = rules
@@ -618,8 +631,14 @@ mod tests {
         assert!(s.registry.get_instance(&id).unwrap().is_some());
         assert_eq!(s.registry.list_skills().unwrap().len(), 1);
         assert_eq!(
-            call(&mut s, "extension.list", json!({}), false).unwrap(),
-            json!([])
+            call(&mut s, "extension.list", json!({}), false)
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|r| r["package"]["host_module"].is_null())
+                .count(),
+            0
         );
         assert_eq!(
             call(&mut s, "registry.search", json!({"query":"Blender"}), false).unwrap(),

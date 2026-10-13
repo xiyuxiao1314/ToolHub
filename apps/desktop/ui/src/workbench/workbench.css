@@ -1,0 +1,26 @@
+.extension-frame{display:block;width:100%;height:calc(100dvh - 130px);min-height:420px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
+.extension-frame-heading{margin-bottom:20px}
+.app-shell.workbench-layout-right{grid-template-columns:minmax(0,1fr) var(--sidebar)}
+.workbench-layout-right>.sidebar{grid-column:2;grid-row:1;border-right:0;border-left:1px solid var(--line)}
+.workbench-layout-right>.content{grid-column:1;grid-row:1}
+.app-shell.workbench-layout-top{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+.workbench-layout-top>.sidebar{padding:10px 20px;border-right:0;border-bottom:1px solid var(--line);display:block}
+.workbench-layout-top .sidebar-scroll{display:flex;flex-direction:row;flex:none;align-items:center;gap:24px;overflow-x:auto;overflow-y:hidden}
+.workbench-layout-top .brand{flex:none;margin:0}
+.workbench-layout-top .brand-badge{width:36px;height:36px}
+.workbench-layout-top .nav{display:flex;flex-direction:row;flex-wrap:nowrap;gap:4px;flex:1}
+.workbench-layout-top .nav-btn{white-space:nowrap;width:auto;flex:none;padding:10px 12px}
+.workbench-layout-top .quick,.workbench-layout-top .side-foot{display:none}
+.workbench-density-compact .nav-btn{padding:9px 12px}
+.workbench-density-compact .content{padding:22px}
+.workbench-density-compact .card-pad{padding:20px}
+.workbench-density-compact .sidebar{gap:10px}
+.extension-kernel-settings{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:18px 22px;margin-bottom:24px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
+.extension-kernel-settings label{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.extension-kernel-settings select{padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+.extension-editor{width:100%;min-height:320px;resize:vertical;padding:14px;background:var(--panel-soft);color:var(--ink);border:1px solid var(--line);border-radius:var(--radius);font:13px/1.5 monospace}
+.extension-edit-area{margin:18px 0;padding:20px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius)}
+.extension-contributions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.extension-runtime-info{padding:12px 16px;background:var(--panel-soft);border-radius:var(--radius);color:var(--muted)}
+.extension-tabs{margin-bottom:20px}
+@media(max-width:850px){.workbench-layout-top .sidebar-scroll{gap:10px}.workbench-layout-top .brand span{display:none}.extension-kernel-settings{align-items:stretch}.extension-frame{min-height:360px}}

@@ -7,7 +7,17 @@ pub fn extension_catalog() -> Result<Value, String> {
     let p = ExtensionPackage::parse(include_bytes!(
         "../../../extensions/examples/blender.toolhub-extension.json"
     ))?;
-    serde_json::to_value(vec![p]).map_err(|e| e.to_string())
+    let mut all: Vec<ExtensionPackage> =
+        serde_json::from_str(include_str!("../../../extensions/official/catalog.json"))
+            .map_err(|e| e.to_string())?;
+    all.push(p);
+    all.push(ExtensionPackage::parse(include_bytes!(
+        "../../../extensions/examples/workspace.toolhub-extension.json"
+    ))?);
+    all.push(ExtensionPackage::parse(include_bytes!(
+        "../../../extensions/examples/graphite.toolhub-extension.json"
+    ))?);
+    serde_json::to_value(all).map_err(|e| e.to_string())
 }
 #[tauri::command]
 pub async fn extension_pick(window: tauri::WebviewWindow) -> Result<Option<Value>, String> {

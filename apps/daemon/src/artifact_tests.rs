@@ -290,3 +290,44 @@ fn summary_pagination_does_not_embed_all_file_manifests() {
         .unwrap();
     assert_eq!(details["package"]["files"].as_array().unwrap().len(), 1);
 }
+
+#[test]
+fn disabling_and_uninstalling_artifact_feature_pause_schedules_without_recycling() {
+    for remove in [false, true] {
+        let (dir, mut svc) = fixture();
+        root(&mut svc, dir.path());
+        let id = package(&mut svc, dir.path(), "low");
+        assert_eq!(complete(&mut svc, &id)["status"], "scheduled");
+        let installed = svc
+            .extension_packages(false)
+            .unwrap()
+            .into_iter()
+            .find(|(p, _, _)| p.host_module.as_deref() == Some("artifacts"))
+            .unwrap();
+        svc.controller_verified = true;
+        let method = if remove {
+            "extension.remove"
+        } else {
+            "extension.set_enabled"
+        };
+        let mut params = json!({"id":installed.0.id,"expected_digest":installed.1});
+        if !remove {
+            params["enabled"] = json!(false);
+        }
+        svc.dispatch_extension(method, &params).unwrap();
+        svc.artifact_cleanup_tick().unwrap();
+        let item = svc.artifact_package(&id).unwrap();
+        assert_eq!(item.status, "blocked");
+        assert!(item.cleanup_after.is_none());
+        assert!(dir.path().join("test_owned.txt").exists());
+        if !remove {
+            svc.dispatch_extension(
+                "extension.set_enabled",
+                &json!({"id":installed.0.id,"expected_digest":installed.1,"enabled":true}),
+            )
+            .unwrap();
+            svc.artifact_cleanup_tick().unwrap();
+            assert!(dir.path().join("test_owned.txt").exists());
+        }
+    }
+}

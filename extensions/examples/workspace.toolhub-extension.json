@@ -1,0 +1,29 @@
+{
+  "schema": "toolhub.extension/v2",
+  "id": "community.workspace",
+  "name": "工具速览工作台",
+  "version": "1.0.0",
+  "description": "独立页面示例：通过隔离的 SDK 查询工具，安装后增加导航，无需重新编译。",
+  "author": "ToolHub examples",
+  "license": "MIT",
+  "platforms": [
+    "windows",
+    "macos",
+    "linux"
+  ],
+  "min_toolhub_version": "0.3.0-beta.3",
+  "permissions": [
+    "tools.read"
+  ],
+  "views": [
+    {
+      "id": "community.workspace.overview",
+      "label": "工具速览",
+      "icon": "◈",
+      "order": 90,
+      "html": "<header><small>EXTENSION WORKSPACE</small><h1>我的工具速览</h1><p>这个页面来自已安装的扩展包。</p></header><div id=\"search\"><input id=\"query\" placeholder=\"搜索工具，例如 FFmpeg\" aria-label=\"搜索工具\"/><button id=\"run-query\" type=\"button\">查询工具</button></div><p id=\"state\" role=\"status\">等待查询</p><div id=\"results\"></div>",
+      "css": "body{font:15px/1.6 system-ui;margin:32px;color:var(--ink);background:var(--bg)}header,#search,#results{max-width:900px}small{letter-spacing:.16em;color:var(--accent)}h1{font-size:32px}input,button{font:inherit;padding:12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);color:var(--ink)}input{width:65%}button{margin-left:8px;background:var(--accent);color:white;cursor:pointer}.row{padding:18px;margin:12px 0;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius)}code{display:block;overflow-wrap:anywhere;color:var(--muted)}",
+      "script": "document.getElementById('run-query').addEventListener('click',async()=>{ const state=document.getElementById('state');state.textContent='正在查询…';try{const rows=await toolhub.call('registry.search',{query:document.getElementById('query').value,limit:5});const root=document.getElementById('results');root.replaceChildren();rows.slice(0,5).forEach(row=>{const item=document.createElement('div');item.className='row';const title=document.createElement('strong');title.textContent=row.name;const path=document.createElement('code');path.textContent=row.path;item.append(title,path);root.append(item)});state.textContent=`找到 ${rows.length} 条结果，最多显示 5 条`;}catch(e){state.textContent=e.message}})"
+    }
+  ]
+}

@@ -43,6 +43,7 @@ impl DaemonService {
         params: &Value,
         rpc_id: Option<Value>,
     ) -> Result<PreparedScan, ProtocolError> {
+        self.require_feature("scan.start")?;
         let settings = self
             .registry
             .get_setting("user_preferences")

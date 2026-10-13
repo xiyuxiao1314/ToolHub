@@ -215,7 +215,7 @@ impl DaemonService {
                 || target.starts_with(&(prefix + if cfg!(windows) { "\\" } else { "/" }))
         }))
     }
-    fn artifact_packages(&self) -> Result<Vec<ArtifactPackage>> {
+    pub(super) fn artifact_packages(&self) -> Result<Vec<ArtifactPackage>> {
         let mut statement = self
             .registry
             .db
@@ -252,7 +252,7 @@ impl DaemonService {
         }
         Ok(item)
     }
-    fn save_artifact(&mut self, item: &mut ArtifactPackage, kind: &str) -> Result<()> {
+    pub(super) fn save_artifact(&mut self, item: &mut ArtifactPackage, kind: &str) -> Result<()> {
         item.updated_at = now();
         let encoded = serde_json::to_string(item).map_err(json_err)?;
         let tx = self.registry.db.conn.transaction().map_err(sql_err)?;
@@ -731,6 +731,9 @@ impl DaemonService {
         Ok(())
     }
     pub fn artifact_cleanup_tick(&mut self) -> Result<()> {
+        if !self.module_enabled("artifacts")? {
+            return Ok(());
+        }
         if !self.running_jobs.is_empty() || !self.running_scans.is_empty() {
             return Ok(());
         }

@@ -32,6 +32,7 @@
     "allow-market-export",
     "allow-extension-catalog",
     "allow-extension-pick",
-    "allow-extension-export"
+    "allow-extension-export",
+    "allow-extension-view-url"
   ]
 }

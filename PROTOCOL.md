@@ -109,3 +109,9 @@ Declarative extensions use `extension.list`, `extension.preview`, `extension.ins
 ## MCP context defaults (development beta.3)
 
 MCP search_tools, search_skills and search_programs default to five summary rows, with limit (1–1000), offset (0–100000) and detail=summary|full. The array result envelope remains; pagination is applied after compatibility/query filtering. Inspect selected tool/Skill IDs for full path, trust, requirements and instructions. Shared-program declarations require detail=full and confer no launch authority. Explicit full search remains available, and ordinary THP/CLI/desktop defaults are unchanged. Both text and structured MCP results are retained for compatibility. See [context footprint](docs/development/MCP-CONTEXT.md); these are payload reductions, not guarantees of a client's billed token consumption.
+
+## Extension workbench v2 (development beta.3)
+
+`toolhub.extension/v2` adds views, restricted theme/layout tokens, frontend permissions, dependencies and reserved first-party host_module/navigation references. V1 package bytes/digests remain compatible. Seven first-party snapshots are seeded exactly once; disabling/removing a feature changes navigation and its query availability, preserving all user data. Removing artifact management pauses cleanup deadlines.
+
+`extension.preferences({})` reads the kernel appearance profile; `{settings:{theme_id?,layout?,density?}}` writes it with controller authority. `extension.invoke({id,expected_digest,method,params?})` validates the current enabled snapshot and declared permission, then delegates as an ordinary extension identity; no desktop authority is inherited. Strict method names/types are shared by Rust, schema and TypeScript. Existing MCP schemas/count and five-summary defaults are unchanged. See [extension contract](docs/development/EXTENSIONS.md).

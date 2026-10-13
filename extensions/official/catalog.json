@@ -1,0 +1,149 @@
+[
+  {
+    "schema": "toolhub.extension/v2",
+    "id": "toolhub.builtin.tools",
+    "name": "工具管理",
+    "version": "1.0.0",
+    "description": "工具发现、能力检索、安装实例与使用。",
+    "author": "ToolHub",
+    "license": "MIT",
+    "platforms": [
+      "windows",
+      "macos",
+      "linux"
+    ],
+    "min_toolhub_version": "0.3.0-beta.3",
+    "host_module": "tools",
+    "navigation": {
+      "label": "工具",
+      "icon": "🧰",
+      "order": 10
+    }
+  },
+  {
+    "schema": "toolhub.extension/v2",
+    "id": "toolhub.builtin.programs",
+    "name": "程序管理",
+    "version": "1.0.0",
+    "description": "登记启动入口，查看 Agent 提案并启动用户程序。",
+    "author": "ToolHub",
+    "license": "MIT",
+    "platforms": [
+      "windows",
+      "macos",
+      "linux"
+    ],
+    "min_toolhub_version": "0.3.0-beta.3",
+    "host_module": "programs",
+    "navigation": {
+      "label": "程序",
+      "icon": "🚀",
+      "order": 20
+    }
+  },
+  {
+    "schema": "toolhub.extension/v2",
+    "id": "toolhub.builtin.artifacts",
+    "name": "产物管理",
+    "version": "1.0.0",
+    "description": "管理任务产物，按用户规则回收到系统回收站。",
+    "author": "ToolHub",
+    "license": "MIT",
+    "platforms": [
+      "windows",
+      "macos",
+      "linux"
+    ],
+    "min_toolhub_version": "0.3.0-beta.3",
+    "host_module": "artifacts",
+    "navigation": {
+      "label": "产物",
+      "icon": "📦",
+      "order": 30
+    }
+  },
+  {
+    "schema": "toolhub.extension/v2",
+    "id": "toolhub.builtin.envs",
+    "name": "环境管理",
+    "version": "1.0.0",
+    "description": "查看本机环境、关联工具和重复安装。",
+    "author": "ToolHub",
+    "license": "MIT",
+    "platforms": [
+      "windows",
+      "macos",
+      "linux"
+    ],
+    "min_toolhub_version": "0.3.0-beta.3",
+    "host_module": "envs",
+    "navigation": {
+      "label": "环境",
+      "icon": "🧩",
+      "order": 50
+    }
+  },
+  {
+    "schema": "toolhub.extension/v2",
+    "id": "toolhub.builtin.skills",
+    "name": "Skill 库管理",
+    "version": "1.0.0",
+    "description": "收录和检索跨智能体复用的通用流程。",
+    "author": "ToolHub",
+    "license": "MIT",
+    "platforms": [
+      "windows",
+      "macos",
+      "linux"
+    ],
+    "min_toolhub_version": "0.3.0-beta.3",
+    "host_module": "skills",
+    "navigation": {
+      "label": "Skill 库",
+      "icon": "📚",
+      "order": 60
+    }
+  },
+  {
+    "schema": "toolhub.extension/v2",
+    "id": "toolhub.builtin.market",
+    "name": "市场管理",
+    "version": "1.0.0",
+    "description": "浏览、导入和分享通用能力包。",
+    "author": "ToolHub",
+    "license": "MIT",
+    "platforms": [
+      "windows",
+      "macos",
+      "linux"
+    ],
+    "min_toolhub_version": "0.3.0-beta.3",
+    "host_module": "market",
+    "navigation": {
+      "label": "市场",
+      "icon": "🛍️",
+      "order": 70
+    }
+  },
+  {
+    "schema": "toolhub.extension/v2",
+    "id": "toolhub.builtin.tasks",
+    "name": "任务管理",
+    "version": "1.0.0",
+    "description": "查看运行任务、执行结果和活动记录。",
+    "author": "ToolHub",
+    "license": "MIT",
+    "platforms": [
+      "windows",
+      "macos",
+      "linux"
+    ],
+    "min_toolhub_version": "0.3.0-beta.3",
+    "host_module": "tasks",
+    "navigation": {
+      "label": "任务",
+      "icon": "📋",
+      "order": 80
+    }
+  }
+]

@@ -377,6 +377,8 @@ fn validate_extension(
     let fail = || ProtocolError::new(ErrorCode::InvalidParams, "invalid extension parameters");
     let keys: &[&str] = match method {
         "extension.list" => &[],
+        "extension.preferences" => &["settings"],
+        "extension.invoke" => &["id", "expected_digest", "method", "params"],
         "extension.preview" => &["package"],
         "extension.install" => &["package", "digest", "expected_digest", "source"],
         "extension.set_enabled" => &["id", "enabled", "expected_digest"],
@@ -384,6 +386,21 @@ fn validate_extension(
         _ => return Err(fail()),
     };
     if p.keys().any(|k| !keys.contains(&k.as_str())) {
+        return Err(fail());
+    }
+    if method == "extension.preferences"
+        && p.get("settings")
+            .is_some_and(|v| !v.is_object() || v.to_string().len() > 1024)
+    {
+        return Err(fail());
+    }
+    if method == "extension.invoke"
+        && (!p
+            .get("method")
+            .is_some_and(|v| v.as_str().is_some_and(|s| !s.is_empty() && s.len() < 128))
+            || p.get("params")
+                .is_some_and(|v| !v.is_object() || v.to_string().len() > 65536))
+    {
         return Err(fail());
     }
     if keys.contains(&"package")

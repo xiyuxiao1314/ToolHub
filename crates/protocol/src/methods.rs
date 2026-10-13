@@ -3,6 +3,8 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Method {
     ExtensionList,
+    ExtensionPreferences,
+    ExtensionInvoke,
     ExtensionPreview,
     ExtensionInstall,
     ExtensionSetEnabled,
@@ -97,12 +99,13 @@ pub enum Method {
 
 pub const METHOD_NAMES: &[(&str, Method)] = &[
     ("extension.list", Method::ExtensionList),
+    ("extension.preferences", Method::ExtensionPreferences),
+    ("extension.invoke", Method::ExtensionInvoke),
     ("extension.preview", Method::ExtensionPreview),
     ("extension.install", Method::ExtensionInstall),
     ("extension.set_enabled", Method::ExtensionSetEnabled),
     ("extension.remove", Method::ExtensionRemove),
     ("extension.rollback", Method::ExtensionRollback),
-
     ("artifact.roots", Method::ArtifactRoots),
     ("artifact.root_add", Method::ArtifactRootAdd),
     ("artifact.root_disable", Method::ArtifactRootDisable),

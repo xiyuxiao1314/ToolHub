@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://toolhub.local/schemas/extension.schema.json",
-  "title": "ToolHub declarative extension v1",
-  "description": "Maximum complete UTF-8 package size 256 KiB. Namespace, semantic version, alias, portable Skill and filename collision checks are authoritative in the Rust validator. No executable payloads.",
+  "title": "ToolHub extension v1/v2",
+  "description": "Maximum 256 KiB. v1 data contracts remain compatible; v2 contributes native module references, opaque sandboxed frontend views, theme tokens and bounded dependencies. Rust validator enforces reserved namespace, portability and lifecycle contracts.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,7 +18,10 @@
   ],
   "properties": {
     "schema": {
-      "const": "toolhub.extension/v1"
+      "enum": [
+        "toolhub.extension/v1",
+        "toolhub.extension/v2"
+      ]
     },
     "id": {
       "type": "string",
@@ -69,7 +72,10 @@
       "maxLength": 32
     },
     "recognition": {
-      "type": "object",
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": false,
       "required": [
         "schema",
@@ -177,13 +183,204 @@
       "items": {
         "$ref": "skill-bundle.schema.json"
       }
+    },
+    "host_module": {
+      "enum": [
+        "tools",
+        "programs",
+        "artifacts",
+        "envs",
+        "skills",
+        "market",
+        "tasks"
+      ]
+    },
+    "navigation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "icon",
+        "order"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "icon": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        }
+      }
+    },
+    "views": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "icon",
+          "order",
+          "html"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "icon": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          },
+          "css": {
+            "type": "string",
+            "maxLength": 32768
+          },
+          "script": {
+            "type": "string",
+            "maxLength": 65536
+          }
+        }
+      }
+    },
+    "permissions": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 6,
+      "items": {
+        "enum": [
+          "tools.read",
+          "programs.read",
+          "programs.propose",
+          "skills.read",
+          "environments.read",
+          "tasks.read"
+        ]
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "min_version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 96
+          },
+          "min_version": {
+            "type": "string",
+            "maxLength": 32
+          }
+        }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "colors",
+        "layout",
+        "density",
+        "sidebar_width",
+        "radius"
+      ],
+      "properties": {
+        "colors": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "enum": [
+              "bg",
+              "panel",
+              "panel-soft",
+              "ink",
+              "ink-2",
+              "muted",
+              "line",
+              "accent",
+              "accent-soft",
+              "ok",
+              "ok-soft",
+              "warn",
+              "warn-soft",
+              "danger",
+              "danger-soft"
+            ]
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"
+          }
+        },
+        "layout": {
+          "enum": [
+            "left",
+            "right",
+            "top"
+          ]
+        },
+        "density": {
+          "enum": [
+            "comfortable",
+            "compact"
+          ]
+        },
+        "sidebar_width": {
+          "type": "integer",
+          "minimum": 200,
+          "maximum": 340
+        },
+        "radius": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 24
+        }
+      }
     }
   },
   "anyOf": [
     {
       "required": [
         "recognition"
-      ]
+      ],
+      "properties": {
+        "recognition": {
+          "type": "object"
+        }
+      }
     },
     {
       "required": [
@@ -192,6 +389,73 @@
       "properties": {
         "skills": {
           "minItems": 1
+        }
+      }
+    },
+    {
+      "required": [
+        "host_module"
+      ]
+    },
+    {
+      "required": [
+        "views"
+      ],
+      "properties": {
+        "views": {
+          "minItems": 1
+        }
+      }
+    },
+    {
+      "required": [
+        "theme"
+      ]
+    }
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema": {
+            "const": "toolhub.extension/v1"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "host_module"
+              ]
+            },
+            {
+              "required": [
+                "navigation"
+              ]
+            },
+            {
+              "required": [
+                "views"
+              ]
+            },
+            {
+              "required": [
+                "theme"
+              ]
+            },
+            {
+              "required": [
+                "permissions"
+              ]
+            },
+            {
+              "required": [
+                "dependencies"
+              ]
+            }
+          ]
         }
       }
     }

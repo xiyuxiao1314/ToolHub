@@ -32,7 +32,8 @@ def copy_assets(destination, desktop=True):
     for doc in ['ARTIFACTS.md','EXTENSIONS.md']:
         shutil.copy2(root/'docs/development'/doc,destination/'docs/development'/doc)
     (destination/'docs/images').mkdir(parents=True,exist_ok=True)
-    shutil.copy2(root/'docs/images/extensions-manager.png',destination/'docs/images/extensions-manager.png')
+    for image in ['extensions-manager.png','extension-workbench.png','extension-theme.png']:
+        shutil.copy2(root/'docs/images'/image,destination/'docs/images'/image)
     shutil.copytree(license_cache/'THIRD-PARTY-LICENSES',destination/'THIRD-PARTY-LICENSES')
     shutil.copy2(license_cache/'DEPENDENCIES.json',destination/'DEPENDENCIES.json')
     shutil.copy2(root/'docs/releases'/('v'+version+'.md'),destination/'RELEASE-NOTES.md')

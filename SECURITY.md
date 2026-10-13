@@ -60,3 +60,11 @@ Automatic approval is server-issued and still binds the authenticated caller, ex
 ## Explicit task-artifact cleanup
 
 Artifact management is a separate user-selected scope and does not change read-only tool discovery. Only explicitly registered regular files can recycle. High priority and manual retention require the verified desktop; low/medium automatic cleanup requires task completion, no-longer-needed, selected scope and a five-minute grace. Medium additionally records an Agent usage/dependency assertion; it is not a built-in model or proof of all external references. Native recycle-only failure preserves unprocessed files, never falls back to permanent deletion. See [artifact lifecycle](docs/development/ARTIFACTS.md) for limits and interruption handling.
+
+## Extension frontend boundary (2026-10-13)
+
+Opening an installed v2 view executes its declared frontend JavaScript in an opaque sandboxed iframe, never the privileged app document. Installation previews source and permissions but does not itself run scripts. The app retains its original script CSP. An on-demand 127.0.0.1 document server issues random sessions and serves only three virtual resources; it does not resolve files or expose RPC. Remote Tauri ACLs remain absent. Child CSP restricts resource sources and blocks connect/subframes/forms; sandbox denies same-origin, popups and top navigation.
+
+The bridge checks message source, random session, active package/digest, declared permission and concurrency/size limits. The daemon delegates as extension:id with controller=false. No direct file access, launch, approval, cleanup or policy/extension mutation is available to third-party frames. Native official module references are reserved and cannot include third-party code; author/source fields are unverified metadata. A process/document boundary is not a complete OS sandbox.
+
+Uninstall does not delete user files or records. Artifact module removal/disable pauses schedules and cancels deadlines; reactivation does not authorize automatic catch-up. Dependency checks reject missing/incompatible/cyclic providers and block removal of active dependencies. The permanent kernel extension/settings routes remain reachable for recovery.

@@ -1,0 +1,21 @@
+{
+  "schema": "toolhub.extension/v2",
+  "id": "toolhub.builtin.tools",
+  "name": "工具管理",
+  "version": "1.0.0",
+  "description": "工具发现、能力检索、安装实例与使用。",
+  "author": "ToolHub",
+  "license": "MIT",
+  "platforms": [
+    "windows",
+    "macos",
+    "linux"
+  ],
+  "min_toolhub_version": "0.3.0-beta.3",
+  "host_module": "tools",
+  "navigation": {
+    "label": "工具",
+    "icon": "🧰",
+    "order": 10
+  }
+}
