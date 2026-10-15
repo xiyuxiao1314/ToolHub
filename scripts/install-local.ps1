@@ -1,5 +1,5 @@
 [CmdletBinding(PositionalBinding=$false)]
-param([switch]$VerifyOnly, [switch]$UpdateCodexMcp)
+param([switch]$VerifyOnly, [switch]$UpdateCodexMcp, [switch]$KeepOldVersions)
 $ErrorActionPreference = 'Stop'
 $sourceRoot = [IO.Path]::GetFullPath($PSScriptRoot)
 $manifest = Get-Content -LiteralPath (Join-Path $sourceRoot 'package.json') -Raw | ConvertFrom-Json
@@ -70,6 +70,14 @@ try {
   $currentFile = Join-Path $installationRoot 'current.json'
   if (Test-Path -LiteralPath $currentFile) { Copy-Item -LiteralPath $currentFile -Destination (Join-Path $versionPath 'current.before.json') }
   @{build_id=$manifest.build_id;path=$versionPath;desktop=$desktopPath;cli=$cliPath;activated_at=(Get-Date).ToUniversalTime().ToString('o')} | ConvertTo-Json | Set-Content -LiteralPath $currentFile -Encoding utf8NoBOM
+  # Activation is complete. Maintenance is best effort and cannot turn an installed
+  # application into a failed install. Live/configured and rollback builds are kept.
+  $maintenancePath=Join-Path $versionPath 'maintenance.ps1'
+  if (-not $KeepOldVersions -and (Test-Path -LiteralPath $maintenancePath)) {
+    try {
+      & $maintenancePath -Scope versions -Apply -Report (Join-Path $installationRoot 'maintenance\last-install.json') | Out-Host
+    } catch { Write-Warning ('Installed successfully; old-version cleanup skipped: '+$_.Exception.Message) }
+  }
   Write-Output $desktopPath
 } catch {
   if ($startupTask -and $originalActions) { Set-ScheduledTask -TaskName $taskName -Action $originalActions | Out-Null }

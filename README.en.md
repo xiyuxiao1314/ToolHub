@@ -283,6 +283,8 @@ Instance IDs come from query results. Execution is subject to policy, the workin
 
 See [SECURITY.md](SECURITY.md) for implementation constraints. Do not upload your registry database, agent configuration, API keys or private logs as source code.
 
+Use [storage maintenance](docs/development/STORAGE.md) to preview and clean developer caches and obsolete local packages. Active, rollback and referenced builds are retained; old packages use the Recycle Bin.
+
 ## Build from source
 
 Stack: Rust / Tokio / SQLite core, Tauri 2 desktop, React / TypeScript frontend, a separate stdio MCP gateway and a TypeScript SDK.

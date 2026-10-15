@@ -291,6 +291,8 @@ toolhub_bin='/Applications/ToolHub.app/Contents/MacOS/toolhub'
 
 更多实现约束见 [SECURITY.md](SECURITY.md)。请勿把自己的注册表数据库、Agent 配置、API Key 或日志作为源码上传。
 
+开发缓存和旧安装包可用 [存储维护命令](docs/development/STORAGE.md) 先预览再清理。默认保留当前、回退及仍被引用的版本；历史包进入回收站，Cargo 缓存可重新生成。
+
 ## 从源码构建
 
 技术栈：Rust / Tokio / SQLite 核心，Tauri 2 桌面，React / TypeScript 前端，独立 stdio MCP 网关与 TypeScript SDK。

@@ -29,7 +29,7 @@ def copy_assets(destination, desktop=True):
     for name in ['LICENSE','NOTICE','README.md','README.en.md']:
         shutil.copy2(root/name,destination/name)
     (destination/'docs/development').mkdir(parents=True,exist_ok=True)
-    for doc in ['ARTIFACTS.md','EXTENSIONS.md']:
+    for doc in ['ARTIFACTS.md','EXTENSIONS.md','STORAGE.md']:
         shutil.copy2(root/'docs/development'/doc,destination/'docs/development'/doc)
     (destination/'docs/images').mkdir(parents=True,exist_ok=True)
     for image in ['extensions-manager.png','extension-workbench.png','extension-theme.png']:
@@ -52,7 +52,8 @@ if suffix:
     folder.mkdir()
     for name in names: shutil.copy2(binary_dir/(name+suffix),folder/(name+suffix))
     copy_assets(folder)
-    shutil.copy2(root/'scripts/install-local.ps1',folder/'install-local.ps1')
+    for helper in ['install-local.ps1','maintenance.ps1','maintenance.py']:
+        shutil.copy2(root/'scripts'/helper,folder/helper)
     # The local installer expects this metadata and a complete file checksum manifest.
     (folder/'package.json').write_text(json.dumps({'schema':'toolhub.package/v1','build_id':'release-'+version.replace('.','-'),'version':reported,'configuration':'release','unsigned':True,'binaries':[n+suffix for n in names]},indent=2)+'\n',encoding='utf-8')
     sums=['{}  {}'.format(hashlib.sha256(p.read_bytes()).hexdigest(),p.relative_to(folder).as_posix()) for p in sorted(folder.rglob('*')) if p.is_file()]
