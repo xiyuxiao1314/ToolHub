@@ -33,6 +33,8 @@
     "allow-extension-catalog",
     "allow-extension-pick",
     "allow-extension-export",
-    "allow-extension-view-url"
+    "allow-extension-view-url",
+    "allow-pick-cli-path",
+    "allow-extension-repository"
   ]
 }

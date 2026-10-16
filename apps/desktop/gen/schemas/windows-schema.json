@@ -237,6 +237,12 @@
           "markdownDescription": "Enables the extension_pick command without any pre-configured scope."
         },
         {
+          "description": "Enables the extension_repository command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-extension-repository",
+          "markdownDescription": "Enables the extension_repository command without any pre-configured scope."
+        },
+        {
           "description": "Enables the extension_view_url command without any pre-configured scope.",
           "type": "string",
           "const": "allow-extension-view-url",
@@ -289,6 +295,12 @@
           "type": "string",
           "const": "allow-open-terminal",
           "markdownDescription": "Enables the open_terminal command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the pick_cli_path command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-pick-cli-path",
+          "markdownDescription": "Enables the pick_cli_path command without any pre-configured scope."
         },
         {
           "description": "Enables the pick_program_path command without any pre-configured scope.",
@@ -399,6 +411,12 @@
           "markdownDescription": "Denies the extension_pick command without any pre-configured scope."
         },
         {
+          "description": "Denies the extension_repository command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-extension-repository",
+          "markdownDescription": "Denies the extension_repository command without any pre-configured scope."
+        },
+        {
           "description": "Denies the extension_view_url command without any pre-configured scope.",
           "type": "string",
           "const": "deny-extension-view-url",
@@ -451,6 +469,12 @@
           "type": "string",
           "const": "deny-open-terminal",
           "markdownDescription": "Denies the open_terminal command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the pick_cli_path command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-pick-cli-path",
+          "markdownDescription": "Denies the pick_cli_path command without any pre-configured scope."
         },
         {
           "description": "Denies the pick_program_path command without any pre-configured scope.",

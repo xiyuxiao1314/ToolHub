@@ -4,6 +4,7 @@ import { useWorkbench, Toast } from './official/Workbench'
 import { useExtensionHost } from './workbench/host'
 import BuiltinPage from './workbench/BuiltinPage'
 import ExtensionFrame from './workbench/ExtensionFrame'
+import ExtensionCli from './workbench/ExtensionCli'
 import Extensions from './Extensions'
 import './workbench/workbench.css'
 export default function App(){
@@ -27,7 +28,7 @@ export default function App(){
     </aside>
     <section className="content" ref={contentRef}>
       {(host.error||error)&&<div className="banner-error" role="alert"><span>{host.error||error}</span><button className="btn" onClick={()=>{void host.reload();void workbench.load()}}>重试连接</button></div>}
-      {page==='extensions'?<Extensions notify={notify} onTools={()=>navigate('tools')} onLibrary={()=>navigate('skills')}/>:!host.ready?<div className="card card-pad">正在加载扩展工作台…</div>:item?.view?<ExtensionFrame key={item.id+item.extension?.digest} item={item} navigate={navigate} notify={notify}/>:item?<BuiltinPage id={item.id} context={workbench}/>:null}
+      {page==='extensions'?<Extensions notify={notify} onTools={()=>navigate('tools')} onLibrary={()=>navigate('skills')}/>:!host.ready?<div className="card card-pad">正在加载扩展工作台…</div>:item?.cli?<ExtensionCli key={item.id+item.extension?.digest} item={item} navigate={navigate}/>:item?.view?<ExtensionFrame key={item.id+item.extension?.digest} item={item} navigate={navigate} notify={notify}/>:item?<BuiltinPage id={item.id} context={workbench}/>:null}
     </section>
   </div>
 }

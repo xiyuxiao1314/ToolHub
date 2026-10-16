@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 export type View = {id:string; label:string; icon:string; order:number; html:string; css:string; script:string}
+export type CliParameter = {id:string;label:string;kind:'input_file'|'output_file'|'choice';extensions?:string[];choices?:{label:string;value:string}[];default?:string}
+export type CliAction = {id:string;label:string;description:string;parameters:CliParameter[];args:string[];timeout_ms:number}
+export type Cli = {id:string;label:string;icon:string;order:number;tool_definition:string;actions:CliAction[]}
 export type Theme = {colors:Record<string,string>; layout:'left'|'right'|'top'; density:'comfortable'|'compact'; sidebar_width:number; radius:number}
-export type Package = {schema:string; id:string; name:string; description:string; version:string; author:string; license:string; platforms:string[]; min_toolhub_version:string; host_module?:string; navigation?:{label:string;icon:string;order:number}; views?:View[]; theme?:Theme; permissions?:string[]; dependencies?:{id:string;min_version:string}[]; recognition?:{tools:any[];version:string}; skills:any[]}
+export type Package = {schema:string; id:string; name:string; description:string; version:string; author:string; license:string; platforms:string[]; min_toolhub_version:string; host_module?:string; navigation?:{label:string;icon:string;order:number}; views?:View[]; cli?:Cli; theme?:Theme; permissions?:string[]; dependencies?:{id:string;min_version:string}[]; recognition?:{tools:any[];version:string}; skills:any[]}
 export type Installed = {package:Package;digest:string;enabled:boolean;can_rollback:boolean;source:string}
 export type Preferences = {theme_id?:string|null;layout?:'left'|'right'|'top'|null;density?:'comfortable'|'compact'|null}
-export type NavItem = {id:string;label:string;icon:string;order:number;extension?:Installed;view?:View}
+export type NavItem = {id:string;label:string;icon:string;order:number;extension?:Installed;view?:View;cli?:Cli}
 export const rpc = (method:string,params:unknown={})=>invoke<any>('rpc',{method,params})
 export const changed = ()=>window.dispatchEvent(new Event('toolhub:extensions-changed'))
 export function useExtensionHost(){
@@ -17,6 +20,7 @@ export function useExtensionHost(){
     for(const item of installed.filter(e=>e.enabled)){
       const p=item.package
       if(p.host_module && p.navigation)items.push({id:p.host_module,...p.navigation,extension:item})
+      if(p.cli)items.push({id:p.cli.id,label:p.cli.label,icon:p.cli.icon,order:p.cli.order,extension:item,cli:p.cli})
       for(const view of p.views??[])items.push({id:view.id,label:view.label,icon:view.icon,order:view.order,extension:item,view})
     }
     return items.sort((a,b)=>a.order-b.order||a.id.localeCompare(b.id))

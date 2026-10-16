@@ -7,9 +7,11 @@ pub async fn pick_program_path(
     #[cfg(windows)]
     {
         let owner = window.hwnd().map_err(|e| e.to_string())?.0 as usize;
-        tauri::async_runtime::spawn_blocking(move || pick(owner, directory, false, false, false))
-            .await
-            .map_err(|e| e.to_string())?
+        tauri::async_runtime::spawn_blocking(move || {
+            pick(owner, directory, false, false, false, false)
+        })
+        .await
+        .map_err(|e| e.to_string())?
     }
     #[cfg(not(windows))]
     {
@@ -42,6 +44,7 @@ fn pick(
     skill: bool,
     bundle: bool,
     artifact: bool,
+    media: bool,
 ) -> Result<Option<String>, String> {
     use windows::{
         core::w,
@@ -75,7 +78,9 @@ fn pick(
             };
         dialog.SetOptions(options).map_err(|e| e.to_string())?;
         dialog
-            .SetTitle(if artifact {
+            .SetTitle(if media {
+                w!("选择输入媒体文件")
+            } else if artifact {
                 if directory {
                     w!("选择产物管理目录")
                 } else {
@@ -94,14 +99,14 @@ fn pick(
         if !directory {
             dialog
                 .SetFileTypes(&[COMDLG_FILTERSPEC {
-                    pszName: if artifact {
+                    pszName: if media { w!("媒体文件") } else if artifact {
                         w!("所有产物文件")
                     } else if bundle {
                         w!("ToolHub 能力包")
                     } else {
                         w!("程序与启动文件")
                     },
-                    pszSpec: if artifact {
+                    pszSpec: if media { w!("*.mp4;*.mkv;*.mov;*.avi;*.webm;*.m4v;*.mpeg;*.mpg;*.wmv;*.flv;*.ts;*.wav;*.mp3;*.m4a;*.flac;*.ogg;*.aac") } else if artifact {
                         w!("*.*")
                     } else if bundle {
                         w!("*.toolhub-skill.json;*.json")
@@ -132,7 +137,7 @@ pub async fn pick_skill_folder(window: tauri::WebviewWindow) -> Result<Option<St
     #[cfg(windows)]
     {
         let owner = window.hwnd().map_err(|e| e.to_string())?.0 as usize;
-        tauri::async_runtime::spawn_blocking(move || pick(owner, true, true, false, false))
+        tauri::async_runtime::spawn_blocking(move || pick(owner, true, true, false, false, false))
             .await
             .map_err(|e| e.to_string())?
     }
@@ -170,7 +175,7 @@ pub async fn pick_bundle_file(window: tauri::WebviewWindow) -> Result<Option<Str
     #[cfg(windows)]
     {
         let owner = window.hwnd().map_err(|e| e.to_string())?.0 as usize;
-        tauri::async_runtime::spawn_blocking(move || pick(owner, false, false, true, false))
+        tauri::async_runtime::spawn_blocking(move || pick(owner, false, false, true, false, false))
             .await
             .map_err(|e| e.to_string())?
     }
@@ -190,6 +195,13 @@ pub async fn pick_bundle_file(window: tauri::WebviewWindow) -> Result<Option<Str
 pub async fn save_bundle_file(
     window: tauri::WebviewWindow,
     name: String,
+) -> Result<Option<String>, String> {
+    save_file(window, name, false).await
+}
+async fn save_file(
+    window: tauri::WebviewWindow,
+    name: String,
+    media: bool,
 ) -> Result<Option<String>, String> {
     #[cfg(windows)]
     {
@@ -226,18 +238,34 @@ pub async fn save_bundle_file(
                     )
                     .map_err(|e| e.to_string())?;
                 dialog
-                    .SetTitle(w!("导出 ToolHub 通用能力包"))
+                    .SetTitle(if media {
+                        w!("保存媒体处理结果")
+                    } else {
+                        w!("导出 ToolHub 通用能力包")
+                    })
                     .map_err(|e| e.to_string())?;
                 dialog
-                    .SetFileName(&HSTRING::from(name))
+                    .SetFileName(&HSTRING::from(&name))
                     .map_err(|e| e.to_string())?;
                 dialog
-                    .SetDefaultExtension(w!("json"))
+                    .SetDefaultExtension(&HSTRING::from(if media {
+                        name.rsplit('.').next().unwrap_or("mp4")
+                    } else {
+                        "json"
+                    }))
                     .map_err(|e| e.to_string())?;
                 dialog
                     .SetFileTypes(&[COMDLG_FILTERSPEC {
-                        pszName: w!("ToolHub 能力包"),
-                        pszSpec: w!("*.toolhub-skill.json"),
+                        pszName: if media {
+                            w!("媒体文件")
+                        } else {
+                            w!("ToolHub 能力包")
+                        },
+                        pszSpec: if media {
+                            w!("*.*")
+                        } else {
+                            w!("*.toolhub-skill.json")
+                        },
                     }])
                     .map_err(|e| e.to_string())?;
                 if let Err(e) = dialog.Show(Some(HWND(owner as *mut _))) {
@@ -262,9 +290,12 @@ pub async fn save_bundle_file(
     {
         let _ = window;
         #[cfg(target_os = "macos")]
-        return tauri::async_runtime::spawn_blocking(move || crate::macos::choose("save", &name))
-            .await
-            .map_err(|e| e.to_string())?;
+        return tauri::async_runtime::spawn_blocking(move || {
+            let _ = media;
+            crate::macos::choose("save", &name)
+        })
+        .await
+        .map_err(|e| e.to_string())?;
         #[cfg(not(target_os = "macos"))]
         {
             let _ = name;
@@ -282,9 +313,11 @@ pub async fn pick_artifact_path(
     #[cfg(windows)]
     {
         let owner = window.hwnd().map_err(|e| e.to_string())?.0 as usize;
-        tauri::async_runtime::spawn_blocking(move || pick(owner, directory, false, false, true))
-            .await
-            .map_err(|e| e.to_string())?
+        tauri::async_runtime::spawn_blocking(move || {
+            pick(owner, directory, false, false, true, false)
+        })
+        .await
+        .map_err(|e| e.to_string())?
     }
     #[cfg(target_os = "macos")]
     {
@@ -306,5 +339,38 @@ pub async fn pick_artifact_path(
     {
         let _ = (window, directory);
         Err("当前平台暂不支持产物选择器".into())
+    }
+}
+
+#[tauri::command]
+pub async fn pick_cli_path(
+    window: tauri::WebviewWindow,
+    save: bool,
+    name: String,
+) -> Result<Option<String>, String> {
+    if name.is_empty() || name.len() > 240 || name.contains(['/', '\\', '\0', ':']) {
+        return Err("invalid media filename".into());
+    }
+    if save {
+        return save_file(window, name, true).await;
+    }
+    #[cfg(windows)]
+    {
+        let owner = window.hwnd().map_err(|e| e.to_string())?.0 as usize;
+        tauri::async_runtime::spawn_blocking(move || pick(owner, false, false, false, false, true))
+            .await
+            .map_err(|e| e.to_string())?
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = window;
+        tauri::async_runtime::spawn_blocking(|| crate::macos::choose("file", "选择输入媒体文件"))
+            .await
+            .map_err(|e| e.to_string())?
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        let _ = window;
+        Err("media picker unavailable".into())
     }
 }

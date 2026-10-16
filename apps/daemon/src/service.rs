@@ -26,6 +26,8 @@ mod program_proposals;
 pub(crate) mod programs;
 #[path = "scan_jobs.rs"]
 mod scan_jobs;
+#[path = "extension_cli.rs"]
+mod extension_cli;
 #[path = "workbench.rs"]
 mod workbench;
 #[path = "workflows.rs"]

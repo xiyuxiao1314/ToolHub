@@ -55,6 +55,173 @@ pub struct ExtensionDependency {
     pub id: String,
     pub min_version: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CliChoice {
+    pub label: String,
+    pub value: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CliParameter {
+    pub id: String,
+    pub label: String,
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub extensions: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub choices: Vec<CliChoice>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<String>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CliAction {
+    pub id: String,
+    pub label: String,
+    pub description: String,
+    pub parameters: Vec<CliParameter>,
+    pub args: Vec<String>,
+    pub timeout_ms: u64,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExtensionCli {
+    pub id: String,
+    pub label: String,
+    pub icon: String,
+    pub order: u16,
+    pub tool_definition: String,
+    pub actions: Vec<CliAction>,
+}
+impl ExtensionCli {
+    pub fn validate(&self, package_id: &str) -> Result<(), String> {
+        let bounded =
+            |s: &str, n| !s.trim().is_empty() && s.len() <= n && !s.chars().any(char::is_control);
+        let key = |s: &str| {
+            !s.is_empty()
+                && s.len() <= 48
+                && s.bytes()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'_')
+        };
+        if !self.id.starts_with(&format!("{package_id}."))
+            || self.id.len() > 128
+            || toolhub_core::DefinitionId::new(&self.id).is_err()
+            || !bounded(&self.label, 64)
+            || !bounded(&self.icon, 32)
+            || self.tool_definition.len() > 128
+            || toolhub_core::DefinitionId::new(&self.tool_definition).is_err()
+            || self.actions.is_empty()
+            || self.actions.len() > 8
+        {
+            return Err("invalid CLI contribution".into());
+        }
+        let mut ids = BTreeSet::new();
+        for action in &self.actions {
+            if !key(&action.id)
+                || !ids.insert(&action.id)
+                || !bounded(&action.label, 64)
+                || !bounded(&action.description, 1024)
+                || !(1..=300000).contains(&action.timeout_ms)
+                || action.parameters.is_empty()
+                || action.parameters.len() > 8
+                || action.args.is_empty()
+                || action.args.len() > 128
+            {
+                return Err("invalid CLI action bounds".into());
+            }
+            let mut parameters = BTreeSet::new();
+            for p in &action.parameters {
+                if !key(&p.id) || !parameters.insert(&p.id) || !bounded(&p.label, 64) {
+                    return Err("invalid CLI parameter".into());
+                }
+                match p.kind.as_str() {
+                    "input_file" | "output_file" => {
+                        if p.extensions.is_empty()
+                            || p.extensions.len() > 24
+                            || !p.choices.is_empty()
+                            || p.default.is_some()
+                            || p.extensions.iter().any(|e| {
+                                e.is_empty()
+                                    || e.len() > 12
+                                    || !e
+                                        .bytes()
+                                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+                            })
+                        {
+                            return Err(
+                                "file parameters require bounded suffixes, no defaults".into()
+                            );
+                        }
+                    }
+                    "choice" => {
+                        if !p.extensions.is_empty()
+                            || p.choices.is_empty()
+                            || p.choices.len() > 16
+                            || p.choices
+                                .iter()
+                                .any(|c| !bounded(&c.label, 64) || !bounded(&c.value, 128))
+                            || p.choices
+                                .iter()
+                                .map(|c| &c.value)
+                                .collect::<BTreeSet<_>>()
+                                .len()
+                                != p.choices.len()
+                            || !p
+                                .default
+                                .as_ref()
+                                .is_some_and(|v| p.choices.iter().any(|c| &c.value == v))
+                        {
+                            return Err(
+                                "choice parameters require finite values and a valid default"
+                                    .into(),
+                            );
+                        }
+                    }
+                    _ => return Err("CLI parameters support files and finite choices only".into()),
+                }
+            }
+            if action
+                .parameters
+                .iter()
+                .filter(|p| p.kind == "input_file")
+                .count()
+                != 1
+                || action
+                    .parameters
+                    .iter()
+                    .filter(|p| p.kind == "output_file")
+                    .count()
+                    != 1
+            {
+                return Err("CLI actions require exactly one input and one output file".into());
+            }
+            let mut used = BTreeSet::new();
+            for arg in &action.args {
+                if !bounded(arg, 4096) {
+                    return Err("invalid CLI argument".into());
+                }
+                if let Some(id) = arg.strip_prefix('{').and_then(|s| s.strip_suffix('}')) {
+                    if !parameters.contains(&id.to_string()) {
+                        return Err("unknown CLI placeholder".into());
+                    }
+                    used.insert(id);
+                } else if arg.contains(['{', '}']) {
+                    return Err("CLI placeholders must occupy a complete argument".into());
+                }
+            }
+            if action
+                .parameters
+                .iter()
+                .any(|p| !used.contains(p.id.as_str()))
+            {
+                return Err("unused CLI parameter".into());
+            }
+        }
+        Ok(())
+    }
+}
 pub const MAX_EXTENSION_BYTES: usize = 262144;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -80,6 +247,8 @@ pub struct ExtensionPackage {
     pub views: Vec<ExtensionView>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<ExtensionTheme>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cli: Option<ExtensionCli>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub permissions: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -121,7 +290,8 @@ impl ExtensionPackage {
                 && self.skills.is_empty()
                 && self.host_module.is_none()
                 && self.views.is_empty()
-                && self.theme.is_none())
+                && self.theme.is_none()
+                && self.cli.is_none())
         {
             return Err("invalid extension metadata or bounds".into());
         }
@@ -130,6 +300,7 @@ impl ExtensionPackage {
                 || self.navigation.is_some()
                 || !self.views.is_empty()
                 || self.theme.is_some()
+                || self.cli.is_some()
                 || !self.permissions.is_empty()
                 || !self.dependencies.is_empty())
         {
@@ -141,6 +312,7 @@ impl ExtensionPackage {
                 || self.navigation.is_none()
                 || !self.views.is_empty()
                 || self.theme.is_some()
+                || self.cli.is_some()
                 || self.recognition.is_some()
                 || !self.skills.is_empty()
                 || !self.permissions.is_empty()
@@ -166,6 +338,18 @@ impl ExtensionPackage {
                 .any(|p| !BRIDGE_PERMISSIONS.contains(&p.as_str()))
         {
             return Err("invalid view, dependency or permission bounds".into());
+        }
+        if let Some(cli) = &self.cli {
+            cli.validate(&self.id)?;
+            if self.min_toolhub_version != "0.3.0-beta.4"
+                && toolhub_core::compare_versions(&self.min_toolhub_version, "0.3.0-beta.4")
+                    .is_ok_and(|v| v == std::cmp::Ordering::Less)
+            {
+                return Err("CLI contributions require ToolHub beta.4 or newer".into());
+            }
+            if self.views.iter().any(|v| v.id == cli.id) {
+                return Err("duplicate navigation id".into());
+            }
         }
         let mut view_ids = BTreeSet::new();
         for view in &self.views {
@@ -403,5 +587,48 @@ mod workbench_validation_tests {
         ] {
             assert!(value.get(field).is_none());
         }
+    }
+}
+
+#[cfg(test)]
+mod cli_contract_tests {
+    use super::*;
+    use serde_json::{json, Value};
+    fn sample() -> Value {
+        serde_json::from_str(include_str!(
+            "../../../extensions/examples/ffmpeg.toolhub-extension.json"
+        ))
+        .unwrap()
+    }
+    #[test]
+    fn cli_sample_and_legacy_snapshots_validate_but_unsafe_templates_do_not() {
+        let sample = sample();
+        assert!(ExtensionPackage::parse(&serde_json::to_vec(&sample).unwrap()).is_ok());
+        for (path, value) in [
+            ("/schema", json!("toolhub.extension/v1")),
+            ("/min_toolhub_version", json!("0.3.0-beta.3")),
+            ("/cli/actions/0/args/0", json!("prefix-{input}")),
+            ("/cli/actions/0/args/0", json!("{undeclared}")),
+            ("/cli/actions/0/parameters/0/kind", json!("shell")),
+            ("/cli/actions/0/parameters/0/extensions/0", json!("../mp4")),
+            ("/cli/actions/0/parameters/2/default", json!("999")),
+            ("/cli/actions/0/timeout_ms", json!(300001)),
+        ] {
+            let mut p = sample.clone();
+            *p.pointer_mut(path).unwrap() = value;
+            assert!(
+                ExtensionPackage::parse(&serde_json::to_vec(&p).unwrap()).is_err(),
+                "accepted {path}"
+            );
+        }
+        let legacy = ExtensionPackage::parse(include_bytes!(
+            "../../../extensions/examples/blender.toolhub-extension.json"
+        ))
+        .unwrap();
+        assert!(!serde_json::to_value(legacy)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .contains_key("cli"));
     }
 }

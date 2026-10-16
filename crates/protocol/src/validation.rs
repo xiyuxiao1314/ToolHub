@@ -376,6 +376,21 @@ fn validate_extension(
 ) -> Result<(), ProtocolError> {
     let fail = || ProtocolError::new(ErrorCode::InvalidParams, "invalid extension parameters");
     let keys: &[&str] = match method {
+        "extension.cli_preview" => &[
+            "id",
+            "expected_digest",
+            "action_id",
+            "instance_id",
+            "values",
+        ],
+        "extension.cli_start" => &[
+            "id",
+            "expected_digest",
+            "action_id",
+            "instance_id",
+            "values",
+            "confirmation",
+        ],
         "extension.list" => &[],
         "extension.preferences" => &["settings"],
         "extension.invoke" => &["id", "expected_digest", "method", "params"],
@@ -386,6 +401,27 @@ fn validate_extension(
         _ => return Err(fail()),
     };
     if p.keys().any(|k| !keys.contains(&k.as_str())) {
+        return Err(fail());
+    }
+    if method.starts_with("extension.cli_")
+        && (!p
+            .get("action_id")
+            .is_some_and(|v| v.as_str().is_some_and(|s| !s.is_empty() && s.len() <= 48))
+            || !p
+                .get("instance_id")
+                .is_some_and(|v| v.as_str().is_some_and(|s| !s.is_empty() && s.len() <= 128))
+            || !p.get("values").is_some_and(|v| {
+                v.as_object().is_some_and(|o| {
+                    o.len() <= 8
+                        && o.values()
+                            .all(|v| v.as_str().is_some_and(|s| s.len() <= 4096))
+                })
+            })
+            || (method == "extension.cli_start"
+                && !p
+                    .get("confirmation")
+                    .is_some_and(|v| v.is_object() && v.to_string().len() <= 65536)))
+    {
         return Err(fail());
     }
     if method == "extension.preferences"
@@ -432,4 +468,32 @@ fn validate_extension(
         return Err(fail());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn cli_params_reject_raw_execute_fields_and_require_confirmation() {
+        let p = json!({"id":"community.ffmpeg","expected_digest":"abc","action_id":"audio","instance_id":"ffmpeg","values":{"input":"x","output":"y"}});
+        assert!(validate_method_params(&JsonRpcRequest::new(
+            1,
+            "extension.cli_preview",
+            p.clone()
+        ))
+        .is_ok());
+        assert!(
+            validate_method_params(&JsonRpcRequest::new(1, "extension.cli_start", p.clone()))
+                .is_err()
+        );
+        let mut bad = p.clone();
+        bad["args"] = json!(["arbitrary"]);
+        assert!(
+            validate_method_params(&JsonRpcRequest::new(1, "extension.cli_preview", bad)).is_err()
+        );
+        let mut ok = p;
+        ok["confirmation"] = json!({});
+        assert!(validate_method_params(&JsonRpcRequest::new(1, "extension.cli_start", ok)).is_ok());
+    }
 }

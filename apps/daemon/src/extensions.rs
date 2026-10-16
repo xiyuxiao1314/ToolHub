@@ -207,7 +207,10 @@ impl DaemonService {
         method: &str,
         params: &Value,
     ) -> Result<Value, ProtocolError> {
-        if matches!(method, "extension.preferences" | "extension.invoke") {
+        if matches!(
+            method,
+            "extension.preferences" | "extension.invoke" | "extension.cli_preview"
+        ) {
             return self.dispatch_workbench(method, params);
         }
         if method == "extension.list" {

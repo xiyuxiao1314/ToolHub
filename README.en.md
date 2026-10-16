@@ -341,3 +341,11 @@ Open an [Issue](https://github.com/xiyuxiao1314/ToolHub/issues) or Pull Request.
 ## License
 
 ToolHub source code is licensed under the [MIT License](LICENSE). Third-party dependencies retain their respective licenses. ToolHub packages do not bundle discovered software such as FFmpeg, Python or Node.js, or grant redistribution rights for it. See [NOTICE](NOTICE) for brand assets and third-party dependency information.
+
+
+### FFmpeg extension (local beta.4 development build)
+
+The [FFmpeg media workshop](extensions/examples/ffmpeg.toolhub-extension.json) adds video compression, MP4 conversion and M4A extraction as an independently installable CLI panel. The kernel renders file pickers, an exact argv preview and one-run confirmation, using existing background tasks/cancellation/policy; the package also provides a portable Agent workflow. FFmpeg is not downloaded or bundled. Windows execution is supported; macOS is preview/query only. Public downloads remain beta.2; beta.4 is unreleased. See [extension documentation](docs/development/EXTENSIONS.md) for actual boundaries.
+
+
+[ToolHub-Extensions](https://github.com/xiyuxiao1314/ToolHub-Extensions) is a separate public catalog with type/tag/platform filters and checksummed manifests. Open it from the desktop extension manager, review a package, then import explicitly.

@@ -37,14 +37,14 @@ fn dispatch(
             Err(response) => response,
         };
     }
-    if req.method == "execute.tool" {
+    if req.method == "execute.tool" || req.method == "extension.cli_start" {
         let prepared = service
             .lock()
             .unwrap()
             .prepare_execution(req, principal, controller);
         match prepared {
             Ok(job) => {
-                if req.params["background"] == true {
+                if req.params["background"] == true || req.method == "extension.cli_start" {
                     let id = job.id().to_string();
                     let owned = Arc::clone(service);
                     std::thread::spawn(move || {

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://toolhub.local/schemas/extension.schema.json",
   "title": "ToolHub extension v1/v2",
-  "description": "Maximum 256 KiB. v1 data contracts remain compatible; v2 contributes native module references, opaque sandboxed frontend views, theme tokens and bounded dependencies. Rust validator enforces reserved namespace, portability and lifecycle contracts.",
+  "description": "Maximum 256 KiB. v1 data contracts remain compatible; v2 contributes native module references, opaque sandboxed frontend views, theme tokens and bounded dependencies. Rust validator enforces reserved namespace, portability and lifecycle contracts. Since beta.4: declarative CLI contribution, rendered by the native host with per-run confirmation; scripts have no execution bridge. Rust additionally validates placeholders and exactly one input/output.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -369,6 +369,211 @@
           "maximum": 24
         }
       }
+    },
+    "cli": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "icon": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "tool_definition": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 48,
+                "pattern": "^[a-z0-9_]+$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "parameters": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 8,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 48,
+                      "pattern": "^[a-z0-9_]+$"
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "kind": {
+                      "enum": [
+                        "input_file",
+                        "output_file",
+                        "choice"
+                      ]
+                    },
+                    "extensions": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 24,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 12,
+                        "pattern": "^[a-z0-9]+$"
+                      }
+                    },
+                    "choices": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 16,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "value": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "value"
+                        ]
+                      }
+                    },
+                    "default": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "label",
+                    "kind"
+                  ],
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "kind": {
+                            "const": "choice"
+                          }
+                        }
+                      },
+                      "then": {
+                        "required": [
+                          "choices",
+                          "default"
+                        ],
+                        "not": {
+                          "required": [
+                            "extensions"
+                          ]
+                        }
+                      },
+                      "else": {
+                        "required": [
+                          "extensions"
+                        ],
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": [
+                                "choices"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "default"
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "args": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 128,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                }
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 300000
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "description",
+              "parameters",
+              "args",
+              "timeout_ms"
+            ]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "icon",
+        "order",
+        "tool_definition",
+        "actions"
+      ]
     }
   },
   "anyOf": [
@@ -410,6 +615,11 @@
     {
       "required": [
         "theme"
+      ]
+    },
+    {
+      "required": [
+        "cli"
       ]
     }
   ],
@@ -453,6 +663,11 @@
             {
               "required": [
                 "dependencies"
+              ]
+            },
+            {
+              "required": [
+                "cli"
               ]
             }
           ]

@@ -17,6 +17,9 @@ pub fn extension_catalog() -> Result<Value, String> {
     all.push(ExtensionPackage::parse(include_bytes!(
         "../../../extensions/examples/graphite.toolhub-extension.json"
     ))?);
+    all.push(ExtensionPackage::parse(include_bytes!(
+        "../../../extensions/examples/ffmpeg.toolhub-extension.json"
+    ))?);
     serde_json::to_value(all).map_err(|e| e.to_string())
 }
 #[tauri::command]
@@ -84,4 +87,34 @@ pub async fn extension_export(
     .map_err(|e| e.to_string())?;
     file.sync_all().map_err(|e| e.to_string())?;
     Ok(Some(path))
+}
+
+/// Explicit user click opens the curated repository; no download or install occurs here.
+#[tauri::command]
+pub fn extension_repository() -> Result<(), String> {
+    const URL: &str = "https://github.com/xiyuxiao1314/ToolHub-Extensions";
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        std::process::Command::new("explorer.exe")
+            .arg(URL)
+            .creation_flags(0x08000000)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(URL)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(URL)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }

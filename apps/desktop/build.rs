@@ -7,6 +7,8 @@ fn main() {
             "autostart_set",
             "agent_integration",
             "agent_mcp_check",
+            "pick_cli_path",
+            "extension_repository",
             "extension_catalog",
             "extension_view_url",
             "extension_pick",

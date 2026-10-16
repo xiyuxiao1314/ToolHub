@@ -349,3 +349,11 @@ docs/                 系统设计、实现说明、历史开发与验证记录
 ## 许可证
 
 ToolHub 源码以 [MIT License](LICENSE) 开源。第三方依赖保持各自许可证；ToolHub 发布包不附带 FFmpeg、Python、Node.js 等被发现的软件，也不授予它们的再分发权。品牌资源和第三方依赖说明见 [NOTICE](NOTICE)。
+
+
+### FFmpeg 媒体扩展（本地 beta.4 开发版）
+
+扩展目录新增 [FFmpeg 媒体工坊](extensions/examples/ffmpeg.toolhub-extension.json)，安装后增加独立导航，可压缩视频、转成 MP4、提取 M4A 音频。核心负责选择文件、预览参数、逐次确认、后台任务与取消，扩展提供操作声明及 Agent 通用流程。不会下载 FFmpeg，首次使用需核对本机安装实例的信任。Windows 支持受控执行；macOS 仅预览/查询。现有公开下载仍为 beta.2，beta.4 尚未发布。完整接口及限制见 [扩展文档](docs/development/EXTENSIONS.md)。
+
+
+[独立扩展目录 / ToolHub-Extensions](https://github.com/xiyuxiao1314/ToolHub-Extensions) 提供分类、标签、平台筛选与可核对的扩展 JSON。桌面扩展管理中可直接打开社区仓库。

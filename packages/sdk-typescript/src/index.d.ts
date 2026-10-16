@@ -20,6 +20,11 @@ export interface ProgramEntry extends ProgramCandidate { metadata?:ProgramMetada
 export interface ProgramSelection extends Omit<ProgramCandidate,'id'> { selection_id:string; args:string[]; favorite:boolean; }
 export interface ProgramDraft { metadata?:ProgramMetadata; id?:string; selection_id?:string; cwd_selection_id?:string; name:string; command:string; args:string[]; favorite:boolean; }
 export interface ProgramScan { id?:string; status:'idle'|'running'|'completed'|'partial'|'cancelled'|'failed'; roots?:string[]; roots_attempted?:string[]; visited?:number; skipped?:number; unreadable?:number; current?:string; limitations?:string[]; total:number; candidates:ProgramCandidate[]; }
+export interface CliParameter {id:string;label:string;kind:'input_file'|'output_file'|'choice';extensions?:string[];choices?:{label:string;value:string}[];default?:string;}
+export interface CliAction {id:string;label:string;description:string;parameters:CliParameter[];args:string[];timeout_ms:number;}
+export interface ExtensionCli {id:string;label:string;icon:string;order:number;tool_definition:string;actions:CliAction[];}
+export interface CliRequest {id:string;expected_digest:string;action_id:string;instance_id:string;values:Record<string,string>;}
+export interface CliPreview {id:string;expected_digest:string;action_id:string;instance_id:string;label:string;executable:string;args:string[];cwd:string;output:string;timeout_ms:number;trust:string;supported:boolean;}
 export interface ExtensionPackage {
  schema:'toolhub.extension/v1'|'toolhub.extension/v2'; id:string; name:string; version:string; description:string;
  author:string; license:string; platforms:('windows'|'macos'|'linux')[]; min_toolhub_version:string;
@@ -31,11 +36,14 @@ export interface ExtensionPackage {
  theme?:{colors:Record<string,string>;layout:'left'|'right'|'top';density:'comfortable'|'compact';sidebar_width:number;radius:number};
  permissions?:('tools.read'|'programs.read'|'programs.propose'|'skills.read'|'environments.read'|'tasks.read')[];
  dependencies?:{id:string;min_version:string}[];
+ cli?:ExtensionCli;
 }
 export interface ExtensionRecord {package:ExtensionPackage;digest:string;enabled:boolean;source:string;can_rollback:boolean;installed_at:string;updated_at:string;}
 export interface ExtensionPreview {package:ExtensionPackage;digest:string;compatible:boolean;conflict:string|null;installed_digest:string|null;dependencies:Json[];permissions:string[];instruction_authority:false;}
 export interface MethodMap {
  'extension.list':{params:{};result:ExtensionRecord[]};
+ 'extension.cli_preview':{params:CliRequest;result:CliPreview};
+ 'extension.cli_start':{params:CliRequest & {confirmation:CliPreview};result:StartedExecution};
  'extension.preferences':{params:{settings?:{theme_id?:string|null;layout?:'left'|'right'|'top'|null;density?:'comfortable'|'compact'|null}};result:Json};
  'extension.invoke':{params:{id:string;expected_digest:string;method:string;params?:Record<string,Json>};result:Json};
  'extension.preview':{params:{package:ExtensionPackage};result:ExtensionPreview};

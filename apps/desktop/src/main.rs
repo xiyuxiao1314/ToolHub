@@ -12,7 +12,7 @@ mod installation;
 mod integration;
 mod market;
 use extension_frame::{extension_view_url, FrameServer};
-use extensions::{extension_catalog, extension_export, extension_pick};
+use extensions::{extension_catalog, extension_export, extension_pick, extension_repository};
 use market::{market_add, market_export, market_inspect, market_list, market_pick, market_share};
 #[cfg(target_os = "macos")]
 mod macos;
@@ -20,7 +20,7 @@ mod program_picker;
 use autostart::{autostart_set, autostart_status};
 use integration::{agent_integration, agent_mcp_check};
 use program_picker::{
-    builtin_skill_paths, pick_artifact_path, pick_program_path, pick_skill_folder,
+    builtin_skill_paths, pick_artifact_path, pick_program_path, pick_skill_folder, pick_cli_path,
 };
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
@@ -269,6 +269,8 @@ fn main() {
             autostart_set,
             agent_integration,
             agent_mcp_check,
+            pick_cli_path,
+            extension_repository,
             extension_catalog,
             extension_view_url,
             extension_pick,

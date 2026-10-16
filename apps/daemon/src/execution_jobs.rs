@@ -49,7 +49,13 @@ impl DaemonService {
         let old = std::mem::replace(&mut self.controller_verified, controller);
         let result = toolhub_protocol::validate_method_params(req)
             .and_then(|()| self.refresh_authority())
-            .and_then(|()| self.prepare_job(&req.params, principal, controller, req.id.clone()));
+            .and_then(|()| {
+                if req.method == "extension.cli_start" {
+                    self.prepare_cli_job(req)
+                } else {
+                    self.prepare_job(&req.params, principal, controller, req.id.clone())
+                }
+            });
         let result = match result {
             Ok(job) => Ok(job),
             Err(error) => {

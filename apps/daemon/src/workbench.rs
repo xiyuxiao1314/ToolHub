@@ -147,6 +147,10 @@ impl DaemonService {
         params: &Value,
     ) -> Result<Value, ProtocolError> {
         match method {
+            "extension.cli_preview" => {
+                self.require_controller()?;
+                Ok(self.cli_request(params)?.1)
+            }
             "extension.preferences" => {
                 if let Some(settings) = params.get("settings") {
                     self.require_controller()?;
