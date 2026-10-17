@@ -11,6 +11,8 @@ mod agent_diagnostics;
 mod artifacts;
 #[path = "execution_jobs.rs"]
 mod execution_jobs;
+#[path = "extension_cli.rs"]
+mod extension_cli;
 #[path = "extensions.rs"]
 mod extensions;
 #[path = "inventory.rs"]
@@ -26,8 +28,6 @@ mod program_proposals;
 pub(crate) mod programs;
 #[path = "scan_jobs.rs"]
 mod scan_jobs;
-#[path = "extension_cli.rs"]
-mod extension_cli;
 #[path = "workbench.rs"]
 mod workbench;
 #[path = "workflows.rs"]
@@ -35,6 +35,9 @@ mod workflows;
 use workflows::{json_err, sql_err};
 #[path = "connected_flows.rs"]
 mod connected_flows;
+#[cfg(test)]
+#[path = "project_dependency_tests.rs"]
+mod project_dependency_tests;
 
 use serde_json::{json, Value};
 
@@ -266,6 +269,10 @@ impl DaemonService {
                 "tools": self.registry.count_instances().map_err(db_err)?,
                 "candidates": self.registry.count_candidates().map_err(db_err)?,
             })),
+            Method::ProjectDependencies => Ok(json!(self
+                .registry
+                .project_dependencies(None)
+                .map_err(db_err)?)),
             Method::SearchTools => self.search_inventory(params),
             Method::PreferInstance => self.prefer_instance(params),
             Method::HealthInstance => self.health_instance(params),
@@ -283,6 +290,7 @@ impl DaemonService {
                             .map_err(db_err)?;
                         Ok(json!({
                             "version_probe_args": inventory::version_probe_args(&row.definition_id),
+                            "projects": self.registry.project_dependencies(Some(&row.id)).map_err(db_err)?,
                             "instance": row,
                             "capabilities": caps,
                         }))
@@ -701,8 +709,21 @@ impl DaemonService {
                 continue;
             }
             if let (Some(def), Some(inst)) = (rec.definition.as_ref(), rec.instance.as_ref()) {
-                let env_id = self.env_graph.ensure_detected(&inst.path);
-                let owner = toolhub_environment::attribute_owner(&inst.path);
+                let project = report
+                    .project_dependencies
+                    .iter()
+                    .find(|d| d.instance_id.as_deref() == Some(inst.id.as_str()));
+                let env_id = if let Some(d) = project {
+                    self.env_graph
+                        .ensure_npm_project(&d.project_root, &d.project_name)
+                } else {
+                    self.env_graph.ensure_detected(&inst.path)
+                };
+                let owner = if let Some(d) = project {
+                    toolhub_core::Owner::from_directory_hint(&d.project_root, &d.project_name)
+                } else {
+                    toolhub_environment::attribute_owner(&inst.path)
+                };
                 let scope = report.coverage.scopes.iter().find(|scope| {
                     toolhub_core::normalize_path(&inst.path)
                         .starts_with(&toolhub_core::normalize_path(&scope.root))
@@ -718,9 +739,19 @@ impl DaemonService {
                         path: inst.path.clone(),
                         canonical_path: inst.canonical_path.clone(),
                         environment_id: Some(env_id.as_str().into()),
-                        origin_json: serde_json::to_string(&inst.origin).map_err(json_err)?,
+                        origin_json: serde_json::to_string(&if project.is_some() {
+                            toolhub_core::Origin::ProjectLocal
+                        } else {
+                            inst.origin.clone()
+                        })
+                        .map_err(json_err)?,
                         owner_json: serde_json::to_string(&owner).map_err(json_err)?,
-                        trust_json: serde_json::to_string(&inst.trust).map_err(json_err)?,
+                        trust_json: serde_json::to_string(&if project.is_some() {
+                            toolhub_core::TrustRecord::unknown()
+                        } else {
+                            inst.trust.clone()
+                        })
+                        .map_err(json_err)?,
                         status: "available".into(),
                         capabilities: def
                             .capabilities
@@ -784,11 +815,12 @@ impl DaemonService {
             })
             .collect::<Vec<_>>();
         self.registry
-            .ingest_scan(
+            .ingest_scan_with_projects(
                 &self.env_graph.environments,
                 &instances,
                 &candidates,
                 &scopes,
+                &report.project_dependencies,
             )
             .map_err(db_err)?;
         self.last_scan = Some(chrono::Utc::now());

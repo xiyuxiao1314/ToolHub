@@ -81,6 +81,24 @@ impl EnvironmentGraph {
             .map(|e| e.id.clone())
     }
 
+    pub fn ensure_npm_project(&mut self, root: &str, name: &str) -> EnvironmentId {
+        let id = EnvironmentId::new(format!(
+            "env.npmproject.{}",
+            &toolhub_core::path_fingerprint(&toolhub_core::normalize_path(root))[..20]
+        ))
+        .unwrap();
+        self.insert(Environment {
+            id: id.clone(),
+            name: name.into(),
+            kind: EnvironmentKind::ProjectLocal,
+            root_path: Some(root.into()),
+            parent_id: Some(EnvironmentId::new("env.user").unwrap()),
+            origin: Origin::ProjectLocal,
+            owner: Owner::from_directory_hint(root, name),
+            labels: vec!["selected npm project; metadata only".into()],
+        });
+        id
+    }
     pub fn ensure_detected(&mut self, path: &str) -> EnvironmentId {
         let id = self.environment_for_path(path);
         if !self.environments.iter().any(|e| e.id == id) {

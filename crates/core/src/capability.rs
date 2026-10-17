@@ -137,6 +137,7 @@ impl CapabilityRegistry {
 pub const CORE_CAPABILITIES: &[(&str, &str)] = &[
     ("language.python.execute", "Execute Python code"),
     ("language.node.execute", "Execute Node.js code"),
+    ("desktop.electron.run", "Run an Electron desktop project"),
     ("language.java.runtime", "Run Java programs"),
     ("language.rust.compile", "Compile Rust code"),
     ("language.go.compile", "Compile Go code"),

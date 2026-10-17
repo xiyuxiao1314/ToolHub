@@ -32,14 +32,38 @@ pub fn read(path: &Path) -> NativeMetadata {
         return NativeMetadata::default();
     };
     let mut bytes = vec![];
-    // Full read keeps version resources reachable on large tools (node.exe is ~90MB).
-    if std::io::Read::take(file, 96 * 1024 * 1024)
-        .read_to_end(&mut bytes)
-        .is_err()
+    // Windows reads a small format header plus bounded version resources via the OS.
+    // Other platforms keep the bounded static prefix parser; no executable is launched.
+    if std::io::Read::take(
+        file,
+        if cfg!(windows) {
+            128 * 1024
+        } else {
+            96 * 1024 * 1024
+        },
+    )
+    .read_to_end(&mut bytes)
+    .is_err()
     {
         return NativeMetadata::default();
     }
     let mut m = measure(&bytes);
+    #[cfg(windows)]
+    if m.format.as_deref() == Some("pe") {
+        if let Some(strings) = windows_version_strings(path) {
+            m.product = strings.get("ProductName").cloned().or(m.product);
+            m.publisher = strings.get("CompanyName").cloned().or(m.publisher);
+            m.original_filename = strings
+                .get("OriginalFilename")
+                .cloned()
+                .or(m.original_filename);
+            m.version = strings
+                .get("ProductVersion")
+                .or_else(|| strings.get("FileVersion"))
+                .map(|v| normalize_pe_version(v))
+                .or(m.version);
+        }
+    }
     if m.version.is_none() {
         m.version = scan_version_fallback(&bytes);
     }
@@ -296,4 +320,46 @@ mod tests {
         assert_eq!(metadata.format.as_deref(), Some("mach_o"));
         assert_eq!(metadata.arch.as_deref(), Some("x86_64"));
     }
+}
+
+// Version APIs read data resources only; no process or DLL code is loaded/executed.
+#[cfg(windows)]
+fn windows_version_strings(path: &Path) -> Option<BTreeMap<String, String>> {
+    use std::os::windows::ffi::OsStrExt;
+    #[link(name = "version")]
+    extern "system" {
+        fn GetFileVersionInfoSizeW(path: *const u16, handle: *mut u32) -> u32;
+        fn GetFileVersionInfoW(
+            path: *const u16,
+            handle: u32,
+            len: u32,
+            data: *mut std::ffi::c_void,
+        ) -> i32;
+    }
+    let wide: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    let size = unsafe { GetFileVersionInfoSizeW(wide.as_ptr(), std::ptr::null_mut()) };
+    if size == 0 || size > 1024 * 1024 {
+        return None;
+    }
+    let mut bytes = vec![0u8; size as usize];
+    if unsafe { GetFileVersionInfoW(wide.as_ptr(), 0, size, bytes.as_mut_ptr().cast()) } == 0 {
+        return None;
+    }
+    let mut strings = BTreeMap::new();
+    parse_block(&bytes, 0, bytes.len(), 0, &mut strings);
+    Some(strings)
+}
+
+#[cfg(windows)]
+#[test]
+fn selected_large_electron_metadata_is_read_without_execution() {
+    let Some(path) = std::env::var_os("TOOLHUB_TEST_ELECTRON") else {
+        return;
+    };
+    let path = Path::new(&path);
+    assert!(std::fs::metadata(path).unwrap().len() > 96 * 1024 * 1024);
+    let metadata = read(path);
+    assert_eq!(metadata.product.as_deref(), Some("Electron"));
+    assert_eq!(metadata.version.as_deref(), Some("37.10.3"));
+    assert_eq!(metadata.format.as_deref(), Some("pe"));
 }

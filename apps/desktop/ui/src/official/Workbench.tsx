@@ -121,7 +121,7 @@ export function toolKindCount(items: any[]): number {
 export function toolTags(name: string, path: string): string[] {
   const n = `${name} ${path}`.toLowerCase()
   const tags: string[] = []
-  if (/python|node|java|rust|cargo|golang|go\.exe/.test(n)) tags.push('Runtime')
+  if (/python|node|electron|java|rust|cargo|golang|go\.exe/.test(n)) tags.push('Runtime')
   if (/\.exe|\\cmd\\|\\bin\\|\.cmd|\.bat/.test(n)) tags.push('CLI')
   if (/ffmpeg|ffprobe|7-?zip|7za?\.exe|imagemagick|magick|pandoc|poppler|pdfto|tesseract|yt-dlp|curl/.test(`${name} ${path.replace(/\\/g, '/').split('/').pop()}`.toLowerCase())) tags.push('实用工具')
   if (/sdk|jdk/.test(n)) tags.push('SDK')

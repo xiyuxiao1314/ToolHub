@@ -15,6 +15,8 @@ pub mod instance;
 pub mod owner;
 pub mod path_norm;
 pub mod program_metadata;
+pub mod project_dependency;
+pub use project_dependency::{ProjectDependency, ProjectDistOverride};
 pub mod skill;
 pub mod skill_portability;
 pub mod task_search;

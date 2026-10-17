@@ -24,3 +24,10 @@ test('oversized stdout cannot grow transport buffer', async () => {
   const transport=nodeStdioTransport(proc,{maxBytes:1024,timeoutMs:500});
   try {await assert.rejects(transport({jsonrpc:'2.0',id:1,method:'status',params:{}}),/large|limit/);}finally{transport.close?.();proc.kill();}
 });
+
+test('project discovery forwards only explicit roots and distribution overrides', async()=>{
+ const requests=[];const client=new ToolhubClient(async req=>{requests.push(req);return {jsonrpc:'2.0',id:req.id,result:[]};});
+ await client.scanProjectDependencies(['D:/project'],[{project_root:'D:/project',electron_dist:'D:/custom'}]);
+ assert.equal(requests[0].method,'scan.start');assert.deepEqual(requests[0].params,{mode:'project',roots:['D:/project'],project_overrides:[{project_root:'D:/project',electron_dist:'D:/custom'}]});
+ await client.projectDependencies();assert.equal(requests[1].method,'registry.project_dependencies');
+});

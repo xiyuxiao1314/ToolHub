@@ -35,6 +35,14 @@ pub struct KnownToolRule {
 /// Reviewed recognition rules (static metadata only).
 pub const KNOWN_TOOLS: &[KnownToolRule] = &[
     KnownToolRule {
+        definition_id: "org.electron.electron",
+        name: "Electron",
+        file_names: &["electron.exe", "electron"],
+        path_substrings: &["node_modules/electron"],
+        capabilities: &["desktop.electron.run"],
+        vendor: "Electron",
+    },
+    KnownToolRule {
         definition_id: "org.python.python",
         name: "Python",
         file_names: &["python.exe", "python3", "python3.exe", "python"],
@@ -465,7 +473,10 @@ pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
         0.85
     };
     let confidence = validate_confidence(confidence).unwrap_or(0.35);
-    let trust = if corroborated {
+    let trust = if corroborated
+        && rule.definition_id != "org.electron.electron"
+        && candidate.metadata.get("project_dependency").is_none()
+    {
         TrustRecord::known(evidence.clone())
     } else {
         TrustRecord::unknown()
@@ -636,7 +647,10 @@ pub fn recognize_with_rules(
         environment_id: None,
         origin: infer_origin(&candidate.path),
         owner: Owner::unknown(),
-        trust: if known {
+        trust: if known
+            && rule.definition_id != "org.electron.electron"
+            && candidate.metadata.get("project_dependency").is_none()
+        {
             TrustRecord::known(evidence.clone())
         } else {
             TrustRecord::unknown()

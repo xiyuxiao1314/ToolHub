@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 toolhub-core = { workspace = true }
+toolhub-recognizer = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 walkdir = { workspace = true }

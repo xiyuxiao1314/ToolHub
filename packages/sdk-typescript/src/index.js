@@ -21,6 +21,8 @@ export class ToolhubClient {
   search(query,options) { return this.call('registry.search',{query},options); }
   resolveCapability(capability,opts={},options) { return this.call('resolve.capability',{capability,...opts},options); }
   scan(mode='quick',options) { return this.call('scan.start',{mode},options); }
+  scanProjectDependencies(roots,projectOverrides=[],options) { return this.call('scan.start',{mode:'project',roots,project_overrides:projectOverrides},options); }
+  projectDependencies(options) { return this.call('registry.project_dependencies',{},options); }
   execute(params,options) { return this.call('execute.tool',params,options); }
   requestApproval(params,options) { return this.call('execute.approval_request',params,options); }
   close() { this.transport.close?.(); }

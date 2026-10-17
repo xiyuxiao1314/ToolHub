@@ -11,6 +11,15 @@ pub struct Registry {
 }
 
 impl Registry {
+    pub fn project_dependencies(
+        &self,
+        instance_id: Option<&str>,
+    ) -> RegistryResult<Vec<toolhub_core::ProjectDependency>> {
+        let mut q=self.db.conn.prepare("SELECT observation_json FROM project_dependencies WHERE (?1 IS NULL OR instance_id=?1) ORDER BY project_root,package_name")?;
+        let rows = q.query_map([instance_id], |r| r.get::<_, String>(0))?;
+        rows.map(|r| Ok(serde_json::from_str(&r?)?)).collect()
+    }
+
     pub fn import_report(
         &mut self,
         environments: &[toolhub_core::Environment],
@@ -126,6 +135,16 @@ impl Registry {
         instances: &[ScanInstanceInput],
         candidates: &[toolhub_core::ScanCandidate],
         scopes: &[ReconcileScope],
+    ) -> RegistryResult<Vec<String>> {
+        self.ingest_scan_with_projects(environments, instances, candidates, scopes, &[])
+    }
+    pub fn ingest_scan_with_projects(
+        &mut self,
+        environments: &[toolhub_core::Environment],
+        instances: &[ScanInstanceInput],
+        candidates: &[toolhub_core::ScanCandidate],
+        scopes: &[ReconcileScope],
+        projects: &[toolhub_core::ProjectDependency],
     ) -> RegistryResult<Vec<String>> {
         let tx = self.db.conn.transaction()?;
         let mut pending: Vec<_> = environments.iter().collect();
@@ -260,12 +279,64 @@ impl Registry {
                 .collect::<Result<Vec<_>, _>>()?;
             drop(query);
             for member in members {
-                if !ids.contains(&member) {
+                // A project may stop depending on a shared/hoisted binary while another
+                // project still uses it. Retire only absent or explicitly measured invalid binaries.
+                let present = if scope.provider == "project_dependencies" {
+                    let path: String = tx.query_row(
+                        "SELECT path FROM tool_instances WHERE id=?1",
+                        [&member],
+                        |r| r.get(0),
+                    )?;
+                    std::path::Path::new(&path).is_file()
+                        && !projects.iter().any(|d| {
+                            d.status == "invalid_binary"
+                                && d.executable
+                                    .as_deref()
+                                    .is_some_and(|p| identity_key(p) == identity_key(&path))
+                        })
+                } else {
+                    false
+                };
+                if !ids.contains(&member) && !present {
                     tx.execute(
                         "UPDATE tool_instances SET status='missing' WHERE id=?1",
                         [&member],
                     )?;
                 }
+            }
+        }
+        for scope in scopes
+            .iter()
+            .filter(|s| s.complete && s.provider == "project_dependencies")
+        {
+            tx.execute(
+                "DELETE FROM project_dependencies WHERE project_root=?1",
+                [identity_key(&scope.root)],
+            )?;
+            for observation in projects
+                .iter()
+                .filter(|d| identity_key(&d.project_root) == identity_key(&scope.root))
+            {
+                let mut d = observation.clone();
+                d.instance_id = None;
+                if let Some(path) = d.executable.as_ref().filter(|_| d.status == "available") {
+                    let mut q = tx.prepare("SELECT id,path,canonical_path FROM tool_instances")?;
+                    let rows = q.query_map([], |r| {
+                        Ok((
+                            r.get::<_, String>(0)?,
+                            r.get::<_, String>(1)?,
+                            r.get::<_, Option<String>>(2)?,
+                        ))
+                    })?;
+                    for row in rows {
+                        let (id, p, c) = row?;
+                        if identity_key(c.as_deref().unwrap_or(&p)) == identity_key(path) {
+                            d.instance_id = Some(id);
+                            break;
+                        }
+                    }
+                }
+                tx.execute("INSERT INTO project_dependencies(project_root,package_name,instance_id,observation_json,observed_at) VALUES(?1,?2,?3,?4,?5)",params![identity_key(&scope.root),d.package_name,d.instance_id,serde_json::to_string(&d)?,now])?;
             }
         }
         tx.execute(

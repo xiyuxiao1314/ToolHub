@@ -178,7 +178,7 @@ pub fn validate_method_params(request: &JsonRpcRequest) -> Result<(), ProtocolEr
     if let Some(value) = params.get("mode") {
         if !value
             .as_str()
-            .is_some_and(|mode| matches!(mode, "quick" | "full" | "custom"))
+            .is_some_and(|mode| matches!(mode, "quick" | "full" | "custom" | "project"))
         {
             return Err(invalid("unknown scan mode".into()));
         }

@@ -78,7 +78,8 @@ export interface MethodMap {
  'registry.search': { params: {query:string; include_missing?:boolean;limit?:number;offset?:number;detail?:'summary'|'full'}; result: InstanceRow[] };
  'registry.inspect_instance': { params: {id:string}; result: Json };
  'resolve.capability': { params: {capability:string}&ResolveOptions; result: ResolveResult };
- 'scan.start': { params: {mode:'quick'|'full'|'custom'}; result: Json };
+ 'scan.start': { params: {mode:'quick'|'full'|'custom'|'project';roots?:string[];project_overrides?:ProjectDistOverride[]}; result: Json };
+ 'registry.project_dependencies': {params:{};result:ProjectDependency[]};
  'execute.tool': { params: ExecuteParams; result: ExecutionResponse };
  'execute.approval_request': { params: ExecuteParams; result: ApprovalRequest };
  'execute.cancel': { params: {execution_id:string}; result: Json };
@@ -134,6 +135,8 @@ export declare class ToolhubClient {
  search(query:string,options?:CallOptions):Promise<InstanceRow[]>;
  resolveCapability(capability:string,opts?:ResolveOptions,options?:CallOptions):Promise<ResolveResult>;
  scan(mode?:'quick'|'full'|'custom',options?:CallOptions):Promise<Json>;
+ scanProjectDependencies(roots:string[],projectOverrides?:ProjectDistOverride[],options?:CallOptions):Promise<Json>;
+ projectDependencies(options?:CallOptions):Promise<ProjectDependency[]>;
  execute(params:ExecuteParams & {background?:false},options?:CallOptions):Promise<ExecutionResult>;
  execute(params:ExecuteParams,options?:CallOptions):Promise<ExecutionResponse>;
  requestApproval(params:ExecuteParams,options?:CallOptions):Promise<ApprovalRequest>;
@@ -175,3 +178,6 @@ export interface MethodMap {
 }
 
 export interface ArtifactSummary extends Omit<ArtifactPackage,'files'|'owner'> { files:[]; file_count:number; bytes:number; remaining_bytes:number; auto_scope:boolean; }
+
+export interface ProjectDistOverride {project_root:string;electron_dist:string}
+export interface ProjectDependency {project_root:string;project_name:string;package_name:string;declared_version:string|null;package_version:string|null;package_root:string;executable:string|null;distribution_override?:string|null;binary_version:string|null;instance_id:string|null;status:string;source:string;issue:string|null}

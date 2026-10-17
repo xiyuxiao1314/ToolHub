@@ -2,6 +2,7 @@
 //! Default discovery never installs, writes config, or executes unknown binaries.
 
 pub mod programs;
+pub mod project_dependencies;
 mod providers;
 mod types;
 mod utilities;
@@ -38,6 +39,7 @@ pub struct ScanScope {
 
 #[derive(Debug, Default, Clone)]
 pub struct ScanReport {
+    pub project_dependencies: Vec<toolhub_core::ProjectDependency>,
     pub candidates: Vec<ScanCandidate>,
     pub coverage: ScanCoverage,
     pub cancelled: bool,

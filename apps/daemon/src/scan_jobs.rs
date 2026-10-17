@@ -7,6 +7,7 @@ pub struct PreparedScan {
     mode_name: String,
     mode: toolhub_scanner::ScanMode,
     roots: Option<Vec<String>>,
+    project_overrides: Vec<toolhub_core::ProjectDistOverride>,
     extensions: Vec<toolhub_scanner::DeclarativeExtension>,
     cancelled: Arc<AtomicBool>,
     rpc_id: Option<Value>,
@@ -14,6 +15,13 @@ pub struct PreparedScan {
 }
 impl PreparedScan {
     pub fn run(&self) -> toolhub_scanner::ScanReport {
+        if self.mode_name == "project" {
+            return toolhub_scanner::project_dependencies::scan(
+                self.roots.as_deref().unwrap_or(&[]),
+                &self.project_overrides,
+                &self.cancelled,
+            );
+        }
         toolhub_scanner::run_scan_with_cancel(
             self.mode,
             self.roots.clone(),
@@ -55,7 +63,7 @@ impl DaemonService {
             .and_then(Value::as_str)
             .unwrap_or("quick")
             .to_string();
-        if !matches!(mode_name.as_str(), "quick" | "full" | "custom") {
+        if !matches!(mode_name.as_str(), "quick" | "full" | "custom" | "project") {
             return Err(invalid("invalid scan mode"));
         }
         let roots = params
@@ -86,8 +94,36 @@ impl DaemonService {
                     .collect::<Result<Vec<_>, _>>()
             })
             .transpose()?;
-        if mode_name == "custom" && roots.is_none() {
-            return Err(invalid("custom scan requires roots"));
+        if matches!(mode_name.as_str(), "custom" | "project") && roots.is_none() {
+            return Err(invalid("custom/project scan requires explicit roots"));
+        }
+        let project_overrides: Vec<toolhub_core::ProjectDistOverride> = params
+            .get("project_overrides")
+            .map(|v| serde_json::from_value(v.clone()).map_err(json_err))
+            .transpose()?
+            .unwrap_or_default();
+        if project_overrides.len() > 64 || (mode_name != "project" && !project_overrides.is_empty())
+        {
+            return Err(invalid("project overrides require project scan; max 64"));
+        }
+        let mut override_roots = std::collections::BTreeSet::new();
+        for o in &project_overrides {
+            if !Path::new(&o.project_root).is_absolute()
+                || !Path::new(&o.electron_dist).is_absolute()
+                || o.project_root.len() > 16384
+                || o.electron_dist.len() > 16384
+                || !roots.as_ref().is_some_and(|rs| {
+                    rs.iter().any(|r| {
+                        toolhub_core::normalize_path(r)
+                            == toolhub_core::normalize_path(&o.project_root)
+                    })
+                })
+                || !override_roots.insert(toolhub_core::normalize_path(&o.project_root))
+            {
+                return Err(invalid(
+                    "override requires one selected project and absolute distribution directory",
+                ));
+            }
         }
         let extensions = settings
             .get("extensions")
@@ -144,6 +180,7 @@ impl DaemonService {
                 toolhub_scanner::ScanMode::Quick
             },
             mode_name,
+            project_overrides,
             roots,
             extensions,
             cancelled,
@@ -176,7 +213,7 @@ impl DaemonService {
         report: &toolhub_scanner::ScanReport,
     ) -> Result<Value, ProtocolError> {
         self.running_scans.remove(&job.id);
-        let coverage = json!({"roots_ok":report.coverage.roots_ok,"roots_failed":report.coverage.roots_failed,"scopes":report.coverage.scopes,"limitations":report.coverage.limitations,"candidates":report.candidates.len()});
+        let coverage = json!({"roots_ok":report.coverage.roots_ok,"roots_failed":report.coverage.roots_failed,"scopes":report.coverage.scopes,"limitations":report.coverage.limitations,"project_dependencies":report.project_dependencies,"candidates":report.candidates.len()});
         let result = self.ingest_scan(report, &job.mode_name);
         let state = if result.is_err() {
             "failed"

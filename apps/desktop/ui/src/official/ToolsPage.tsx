@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import ToolsList from '../ToolsList'
+import ProjectDependencies from '../ProjectDependencies'
 import ToolIcon from '../ToolIcon'
 import AgentHelp from '../AgentHelp'
 import StartupSetting from '../StartupSetting'
@@ -26,6 +27,7 @@ export default function ToolsPage(props: WorkbenchContext) {
                 </button>
               </div>
             </div>
+            <ProjectDependencies refresh={refresh} fail={fail} />
             <div className="layout-2">
               <div>
                 {addToolOpen && (
@@ -103,6 +105,7 @@ export default function ToolsPage(props: WorkbenchContext) {
                       {selected.version ? ` 版本 ${String(selected.version)}。` : '。'}
                       路径：<code>{String(selected.path ?? '—')}</code>
                     </p>
+                    {detailData?.projects?.map((p:any)=><p className="muted" key={p.project_root}>项目归属：{p.project_name}<br/><code>{p.project_root}</code></p>)}
                     <div className="tags" style={{ marginBottom: 14 }}>
                       {toolTags(String(selected.name ?? ''), String(selected.path ?? '')).map((tag) => (
                         <span key={tag} className={tagClass(tag)}>

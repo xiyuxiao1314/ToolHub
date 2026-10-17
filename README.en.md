@@ -349,3 +349,5 @@ The [FFmpeg media workshop](extensions/examples/ffmpeg.toolhub-extension.json) a
 
 
 [ToolHub-Extensions](https://github.com/xiyuxiao1314/ToolHub-Extensions) is a separate public catalog with type/tag/platform filters and checksummed manifests. Open it from the desktop extension manager, review a package, then import explicitly.
+
+Project dependency discovery: [Electron adapter](docs/development/PROJECT_DEPENDENCIES.md) (development beta.5).

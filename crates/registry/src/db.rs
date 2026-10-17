@@ -14,6 +14,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (5, include_str!("migrations/005_managed_tasks.sql")),
     (6, include_str!("migrations/006_artifacts.sql")),
     (7, include_str!("migrations/007_extensions.sql")),
+    (8, include_str!("migrations/008_project_dependencies.sql")),
 ];
 
 pub fn open_path(path: &std::path::Path) -> RegistryResult<RegistryDb> {
@@ -87,7 +88,7 @@ mod tests {
     #[test]
     fn migrates_from_empty() {
         let db = open_memory().unwrap();
-        assert_eq!(db.schema_version().unwrap(), 7);
+        assert_eq!(db.schema_version().unwrap(), 8);
     }
 
     #[test]
@@ -96,10 +97,10 @@ mod tests {
         let path = dir.path().join("t.db");
         {
             let db = open_path(&path).unwrap();
-            assert_eq!(db.schema_version().unwrap(), 7);
+            assert_eq!(db.schema_version().unwrap(), 8);
         }
         let db2 = open_path(&path).unwrap();
-        assert_eq!(db2.schema_version().unwrap(), 7);
+        assert_eq!(db2.schema_version().unwrap(), 8);
     }
 
     #[test]
@@ -119,7 +120,7 @@ mod tests {
         }
         conn.execute("INSERT INTO program_entries(id,identity,entry_json,updated_at) VALUES('existing','file:fixture','preserve exactly','fixture')",[]).unwrap();
         let db = init(conn).unwrap();
-        assert_eq!(db.schema_version().unwrap(), 7);
+        assert_eq!(db.schema_version().unwrap(), 8);
         assert_eq!(
             db.conn
                 .query_row(

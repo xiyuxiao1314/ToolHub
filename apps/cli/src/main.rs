@@ -20,7 +20,7 @@ struct Cli {
 enum Commands {
     /// Daemon and registry status
     Status,
-    /// Native discovery scan
+    /// Native discovery scan (project mode reads selected package manifests only)
     Scan {
         #[arg(long, default_value = "quick")]
         mode: String,
@@ -28,6 +28,9 @@ enum Commands {
         roots: Vec<String>,
         #[arg(long)]
         scan_id: Option<String>,
+        /// Explicit Electron distribution directory (project mode, exactly one root)
+        #[arg(long)]
+        electron_dist: Option<String>,
     },
     ScanStatus {
         scan_id: String,
@@ -247,11 +250,17 @@ fn run(cli: &Cli) -> anyhow::Result<()> {
             mode,
             roots,
             scan_id,
-        } => call(
-            &mut client,
-            "scan.start",
-            json!({"mode": mode,"roots":if roots.is_empty(){None}else{Some(roots)},"scan_session_id":scan_id}),
-        )?,
+            electron_dist,
+        } => {
+            if electron_dist.is_some() && (mode != "project" || roots.len() != 1) {
+                anyhow::bail!("--electron-dist requires project mode and exactly one --roots");
+            }
+            call(
+                &mut client,
+                "scan.start",
+                json!({"mode": mode,"roots":if roots.is_empty(){None}else{Some(roots)},"scan_session_id":scan_id,"project_overrides":electron_dist.as_ref().map(|dist|vec![json!({"project_root":roots[0],"electron_dist":dist})]).unwrap_or_default()}),
+            )?
+        }
         Commands::ScanStatus { scan_id } => call(
             &mut client,
             "scan.status",

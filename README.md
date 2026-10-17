@@ -357,3 +357,5 @@ ToolHub 源码以 [MIT License](LICENSE) 开源。第三方依赖保持各自许
 
 
 [独立扩展目录 / ToolHub-Extensions](https://github.com/xiyuxiao1314/ToolHub-Extensions) 提供分类、标签、平台筛选与可核对的扩展 JSON。桌面扩展管理中可直接打开社区仓库。
+
+项目工具依赖发现 / Project dependency discovery: [Electron adapter](docs/development/PROJECT_DEPENDENCIES.md) (development beta.5).
