@@ -29,7 +29,7 @@ def copy_assets(destination, desktop=True):
     for name in ['LICENSE','NOTICE','README.md','README.en.md']:
         shutil.copy2(root/name,destination/name)
     (destination/'docs/development').mkdir(parents=True,exist_ok=True)
-    for doc in ['ARTIFACTS.md','EXTENSIONS.md','STORAGE.md']:
+    for doc in ['ARTIFACTS.md','EXTENSIONS.md','STORAGE.md','PROJECT_DEPENDENCIES.md','MCP-CONTEXT.md']:
         shutil.copy2(root/'docs/development'/doc,destination/'docs/development'/doc)
     (destination/'docs/images').mkdir(parents=True,exist_ok=True)
     for image in ['extensions-manager.png','extension-workbench.png','extension-theme.png']:

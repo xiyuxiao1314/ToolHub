@@ -10,7 +10,7 @@
     <img alt="Beta status" src="https://img.shields.io/badge/status-beta-orange" />
   </p>
   <p><a href="README.md">简体中文</a> | <strong>English</strong></p>
-  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.2">Download v0.3.0-beta.2</a> · <a href="#screenshots">Screenshots</a> · <a href="#connect-an-ai-agent">Agent setup</a> · <a href="#build-from-source">Build from source</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">Report an issue</a></p>
+  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.5">Download v0.3.0-beta.5</a> · <a href="#screenshots">Screenshots</a> · <a href="#connect-an-ai-agent">Agent setup</a> · <a href="#build-from-source">Build from source</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">Report an issue</a></p>
 </div>
 
 ## Why ToolHub?
@@ -55,9 +55,9 @@ Group temporary files, test records and backups by task, decide retention by pri
 
 ![ToolHub Artifacts page with priority tiers, management scope and system Recycle Bin results](docs/images/artifacts.png)
 
-### Extension workbench (local development build)
+### Extension workbench
 
-Seven optional first-party features plus independently imported pages and themes. These screenshots are from an isolated v0.3.0-beta.3 Windows acceptance instance; this build has not been published to GitHub.
+Seven optional first-party features plus independently imported pages and themes. These screenshots are from an isolated v0.3.0-beta.3 Windows acceptance instance; these workbench features are included in the current beta.5 release.
 
 ![Extension workbench: first-party feature lifecycle and appearance recovery](docs/images/extension-workbench.png)
 
@@ -67,6 +67,10 @@ Seven optional first-party features plus independently imported pages and themes
 
 | Module | Implemented features |
 | --- | --- |
+| Extension workbench | Seven optional official modules, custom pages/navigation/themes/layouts, local edits and rollback |
+| Project dependencies | Selected-project Electron discovery, complete/missing states, multiple versions and canonical-path deduplication |
+| CLI panels | FFmpeg media workflow with host-rendered file selection, exact arguments and per-run confirmation |
+| Storage maintenance | Preview regenerable caches and recycle obsolete packages while protecting active/current/rollback references |
 | Tools | Local discovery; search by name, path or task; capability resolution; version and environment details; availability checks; preferred path selection |
 | Tool list | Group by tool or show individual installations; category filters; 6 / 12 / 24 items per page; saved page-size preferences |
 | Utilities | Recognize media, document and automation tools such as FFmpeg, FFprobe, 7-Zip, ImageMagick, Pandoc, Tesseract and Poppler |
@@ -102,7 +106,7 @@ The user selects, reviews and adds it to the program shelf
 
 The Artifacts page groups explicitly registered task files without moving them. Users choose managed directories and select read-only scan candidates; imported leftovers default to high priority. Four bounded MCP tools register/list packages, mark tasks complete, and submit medium-priority reviews. Low-priority files recycle only after successful completion and an explicit no-longer-needed declaration, followed by a five-minute cancellation period. Medium adds an Agent dependency/usage review; high and manually retained packages require a human decision.
 
-Cleanup goes to the system Recycle Bin/Trash with no permanent-delete fallback. Changed files, known ToolHub references and detected usage block cleanup. Filename matches do not establish Agent provenance or disposability. Windows native recycling is tested; the macOS Finder adapter requires native validation. This feature is included in the v0.3.0-beta.2 release assets. See [artifact lifecycle and API](docs/development/ARTIFACTS.md).
+Cleanup goes to the system Recycle Bin/Trash with no permanent-delete fallback. Changed files, known ToolHub references and detected usage block cleanup. Filename matches do not establish Agent provenance or disposability. Windows native recycling is tested; the macOS Finder adapter requires native validation. This feature is included in the v0.3.0-beta.5 release assets. See [artifact lifecycle and API](docs/development/ARTIFACTS.md).
 
 ### Automatic execution approval
 
@@ -112,24 +116,25 @@ On Windows, automatic tool execution approval is enabled by default. Trusted too
 
 A shared Skill describes a procedure that different agents can understand, such as compressing video with an existing FFmpeg installation. It declares inputs, outputs, platforms, tool dependencies and permissions. ToolHub does not scan and register every agent's private Skills, or treat a host-specific image generator, browser or plugin API as available to all agents.
 
-The market is currently a local catalog shipped with the application. You can import, preview, add and share `.toolhub-skill.json` packages. Bundled packages cover media processing, image conversion/OCR, PDF text/OCR, document conversion, archive extraction and CSV checks. There is no online community index, account system, paid content or automatic dependency installation yet.
+The market is currently a local catalog shipped with the application. You can import, preview, add and share `.toolhub-skill.json` packages. Bundled packages cover media processing, image conversion/OCR, PDF text/OCR, document conversion, archive extraction and CSV checks. There is no account system, paid content or automatic dependency installation. A separate [public extension catalog](https://github.com/xiyuxiao1314/ToolHub-Extensions) supports browsing/filtering packages before explicit import.
 
-The local beta.3 development build is an extension workbench. Tools, programs, artifacts, environments, Skills, the capability market and tasks are seven default-enabled official feature extensions, with install, disable, uninstall, local edits and rollback. User data survives removal. Independent v2 packages add navigation and isolated HTML/CSS/JavaScript pages, or change theme, layout and density. Agent connectivity, permissions and recovery stay in the kernel. See [extension contracts and development](docs/development/EXTENSIONS.md).
+The current beta.5 release is an extension workbench. Tools, programs, artifacts, environments, Skills, the capability market and tasks are seven default-enabled official feature extensions, with install, disable, uninstall, local edits and rollback. User data survives removal. Independent v2 packages add navigation and isolated HTML/CSS/JavaScript pages, or change theme, layout and density. Agent connectivity, permissions and recovery stay in the kernel. See [extension contracts and development](docs/development/EXTENSIONS.md).
 
-This workbench is not yet published as a GitHub Release; downloads remain beta.2. Frontend plugins use a limited SDK without direct program launch or file cleanup. Arbitrary native/background plugin runtimes are not supported.
+The extension workbench is included in the beta.5 release. Frontend plugins use a limited SDK without direct program launch or file cleanup. Arbitrary native/background plugin runtimes are not supported.
 
 The development gateway defaults to five search summaries and loads full details on demand. Daily Agent instructions are separated from setup and advanced reference material. See [MCP context footprint](docs/development/MCP-CONTEXT.md) for measurements and limits.
 
 ## Downloads and platform support
 
-The current open-source preview is **v0.3.0-beta.2**. Download files from the Assets section of [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.2).
+The current open-source preview is **v0.3.0-beta.5**. Download files from the Assets section of [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.5).
 
 | Your system | Recommended download | Notes |
 | --- | --- | --- |
-| Windows 10 / 11, 64-bit | `ToolHub-v0.3.0-beta.2-windows-x64.zip` | Desktop, CLI, daemon and capability packages; native maintainer-host verification |
-| Mac, Apple Silicon (M series) | `ToolHub-v0.3.0-beta.2-macos-arm64.dmg` | macOS 13+; preview support; ZIP also available |
-| Mac, Intel | `ToolHub-v0.3.0-beta.2-macos-x64.dmg` | macOS 13+; preview support; ZIP also available |
-| CLI / MCP only | `ToolHub-CLI-v0.3.0-beta.2-<platform>.zip` | CLI and paired daemon; no desktop approval interface |
+| Windows 10 / 11, 64-bit | `ToolHub-v0.3.0-beta.5-windows-x64.zip` | Desktop, CLI, daemon and capability packages; native maintainer-host verification |
+| Mac, Apple Silicon (M series) | `ToolHub-v0.3.0-beta.5-macos-arm64.dmg` | macOS 13+; preview support; ZIP also available |
+| Mac, Intel | `ToolHub-v0.3.0-beta.5-macos-x64.dmg` | macOS 13+; preview support; ZIP also available |
+| CLI / MCP only | `ToolHub-CLI-v0.3.0-beta.5-<platform>.zip` | CLI and paired daemon; no desktop approval interface |
+| Example extensions and SDK | `ToolHub-Extensions-v0.3.0-beta.5.zip` | Reviewable FFmpeg, page and theme examples |
 | Checksums | `SHA256SUMS.txt` | Compare SHA-256 values to check download integrity |
 
 Windows and macOS share code, data models and MCP interfaces, with the following platform differences:
@@ -326,7 +331,7 @@ scripts/                 Local installation, verification and native release pac
 docs/                    Design, implementation notes and historical development/verification records
 ```
 
-The [system design](docs/design/TOOLHUB_SYSTEM_DESIGN.md) describes the full product direction, including goals not yet implemented. This README and the [release notes](docs/releases/v0.3.0-beta.2.md) describe the current feature set. Linked design and release documents are currently in Chinese or mixed languages.
+The [system design](docs/design/TOOLHUB_SYSTEM_DESIGN.md) describes the full product direction, including goals not yet implemented. This README and the [release notes](docs/releases/v0.3.0-beta.5.md) describe the current feature set. Linked design and release documents are currently in Chinese or mixed languages.
 
 ## Known limitations and next steps
 
@@ -343,11 +348,11 @@ Open an [Issue](https://github.com/xiyuxiao1314/ToolHub/issues) or Pull Request.
 ToolHub source code is licensed under the [MIT License](LICENSE). Third-party dependencies retain their respective licenses. ToolHub packages do not bundle discovered software such as FFmpeg, Python or Node.js, or grant redistribution rights for it. See [NOTICE](NOTICE) for brand assets and third-party dependency information.
 
 
-### FFmpeg extension (local beta.4 development build)
+### FFmpeg media workshop extension
 
-The [FFmpeg media workshop](extensions/examples/ffmpeg.toolhub-extension.json) adds video compression, MP4 conversion and M4A extraction as an independently installable CLI panel. The kernel renders file pickers, an exact argv preview and one-run confirmation, using existing background tasks/cancellation/policy; the package also provides a portable Agent workflow. FFmpeg is not downloaded or bundled. Windows execution is supported; macOS is preview/query only. Public downloads remain beta.2; beta.4 is unreleased. See [extension documentation](docs/development/EXTENSIONS.md) for actual boundaries.
+The [FFmpeg media workshop](extensions/examples/ffmpeg.toolhub-extension.json) adds video compression, MP4 conversion and M4A extraction as an independently installable CLI panel. The kernel renders file pickers, an exact argv preview and one-run confirmation, using existing background tasks/cancellation/policy; the package also provides a portable Agent workflow. FFmpeg is not downloaded or bundled. Windows execution is supported; macOS is preview/query only. The host features ship in beta.5; explicitly import the sample from the extension directory. See [extension documentation](docs/development/EXTENSIONS.md) for actual boundaries.
 
 
 [ToolHub-Extensions](https://github.com/xiyuxiao1314/ToolHub-Extensions) is a separate public catalog with type/tag/platform filters and checksummed manifests. Open it from the desktop extension manager, review a package, then import explicitly.
 
-Project dependency discovery: [Electron adapter](docs/development/PROJECT_DEPENDENCIES.md) (development beta.5).
+Project dependency discovery: [Electron adapter](docs/development/PROJECT_DEPENDENCIES.md) (beta.5).

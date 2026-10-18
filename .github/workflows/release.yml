@@ -48,14 +48,16 @@ jobs:
         run: |
           npm ci --prefix apps/desktop/ui
           npm run build --prefix apps/desktop/ui
+      - name: Release build
+        run: cargo build --release -p toolhub-cli -p toolhub-daemon -p toolhub-desktop --locked
       - name: Native checks
         run: cargo test --release --workspace --locked -- --test-threads=1
       - name: TypeScript SDK
         run: node --test packages/sdk-typescript/test/client.test.js
-      - name: Release build
-        run: cargo build --release -p toolhub-cli -p toolhub-daemon -p toolhub-desktop --locked
       - name: Package
         run: python scripts/package-release.py --platform ${{ matrix.platform }}
+      - name: Verify distributable contents
+        run: python scripts/verify-release.py --platform ${{ matrix.platform }}
       - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
         if: always() && steps.rust-cache.outputs.cache-hit != 'true'
         with:
@@ -70,5 +72,6 @@ jobs:
           path: |
             dist/release/${{ matrix.platform }}/*.zip
             dist/release/${{ matrix.platform }}/*.dmg
+            dist/release/${{ matrix.platform }}/verification.json
           if-no-files-found: error
           retention-days: 14

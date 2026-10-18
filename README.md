@@ -10,7 +10,7 @@
     <img alt="Status beta" src="https://img.shields.io/badge/status-beta-orange" />
   </p>
   <p><strong>简体中文</strong> | <a href="README.en.md">English</a></p>
-  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.2">下载 v0.3.0-beta.2</a> · <a href="#界面预览">界面预览</a> · <a href="#接入-ai-agent">Agent 接入</a> · <a href="#从源码构建">源码构建</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">反馈问题</a></p>
+  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.5">下载 v0.3.0-beta.5</a> · <a href="#界面预览">界面预览</a> · <a href="#接入-ai-agent">Agent 接入</a> · <a href="#从源码构建">源码构建</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">反馈问题</a></p>
 </div>
 
 ## 为什么做 ToolHub
@@ -55,9 +55,9 @@ ToolHub 使用已有工具，工具发现不依赖 AI 服务；它不会自动�
 
 ![ToolHub 产物页：分级文件包、管理范围与系统回收站结果](docs/images/artifacts.png)
 
-### 扩展工作台（本地开发版）
+### 扩展工作台
 
-七个官方功能可独立装卸；第三方包可新增导航、交互页和主题。本节截图来自 v0.3.0-beta.3 Windows 独立验收实例，该版本尚未发布到 GitHub。
+七个官方功能可独立装卸；第三方包可新增导航、交互页和主题。本节截图来自 v0.3.0-beta.3 Windows 独立验收实例；这些扩展工作台能力已包含在当前 beta.5 发布中。
 
 ![扩展工作台：官方模块、安装管理和界面恢复](docs/images/extension-workbench.png)
 
@@ -67,7 +67,11 @@ ToolHub 使用已有工具，工具发现不依赖 AI 服务；它不会自动�
 
 | 模块 | 已实现的功能 |
 | --- | --- |
+| 扩展工作台 | 七个官方功能独立启停/装卸，第三方页面、导航、主题、布局、编辑和回滚 |
 | 工具 | 本机扫描、名称/路径/任务搜索、能力解析、版本与环境查看、可用性检查、默认路径选择 |
+| 项目依赖 | 从明确选定的项目发现 Electron，区分完整安装与缺失包/二进制，多项目、多版本及路径去重 |
+| CLI 扩展 | FFmpeg 媒体面板，核心负责文件选择、参数预览、单次确认与后台任务 |
+| 存储维护 | 预览并清理可重建缓存，回收过期安装包，保护当前/回退/被引用版本 |
 | 列表 | 按工具合并或显示安装实例，分类筛选，每页 6 / 12 / 24 项，分页和每页数量记忆 |
 | 实用程序 | 识别 FFmpeg、FFprobe、7-Zip、ImageMagick、Pandoc、Tesseract、Poppler 等媒体、文档与自动化工具 |
 | 产物 | 按任务组成文件包、管理目录只读扫描、勾选收录、低/中/高优先级、5 分钟撤销期、系统回收站和清理历史 |
@@ -108,7 +112,7 @@ Agent 查询 ToolHub：本机已有工具 / 通用 Skill / 对应能力
 | 中 | 完成后由接入的 Agent 检查用途和依赖，提交理由；等待 5 分钟后回收 |
 | 高 | 人工保留或手动移入回收站，Agent 不能降级或删除 |
 
-自动清理只在用户选定且启用的管理目录内进行；人工保留优先。所有清理调用系统回收站，不提供永久删除或失败后的删除兜底。文件改变、已知引用或占用会暂缓。扫描不能证明 Agent 来源，也不能代替依赖判断。Windows 已做真实回收站验证；macOS Finder 适配仍需原机验证。此功能已包含在 v0.3.0-beta.2 发布包中。
+自动清理只在用户选定且启用的管理目录内进行；人工保留优先。所有清理调用系统回收站，不提供永久删除或失败后的删除兜底。文件改变、已知引用或占用会暂缓。扫描不能证明 Agent 来源，也不能代替依赖判断。Windows 已做真实回收站验证；macOS Finder 适配仍需原机验证。此功能已包含在 v0.3.0-beta.5 发布包中。
 
 完整流程和接口见 [产物管理](docs/development/ARTIFACTS.md)。
 
@@ -120,24 +124,25 @@ Windows 的“自动批准工具执行”默认开启：已信任且策略允许
 
 共享 Skill 是可以被不同 Agent 理解的流程说明，例如“使用已有 FFmpeg 压缩视频”，包含输入、输出、平台、工具依赖和权限声明。ToolHub 不会扫描并注册每个 Agent 的私有 Skill，也不会把某个宿主专属的图像生成、浏览器或插件 API 当作其他 Agent 都能使用的能力。
 
-市场当前是随应用发布的本地能力包目录，可导入、预览、收录和分享 `.toolhub-skill.json`。内置包涉及媒体压缩/探测、音频提取、图片转换、PDF 文本/OCR、文档转换、归档解压和 CSV 数据检查。市场尚无在线社区索引、账号、付费内容或自动安装依赖。
+市场当前是随应用发布的本地能力包目录，可导入、预览、收录和分享 `.toolhub-skill.json`。内置包涉及媒体压缩/探测、音频提取、图片转换、PDF 文本/OCR、文档转换、归档解压和 CSV 数据检查。应用内没有账号、付费内容或自动安装依赖；另有公开的 [扩展目录](https://github.com/xiyuxiao1314/ToolHub-Extensions)，支持浏览筛选后明确导入。
 
-本地 beta.3 开发版已改为扩展工作台：工具、程序、产物、环境、Skill、市场和任务成为默认启用的七个官方功能扩展，可安装、停用、卸载、编辑和回滚；卸载保留用户数据。独立 v2 包可以增加导航和 HTML/CSS/JavaScript 页面，也可以更换主题、导航布局和密度。智能体接入、权限和恢复入口保留在核心。参见 [扩展开发与使用说明](docs/development/EXTENSIONS.md)。
+当前 beta.5 已采用扩展工作台架构：工具、程序、产物、环境、Skill、市场和任务成为默认启用的七个官方功能扩展，可安装、停用、卸载、编辑和回滚；卸载保留用户数据。独立 v2 包可以增加导航和 HTML/CSS/JavaScript 页面，也可以更换主题、导航布局和密度。智能体接入、权限和恢复入口保留在核心。参见 [扩展开发与使用说明](docs/development/EXTENSIONS.md)。
 
-此功能尚未发布到 GitHub Release；现有下载仍为 beta.2。第三方页面使用受限 SDK，不能直接启动程序或清理文件，任意本机后台插件尚不支持。
+扩展架构已随 beta.5 发布。第三方页面使用受限 SDK，不能直接启动程序或清理文件，任意本机后台插件尚不支持。
 
-开发版还优化了 Agent 上下文：MCP 搜索默认返回 5 条摘要，完整信息按需查询，接入 Skill 的配置和高级流程分开读取。具体测量与边界见 [MCP 上下文优化](docs/development/MCP-CONTEXT.md)。
+Agent 上下文也已优化：MCP 搜索默认返回 5 条摘要，完整信息按需查询，接入 Skill 的配置和高级流程分开读取。具体测量与边界见 [MCP 上下文优化](docs/development/MCP-CONTEXT.md)。
 
 ## 下载与平台支持
 
-当前开源预览版为 **v0.3.0-beta.2**。所有文件在 [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.2) 的 Assets 中下载。
+当前开源预览版为 **v0.3.0-beta.5**。所有文件在 [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.5) 的 Assets 中下载。
 
 | 你的系统 | 推荐下载 | 说明 |
 | --- | --- | --- |
-| Windows 10 / 11，64 位 | `ToolHub-v0.3.0-beta.2-windows-x64.zip` | 桌面、CLI、daemon 和能力包；本机原生验证 |
-| Mac，Apple Silicon（M 系列） | `ToolHub-v0.3.0-beta.2-macos-arm64.dmg` | macOS 13+；预览支持，另附 ZIP |
-| Mac，Intel | `ToolHub-v0.3.0-beta.2-macos-x64.dmg` | macOS 13+；预览支持，另附 ZIP |
-| 只需 CLI / MCP 服务 | `ToolHub-CLI-v0.3.0-beta.2-<平台>.zip` | 包含 CLI 和配对 daemon，不含桌面审批界面 |
+| Windows 10 / 11，64 位 | `ToolHub-v0.3.0-beta.5-windows-x64.zip` | 桌面、CLI、daemon 和能力包；本机原生验证 |
+| Mac，Apple Silicon（M 系列） | `ToolHub-v0.3.0-beta.5-macos-arm64.dmg` | macOS 13+；预览支持，另附 ZIP |
+| Mac，Intel | `ToolHub-v0.3.0-beta.5-macos-x64.dmg` | macOS 13+；预览支持，另附 ZIP |
+| 只需 CLI / MCP 服务 | `ToolHub-CLI-v0.3.0-beta.5-<平台>.zip` | 包含 CLI 和配对 daemon，不含桌面审批界面 |
+| 示例扩展与 SDK | `ToolHub-Extensions-v0.3.0-beta.5.zip` | FFmpeg、页面与主题示例，安装前可审阅源码 |
 | 校验文件 | `SHA256SUMS.txt` | 对照 SHA-256 检查下载文件完整性 |
 
 Windows 与 macOS 共用代码、数据模型和 MCP 接口，部分桌面能力仍有平台差异：
@@ -334,7 +339,7 @@ scripts/              本机安装、验证、原生发布打包
 docs/                 系统设计、实现说明、历史开发与验证记录
 ```
 
-[系统设计](docs/design/TOOLHUB_SYSTEM_DESIGN.md) 描述完整产品方向，其中部分目标尚未实现；当前功能以本 README 与 [版本说明](docs/releases/v0.3.0-beta.2.md) 为准。
+[系统设计](docs/design/TOOLHUB_SYSTEM_DESIGN.md) 描述完整产品方向，其中部分目标尚未实现；当前功能以本 README 与 [版本说明](docs/releases/v0.3.0-beta.5.md) 为准。
 
 ## 已知限制与后续方向
 
@@ -353,9 +358,9 @@ ToolHub 源码以 [MIT License](LICENSE) 开源。第三方依赖保持各自许
 
 ### FFmpeg 媒体扩展（本地 beta.4 开发版）
 
-扩展目录新增 [FFmpeg 媒体工坊](extensions/examples/ffmpeg.toolhub-extension.json)，安装后增加独立导航，可压缩视频、转成 MP4、提取 M4A 音频。核心负责选择文件、预览参数、逐次确认、后台任务与取消，扩展提供操作声明及 Agent 通用流程。不会下载 FFmpeg，首次使用需核对本机安装实例的信任。Windows 支持受控执行；macOS 仅预览/查询。现有公开下载仍为 beta.2，beta.4 尚未发布。完整接口及限制见 [扩展文档](docs/development/EXTENSIONS.md)。
+扩展目录新增 [FFmpeg 媒体工坊](extensions/examples/ffmpeg.toolhub-extension.json)，安装后增加独立导航，可压缩视频、转成 MP4、提取 M4A 音频。核心负责选择文件、预览参数、逐次确认、后台任务与取消，扩展提供操作声明及 Agent 通用流程。不会下载 FFmpeg，首次使用需核对本机安装实例的信任。Windows 支持受控执行；macOS 仅预览/查询。此扩展宿主能力已包含在 beta.5；示例包在扩展目录中，需要明确安装。完整接口及限制见 [扩展文档](docs/development/EXTENSIONS.md)。
 
 
 [独立扩展目录 / ToolHub-Extensions](https://github.com/xiyuxiao1314/ToolHub-Extensions) 提供分类、标签、平台筛选与可核对的扩展 JSON。桌面扩展管理中可直接打开社区仓库。
 
-项目工具依赖发现 / Project dependency discovery: [Electron adapter](docs/development/PROJECT_DEPENDENCIES.md) (development beta.5).
+项目工具依赖发现 / Project dependency discovery: [Electron adapter](docs/development/PROJECT_DEPENDENCIES.md) (beta.5).
