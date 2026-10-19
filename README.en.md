@@ -13,6 +13,8 @@
   <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.6">Download v0.3.0-beta.6</a> · <a href="#screenshots">Screenshots</a> · <a href="#connect-an-ai-agent">Agent setup</a> · <a href="#build-from-source">Build from source</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">Report an issue</a></p>
 </div>
 
+[![M8ven Score](https://m8ven.ai/badge/mcp/xiyuxiao1314-toolhub-q0hzms?v=605fc85d6d6538d906e384fc8a7e66c1)](https://m8ven.ai/mcp/xiyuxiao1314-toolhub-q0hzms?s=readme)
+
 ## Design Studio and MCP updates
 
 Design Studio 0.2.0 is an optional extension with twelve visual directions, ten layout families, platform-specific Web/Android/desktop previews, composable visuals/motion, runnable HTML/JSON/Agent instructions and local reusable presets. Download it from [ToolHub-Extensions](https://github.com/xiyuxiao1314/ToolHub-Extensions/releases/tag/design-studio-v0.2.0), then import the reviewed package in Extensions. It requires beta.6 or later.

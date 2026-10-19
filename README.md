@@ -13,6 +13,8 @@
   <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.6">下载 v0.3.0-beta.6</a> · <a href="#界面预览">界面预览</a> · <a href="#接入-ai-agent">Agent 接入</a> · <a href="#从源码构建">源码构建</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">反馈问题</a></p>
 </div>
 
+[![M8ven Score](https://m8ven.ai/badge/mcp/xiyuxiao1314-toolhub-q0hzms?v=605fc85d6d6538d906e384fc8a7e66c1)](https://m8ven.ai/mcp/xiyuxiao1314-toolhub-q0hzms?s=readme)
+
 ## 为什么做 ToolHub
 
 当你让 Agent 压缩视频、处理 PDF 或运行一个项目时，它可能重新寻找 FFmpeg、安装 Python，或者留下一个散落在项目目录中的启动脚本。工具越多、Agent 越多，本机已经具备的能力反而越难被看见。
