@@ -29,10 +29,10 @@ def copy_assets(destination, desktop=True):
     for name in ['LICENSE','NOTICE','README.md','README.en.md']:
         shutil.copy2(root/name,destination/name)
     (destination/'docs/development').mkdir(parents=True,exist_ok=True)
-    for doc in ['ARTIFACTS.md','EXTENSIONS.md','STORAGE.md','PROJECT_DEPENDENCIES.md','MCP-CONTEXT.md','DESIGN-STUDIO.md']:
+    for doc in ['ARTIFACTS.md','EXTENSIONS.md','STORAGE.md','PROJECT_DEPENDENCIES.md','MCP-CONTEXT.md','DESIGN-STUDIO.md','MCP-ANNOTATIONS.md']:
         shutil.copy2(root/'docs/development'/doc,destination/'docs/development'/doc)
     (destination/'docs/images').mkdir(parents=True,exist_ok=True)
-    for image in ['extensions-manager.png','extension-workbench.png','extension-theme.png','navigation-applications.png']:
+    for image in ['extensions-manager.png','extension-workbench.png','extension-theme.png','navigation-applications.png','design-studio.png']:
         shutil.copy2(root/'docs/images'/image,destination/'docs/images'/image)
     shutil.copytree(license_cache/'THIRD-PARTY-LICENSES',destination/'THIRD-PARTY-LICENSES')
     shutil.copy2(license_cache/'DEPENDENCIES.json',destination/'DEPENDENCIES.json')

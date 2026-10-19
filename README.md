@@ -10,7 +10,7 @@
     <img alt="Status beta" src="https://img.shields.io/badge/status-beta-orange" />
   </p>
   <p><strong>简体中文</strong> | <a href="README.en.md">English</a></p>
-  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.5">下载 v0.3.0-beta.5</a> · <a href="#界面预览">界面预览</a> · <a href="#接入-ai-agent">Agent 接入</a> · <a href="#从源码构建">源码构建</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">反馈问题</a></p>
+  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.6">下载 v0.3.0-beta.6</a> · <a href="#界面预览">界面预览</a> · <a href="#接入-ai-agent">Agent 接入</a> · <a href="#从源码构建">源码构建</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">反馈问题</a></p>
 </div>
 
 ## 为什么做 ToolHub
@@ -57,17 +57,26 @@ ToolHub 使用已有工具，工具发现不依赖 AI 服务；它不会自动�
 
 ### 扩展工作台
 
-七个官方功能可独立装卸；第三方包可新增导航、交互页和主题。本节截图来自 v0.3.0-beta.3 Windows 独立验收实例；这些扩展工作台能力已包含在当前 beta.5 发布中。
+七个官方功能可独立装卸；第三方包可新增导航、交互页和主题。本节截图来自 v0.3.0-beta.3 Windows 独立验收实例；这些扩展工作台能力已包含在当前 beta.6 发布中。
 
 ![扩展工作台：官方模块、安装管理和界面恢复](docs/images/extension-workbench.png)
 
 ![石墨主题：顶部导航和紧凑布局](docs/images/extension-theme.png)
 
+### 设计台与 Agent 接口更新
+
+设计台是可选扩展，支持组合视觉方向、布局、导航、封面/字体和动效；Web / Android / 桌面预览有各自的外壳与重排。同步导出 JSON、可运行 HTML 和 Agent 设计说明，并保存本机预设。下载 [设计台 0.2.0](https://github.com/xiyuxiao1314/ToolHub-Extensions/releases/tag/design-studio-v0.2.0)，在“扩展”中导入；需要 beta.6 或更高版本。
+
+![设计台：组合、实时预览与平台参数](docs/images/design-studio.png)
+
+16 个 MCP 工具现已全部提供四项行为标注，协议测试使用独立注册表逐项调用。查询会保存 Agent 最近活动时间，因此采用保守的非严格只读标记；详见 [MCP 行为标注与外部报告说明](docs/development/MCP-ANNOTATIONS.md)。
+
 ## 当前功能
 
 | 模块 | 已实现的功能 |
 | --- | --- |
-| 扩展工作台 | 七个官方功能独立启停/装卸，第三方页面、导航、主题、布局、编辑和回滚 |
+| 扩展工作台 | 两级导航、七个官方功能独立启停/装卸，第三方页面、导航、主题、布局、编辑和回滚 |
+| 设计台 | 12 个视觉方向、10 类布局、平台适配、实时预览与可运行代码、Agent 说明和本机预设 |
 | 工具 | 本机扫描、名称/路径/任务搜索、能力解析、版本与环境查看、可用性检查、默认路径选择 |
 | 项目依赖 | 从明确选定的项目发现 Electron，区分完整安装与缺失包/二进制，多项目、多版本及路径去重 |
 | CLI 扩展 | FFmpeg 媒体面板，核心负责文件选择、参数预览、单次确认与后台任务 |
@@ -112,7 +121,7 @@ Agent 查询 ToolHub：本机已有工具 / 通用 Skill / 对应能力
 | 中 | 完成后由接入的 Agent 检查用途和依赖，提交理由；等待 5 分钟后回收 |
 | 高 | 人工保留或手动移入回收站，Agent 不能降级或删除 |
 
-自动清理只在用户选定且启用的管理目录内进行；人工保留优先。所有清理调用系统回收站，不提供永久删除或失败后的删除兜底。文件改变、已知引用或占用会暂缓。扫描不能证明 Agent 来源，也不能代替依赖判断。Windows 已做真实回收站验证；macOS Finder 适配仍需原机验证。此功能已包含在 v0.3.0-beta.5 发布包中。
+自动清理只在用户选定且启用的管理目录内进行；人工保留优先。所有清理调用系统回收站，不提供永久删除或失败后的删除兜底。文件改变、已知引用或占用会暂缓。扫描不能证明 Agent 来源，也不能代替依赖判断。Windows 已做真实回收站验证；macOS Finder 适配仍需原机验证。此功能已包含在 v0.3.0-beta.6 发布包中。
 
 完整流程和接口见 [产物管理](docs/development/ARTIFACTS.md)。
 
@@ -126,23 +135,23 @@ Windows 的“自动批准工具执行”默认开启：已信任且策略允许
 
 市场当前是随应用发布的本地能力包目录，可导入、预览、收录和分享 `.toolhub-skill.json`。内置包涉及媒体压缩/探测、音频提取、图片转换、PDF 文本/OCR、文档转换、归档解压和 CSV 数据检查。应用内没有账号、付费内容或自动安装依赖；另有公开的 [扩展目录](https://github.com/xiyuxiao1314/ToolHub-Extensions)，支持浏览筛选后明确导入。
 
-当前 beta.5 已采用扩展工作台架构：工具、程序、产物、环境、Skill、市场和任务成为默认启用的七个官方功能扩展，可安装、停用、卸载、编辑和回滚；卸载保留用户数据。独立 v2 包可以增加导航和 HTML/CSS/JavaScript 页面，也可以更换主题、导航布局和密度。智能体接入、权限和恢复入口保留在核心。参见 [扩展开发与使用说明](docs/development/EXTENSIONS.md)。
+当前 beta.6 已采用扩展工作台架构：工具、程序、产物、环境、Skill、市场和任务成为默认启用的七个官方功能扩展，可安装、停用、卸载、编辑和回滚；卸载保留用户数据。独立 v2 包可以增加导航和 HTML/CSS/JavaScript 页面，也可以更换主题、导航布局和密度。智能体接入、权限和恢复入口保留在核心。参见 [扩展开发与使用说明](docs/development/EXTENSIONS.md)。
 
-扩展架构已随 beta.5 发布。第三方页面使用受限 SDK，不能直接启动程序或清理文件，任意本机后台插件尚不支持。
+扩展架构已随 beta.6 发布。第三方页面使用受限 SDK，不能直接启动程序或清理文件，任意本机后台插件尚不支持。
 
 Agent 上下文也已优化：MCP 搜索默认返回 5 条摘要，完整信息按需查询，接入 Skill 的配置和高级流程分开读取。具体测量与边界见 [MCP 上下文优化](docs/development/MCP-CONTEXT.md)。
 
 ## 下载与平台支持
 
-当前开源预览版为 **v0.3.0-beta.5**。所有文件在 [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.5) 的 Assets 中下载。
+当前开源预览版为 **v0.3.0-beta.6**。所有文件在 [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.6) 的 Assets 中下载。
 
 | 你的系统 | 推荐下载 | 说明 |
 | --- | --- | --- |
-| Windows 10 / 11，64 位 | `ToolHub-v0.3.0-beta.5-windows-x64.zip` | 桌面、CLI、daemon 和能力包；本机原生验证 |
-| Mac，Apple Silicon（M 系列） | `ToolHub-v0.3.0-beta.5-macos-arm64.dmg` | macOS 13+；预览支持，另附 ZIP |
-| Mac，Intel | `ToolHub-v0.3.0-beta.5-macos-x64.dmg` | macOS 13+；预览支持，另附 ZIP |
-| 只需 CLI / MCP 服务 | `ToolHub-CLI-v0.3.0-beta.5-<平台>.zip` | 包含 CLI 和配对 daemon，不含桌面审批界面 |
-| 示例扩展与 SDK | `ToolHub-Extensions-v0.3.0-beta.5.zip` | FFmpeg、页面与主题示例，安装前可审阅源码 |
+| Windows 10 / 11，64 位 | `ToolHub-v0.3.0-beta.6-windows-x64.zip` | 桌面、CLI、daemon 和能力包；本机原生验证 |
+| Mac，Apple Silicon（M 系列） | `ToolHub-v0.3.0-beta.6-macos-arm64.dmg` | macOS 13+；预览支持，另附 ZIP |
+| Mac，Intel | `ToolHub-v0.3.0-beta.6-macos-x64.dmg` | macOS 13+；预览支持，另附 ZIP |
+| 只需 CLI / MCP 服务 | `ToolHub-CLI-v0.3.0-beta.6-<平台>.zip` | 包含 CLI 和配对 daemon，不含桌面审批界面 |
+| 独立扩展与源码 | [ToolHub-Extensions Releases](https://github.com/xiyuxiao1314/ToolHub-Extensions/releases) | 设计台、FFmpeg、主题与页面包单独发布，安装前可审阅源码 |
 | 校验文件 | `SHA256SUMS.txt` | 对照 SHA-256 检查下载文件完整性 |
 
 Windows 与 macOS 共用代码、数据模型和 MCP 接口，部分桌面能力仍有平台差异：
@@ -339,7 +348,7 @@ scripts/              本机安装、验证、原生发布打包
 docs/                 系统设计、实现说明、历史开发与验证记录
 ```
 
-[系统设计](docs/design/TOOLHUB_SYSTEM_DESIGN.md) 描述完整产品方向，其中部分目标尚未实现；当前功能以本 README 与 [版本说明](docs/releases/v0.3.0-beta.5.md) 为准。
+[系统设计](docs/design/TOOLHUB_SYSTEM_DESIGN.md) 描述完整产品方向，其中部分目标尚未实现；当前功能以本 README 与 [版本说明](docs/releases/v0.3.0-beta.6.md) 为准。
 
 ## 已知限制与后续方向
 
@@ -358,10 +367,10 @@ ToolHub 源码以 [MIT License](LICENSE) 开源。第三方依赖保持各自许
 
 ### FFmpeg 媒体工坊扩展
 
-扩展目录新增 [FFmpeg 媒体工坊](extensions/examples/ffmpeg.toolhub-extension.json)，安装后增加独立导航，可压缩视频、转成 MP4、提取 M4A 音频。核心负责选择文件、预览参数、逐次确认、后台任务与取消，扩展提供操作声明及 Agent 通用流程。不会下载 FFmpeg，首次使用需核对本机安装实例的信任。Windows 支持受控执行；macOS 仅预览/查询。此扩展宿主能力已包含在 beta.5；示例包在扩展目录中，需要明确安装。完整接口及限制见 [扩展文档](docs/development/EXTENSIONS.md)。
+扩展目录新增 [FFmpeg 媒体工坊](extensions/examples/ffmpeg.toolhub-extension.json)，安装后增加独立导航，可压缩视频、转成 MP4、提取 M4A 音频。核心负责选择文件、预览参数、逐次确认、后台任务与取消，扩展提供操作声明及 Agent 通用流程。不会下载 FFmpeg，首次使用需核对本机安装实例的信任。Windows 支持受控执行；macOS 仅预览/查询。此扩展宿主能力已包含在 beta.6；示例包在扩展目录中，需要明确安装。完整接口及限制见 [扩展文档](docs/development/EXTENSIONS.md)。
 
 
 [独立扩展目录 / ToolHub-Extensions](https://github.com/xiyuxiao1314/ToolHub-Extensions) 提供分类、标签、平台筛选与可核对的扩展 JSON。桌面扩展管理中可直接打开社区仓库。
 
-项目工具依赖发现 / Project dependency discovery: [Electron adapter](docs/development/PROJECT_DEPENDENCIES.md) (beta.5).
+项目工具依赖发现 / Project dependency discovery: [Electron adapter](docs/development/PROJECT_DEPENDENCIES.md) (beta.6).
 

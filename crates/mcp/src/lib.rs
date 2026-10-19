@@ -47,6 +47,21 @@ pub struct McpToolSpec {
     pub input_schema: Value,
 }
 
+impl McpToolSpec {
+    /// Hints describe the complete call, including persistent client activity.
+    /// They are never an authorization decision or a substitute for policy.
+    pub fn annotations(&self) -> Value {
+        json!({
+            "readOnlyHint": false,
+            "destructiveHint": matches!(self.name,
+                "execute_tool" | "cancel_task" |
+                "complete_artifact_package" | "review_artifact_package"),
+            "idempotentHint": false,
+            "openWorldHint": self.name == "execute_tool"
+        })
+    }
+}
+
 pub fn tool_specs() -> Vec<McpToolSpec> {
     let mut specs = vec![
         McpToolSpec{name:"get_task",description:"Get your task status, bounded output and declared artifacts; memory-only output expires.",input_schema:json!({"type":"object","properties":{"execution_id":{"type":"string"}},"required":["execution_id"]})},
@@ -381,7 +396,7 @@ impl Server {
         }
         match req.method.as_str() {
             "tools/list" => Ok(
-                json!({"tools":tool_specs().into_iter().map(|spec|json!({"name":spec.name,"description":spec.description,"inputSchema":spec.input_schema,"outputSchema":{"type":"object","properties":{"result":{}},"required":["result"]}})).collect::<Vec<_>>()}),
+                json!({"tools":tool_specs().into_iter().map(|spec|json!({"name":spec.name,"description":spec.description,"inputSchema":spec.input_schema,"annotations":spec.annotations(),"outputSchema":{"type":"object","properties":{"result":{}},"required":["result"]}})).collect::<Vec<_>>()}),
             ),
             "tools/call" => {
                 let params = req

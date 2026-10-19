@@ -1,6 +1,6 @@
 # 设计台 / Design Studio
 
-`community.design-studio` 0.2.0，独立页面扩展，需要 ToolHub 0.3.0-beta.6 或更新版本。本轮为本机更新，未推送或发布 GitHub。
+`community.design-studio` 0.2.0，独立页面扩展，需要 ToolHub 0.3.0-beta.6 或更新版本。独立扩展包、源码与校验值在 [扩展仓库](https://github.com/xiyuxiao1314/ToolHub-Extensions/releases/tag/design-studio-v0.2.0) 发布；主程序安装包在 [ToolHub](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.6) 发布。
 
 ## 使用
 

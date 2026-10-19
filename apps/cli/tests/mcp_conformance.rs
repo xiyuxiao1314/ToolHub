@@ -155,3 +155,202 @@ fn unknown_method_is_method_not_found_and_server_recovers() {
     c.send(json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_tools","arguments":{"query":"python"}}}));
     assert_eq!(c.read()["result"]["isError"], false);
 }
+
+#[test]
+fn all_meta_tools_have_complete_behavior_hints() {
+    let mut client = McpClient::spawn(true);
+    client.send(json!({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}));
+    let response = client.read();
+    let tools = response["result"]["tools"].as_array().unwrap();
+    let names: std::collections::BTreeSet<_> = tools
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap())
+        .collect();
+    let declared: std::collections::BTreeSet<_> = toolhub_mcp::META_TOOLS
+        .iter()
+        .map(|(name, _)| *name)
+        .collect();
+    assert_eq!(names, declared);
+    assert_eq!(tools.len(), names.len(), "duplicate MCP name");
+    for tool in tools {
+        let hints = &tool["annotations"];
+        for name in [
+            "readOnlyHint",
+            "destructiveHint",
+            "idempotentHint",
+            "openWorldHint",
+        ] {
+            assert!(hints[name].is_boolean(), "{}: {name}", tool["name"]);
+        }
+        // Every successful gateway call persists self-reported agent activity.
+        assert_eq!(hints["readOnlyHint"], false);
+        assert_eq!(hints["idempotentHint"], false);
+        assert_eq!(hints["openWorldHint"], tool["name"] == "execute_tool");
+        assert_eq!(
+            hints["destructiveHint"],
+            matches!(
+                tool["name"].as_str().unwrap(),
+                "execute_tool"
+                    | "cancel_task"
+                    | "complete_artifact_package"
+                    | "review_artifact_package"
+            )
+        );
+    }
+}
+
+fn call_tool(client: &mut McpClient, name: &str, arguments: Value, is_error: bool) -> Value {
+    client.send(json!({"jsonrpc":"2.0","id":200,"method":"tools/call","params":{"name":name,"arguments":arguments}}));
+    let response = client.read();
+    assert!(response.get("error").is_none(), "{name}: {response}");
+    let result = &response["result"];
+    assert_eq!(result["isError"], is_error, "{name}: {response}");
+    let text: Value = serde_json::from_str(result["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(
+        text, result["structuredContent"]["result"],
+        "{name}: result formats differ"
+    );
+    text
+}
+
+#[test]
+fn all_sixteen_tools_route_through_isolated_daemon_and_preserve_authority() {
+    let mut client = McpClient::spawn(true);
+    let artifact_dir = tempfile::Builder::new()
+        .prefix("mcp-artifact-fixture-")
+        .tempdir_in(std::env::current_dir().unwrap())
+        .unwrap();
+    let task_root = artifact_dir.path().join("task-output");
+    std::fs::create_dir(&task_root).unwrap();
+    let protected = task_root.join("fixture.txt");
+    std::fs::write(&protected, "retain this task output").unwrap();
+
+    assert_eq!(
+        call_tool(
+            &mut client,
+            "search_tools",
+            json!({"query":"absent-conformance-tool"}),
+            false
+        ),
+        json!([])
+    );
+    // Unknown capability is a semantic error, never permission to execute.
+    let resolution = call_tool(
+        &mut client,
+        "resolve_capability",
+        json!({"capability":"conformance.absent"}),
+        true,
+    );
+    assert!(resolution.is_object() || resolution.is_array());
+    call_tool(
+        &mut client,
+        "inspect_tool",
+        json!({"id":"missing-instance"}),
+        true,
+    );
+    assert!(call_tool(&mut client, "list_environments", json!({}), false).is_array());
+    assert_eq!(
+        call_tool(&mut client, "search_programs", json!({}), false),
+        json!([])
+    );
+    let proposal = call_tool(
+        &mut client,
+        "propose_program",
+        json!({
+            "name":"Conformance proposal", "kind":"command", "cwd":task_root,
+            "command":"echo submitted-but-never-executed", "source":"conformance"
+        }),
+        false,
+    );
+    assert_eq!(proposal["status"], "pending");
+    // Submitting metadata neither collects nor launches a program.
+    assert_eq!(
+        call_tool(&mut client, "search_programs", json!({}), false),
+        json!([])
+    );
+    call_tool(
+        &mut client,
+        "get_task",
+        json!({"execution_id":"missing-task"}),
+        true,
+    );
+    call_tool(
+        &mut client,
+        "cancel_task",
+        json!({"execution_id":"missing-task"}),
+        true,
+    );
+    call_tool(
+        &mut client,
+        "execute_tool",
+        json!({"instance_id":"missing-instance"}),
+        true,
+    );
+    assert!(call_tool(&mut client, "search_skills", json!({}), false).is_array());
+    call_tool(
+        &mut client,
+        "inspect_skill",
+        json!({"id":"missing-skill"}),
+        true,
+    );
+    let package = call_tool(
+        &mut client,
+        "register_artifact_package",
+        json!({
+            "name":"Protected fixture", "task":"MCP conformance", "root":task_root,
+            "files":["fixture.txt"]
+        }),
+        false,
+    );
+    let id = package["id"].as_str().unwrap();
+    assert_eq!(package["package"]["priority"], "high");
+    assert_eq!(package["auto_scope"], false);
+    let listed = call_tool(&mut client, "list_artifact_packages", json!({}), false);
+    assert!(listed
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item["id"] == id));
+    let inspected = call_tool(
+        &mut client,
+        "list_artifact_packages",
+        json!({"id":id}),
+        false,
+    );
+    assert_eq!(inspected["package"]["files"][0]["status"], "present");
+    let completed = call_tool(
+        &mut client,
+        "complete_artifact_package",
+        json!({
+            "id":id, "no_longer_needed":true, "reason":"Fixture task succeeded"
+        }),
+        false,
+    );
+    assert_eq!(completed["status"], "retained");
+    assert!(completed["cleanup_after"].is_null());
+    call_tool(
+        &mut client,
+        "review_artifact_package",
+        json!({
+            "id":id, "decision":"recycle", "unused":true, "dependencies_checked":true,
+            "reason":"Agent must not override high priority"
+        }),
+        true,
+    );
+    call_tool(
+        &mut client,
+        "request_execution_approval",
+        json!({"instance_id":"missing-instance"}),
+        true,
+    );
+    call_tool(
+        &mut client,
+        "request_execution_approval",
+        json!({"request_id":"missing-request"}),
+        true,
+    );
+    assert_eq!(
+        std::fs::read_to_string(&protected).unwrap(),
+        "retain this task output"
+    );
+}
