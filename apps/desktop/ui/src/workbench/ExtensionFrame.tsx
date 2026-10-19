@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { NavItem } from './host'
 import { rpc } from './host'
+import { extensionState } from './extensionStorage'
 export default function ExtensionFrame({item,navigate,notify}:{item:NavItem;navigate:(id:string)=>void;notify:(m:string)=>void}){
   const frame=useRef<HTMLIFrameElement>(null), [url,setUrl]=useState(''),[error,setError]=useState('')
   const token=useMemo(()=>crypto.randomUUID(),[item.id,item.extension?.digest])
@@ -23,6 +24,12 @@ export default function ExtensionFrame({item,navigate,notify}:{item:NavItem;navi
         if(m.type==='call'){if(typeof m.method!=='string'||JSON.stringify(m.params??{}).length>65536)throw new Error('Invalid bridge request');respond({result:await rpc('extension.invoke',{id:extension.package.id,expected_digest:extension.digest,method:m.method,params:m.params??{}})})}
         else if(m.type==='navigate'){if(typeof m.page!=='string')throw new Error('Invalid page');navigate(m.page);respond({result:true})}
         else if(m.type==='notify'){notify(String(m.message??'').slice(0,256));respond({result:true})}
+        else if(m.type==='storage'){
+          if(JSON.stringify(m.data??null).length>65536)throw Error('Extension storage payload too large')
+          const current=await rpc('extension.list')
+          if(!active||!current.some((row:any)=>row.enabled&&row.package.id===extension.package.id&&row.digest===extension.digest))throw Error('Extension disabled, removed or updated')
+          respond({result:extensionState(localStorage,extension.package.id,m.operation,m.revision,m.data)})
+        }
         else respond({error:'Unknown SDK action'})
       }catch(error){respond({error:String(error)})}finally{inFlight--}
     }

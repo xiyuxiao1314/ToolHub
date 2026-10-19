@@ -1,5 +1,7 @@
 # Security baseline
 
+The beta.6 page SDK adds package-scoped presentation storage in the parent WebView, capped at 32 KiB of JSON data per package with compare-and-swap revisions. The frame/session source and current enabled package digest are checked before access. No caller-supplied namespace, disk path, backend setting, native execution or network permission is accepted. Uninstall retains this local display state; clearing the WebView profile resets it. This is separate from the registry and configuration export.
+
 ## Product invariants
 
 - Discovery defaults to read-only metadata inspection. No installation, removal, configuration writes, registry modification, PATH modification, or elevation through discovery.

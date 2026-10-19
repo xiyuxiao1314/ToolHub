@@ -20,6 +20,9 @@ pub fn extension_catalog() -> Result<Value, String> {
     all.push(ExtensionPackage::parse(include_bytes!(
         "../../../extensions/examples/ffmpeg.toolhub-extension.json"
     ))?);
+    all.push(ExtensionPackage::parse(include_bytes!(
+        "../../../extensions/examples/design-studio.toolhub-extension.json"
+    ))?);
     serde_json::to_value(all).map_err(|e| e.to_string())
 }
 #[tauri::command]

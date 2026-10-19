@@ -1,0 +1,14 @@
+{
+  "schema": "toolhub.extension/v2",
+  "id": "community.design-studio",
+  "name": "设计台",
+  "version": "0.1.0",
+  "description": "自由组合页面结构、导航、视觉与交互效果，实时试用布局，生成对应配置、HTML 示例和 Agent 设计说明，保存自己的设计预设。",
+  "author": "ToolHub community",
+  "license": "MIT",
+  "platforms": ["windows", "macos"],
+  "min_toolhub_version": "0.3.0-beta.6",
+  "permissions": [],
+  "skills": [],
+  "views": [{"id":"community.design-studio.composer","label":"设计台","icon":"◧","order":91}]
+}

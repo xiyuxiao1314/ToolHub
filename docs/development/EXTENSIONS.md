@@ -57,6 +57,8 @@ await toolhub.navigate('tools'); // 只能导航到当前已启用页面
 
 全局 `toolhub` 提供 Promise 接口：call(method, params)、notify(message)、navigate(page)。查询方法保留原生 THP 参数和返回值；页面需要自行分页/限制输出。该接口不是新 MCP server，Agent 仍使用固定的 16 个元工具与默认 5 条摘要。
 
+beta.6 新增可选的显示状态接口 `toolhub.storage.get()` → `{revision,data}`、`toolhub.storage.set(data,expectedRevision)` → 新快照。它是包专属的父 WebView localStorage，不是 THP 方法；最大 32 KiB UTF-8 数据，不接受包 ID、磁盘路径或后端设置名。每次读取/写入前重新核对包仍已启用且摘要相同，写入修订号不符则拒绝。清除 WebView 数据会重置；卸载保留，重新安装相同包 ID 可恢复。旧页面 SDK 保持兼容，不新增本机执行、网络或文件权限。需要此功能的包应声明 min_toolhub_version ≥ 0.3.0-beta.6；并发保存要串行处理并使用最新 revision。设计台的实际用法见 [设计台](DESIGN-STUDIO.md)。
+
 | 页面权限 | 可调用方法 |
 | --- | --- |
 | tools.read | registry.search、registry.inspect_tool、registry.inspect_instance、resolve.capability、capability.list |

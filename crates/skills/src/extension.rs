@@ -632,3 +632,20 @@ mod cli_contract_tests {
             .contains_key("cli"));
     }
 }
+
+#[cfg(test)]
+mod design_studio_contract_tests {
+    use super::*;
+    #[test]
+    fn design_studio_is_bounded_unprivileged_and_requires_the_storage_sdk_host() {
+        let package = ExtensionPackage::parse(include_bytes!(
+            "../../../extensions/examples/design-studio.toolhub-extension.json"
+        )).unwrap();
+        assert!(package.permissions.is_empty());
+        assert!(package.host_module.is_none());
+        assert!(package.cli.is_none());
+        assert_eq!(package.views.len(), 1);
+        assert!(!package.compatible("windows", "0.3.0-beta.5"));
+        assert!(package.compatible("windows", "0.3.0-beta.6"));
+    }
+}
