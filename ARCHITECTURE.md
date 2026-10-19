@@ -57,5 +57,7 @@ Versioned v2 packages can contribute interactive frontend documents, bounded the
 
 Official page adapters reside under `apps/desktop/ui/src/official`, kernel shell/loader under `workbench`, manifests under `extensions/official`. Existing Programs/Artifacts/Skills/Market components are loaded through the same official feature registry. Arbitrary native executable plugins, online catalogs and privileged layout code are excluded from this implemented contract. See the authoritative extension guide and schema.
 
+The owner-approved hierarchical shell (2026-10-19 local development) keeps four kernel-owned primary groups. Existing module/page/CLI IDs remain secondary destinations; generic pages are grouped by package and can be pinned by the user. Theme/recognition-only extensions contribute no destinations. Presentation history/pins are local WebView preferences; no protocol, manifest, execution or database contract changes.
+
 
 The beta.4 workbench adds an optional declarative CLI contribution: extension-owned metadata and argv templates, host-owned native forms and a controller-only preview/start API, and the existing daemon execution pipeline under an ordinary extension identity. Generic iframe scripts retain their previous limited bridge. The FFmpeg package is externalizable independently of core code and includes one portable Agent workflow; no per-plugin MCP tools are generated.

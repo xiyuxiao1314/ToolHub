@@ -16,7 +16,17 @@ export function useExtensionHost(){
   const reload=useCallback(async()=>{try{const [rows,p]=await Promise.all([rpc('extension.list'),rpc('extension.preferences')]);setInstalled(rows);setPrefs(p);setError('');setReady(true)}catch(e){setError(String(e))}},[])
   useEffect(()=>{void reload(); const refresh=()=>void reload();window.addEventListener('toolhub:extensions-changed',refresh);window.addEventListener('focus',refresh);return()=>{window.removeEventListener('toolhub:extensions-changed',refresh);window.removeEventListener('focus',refresh)}},[reload])
   const nav=useMemo(()=>{
-    const items:NavItem[]=[{id:'agents',label:'智能体',icon:'🤖',order:40},{id:'extensions',label:'扩展',icon:'◈',order:85},{id:'settings',label:'设置',icon:'⚙️',order:1000}]
+    // Primary groups are owned by the shell. Packages only contribute secondary destinations.
+    const items:NavItem[]=[
+      {id:'workspace',label:'工作空间',icon:'',order:0},
+      {id:'agents',label:'已接入智能体',icon:'',order:40},
+      {id:'agent-guide',label:'接入说明',icon:'',order:41},
+      {id:'extension-apps',label:'扩展应用',icon:'',order:80},
+      {id:'extensions',label:'已安装',icon:'',order:85},
+      {id:'extension-catalog',label:'扩展市场',icon:'',order:86},
+      {id:'extension-appearance',label:'主题与布局',icon:'',order:87},
+      {id:'settings',label:'通用设置',icon:'',order:1000},
+    ]
     for(const item of installed.filter(e=>e.enabled)){
       const p=item.package
       if(p.host_module && p.navigation)items.push({id:p.host_module,...p.navigation,extension:item})

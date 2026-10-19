@@ -19,7 +19,7 @@ New-Item -ItemType Directory -Path $guidePath -Force | Out-Null
 foreach ($guideName in @('EXTENSIONS.md','ARTIFACTS.md','STORAGE.md','PROJECT_DEPENDENCIES.md')) { Copy-Item -LiteralPath (Join-Path $projectRoot ('docs\development\' + $guideName)) -Destination $guidePath }
 $imagePath = Join-Path $packagePath 'docs\images'
 New-Item -ItemType Directory -Path $imagePath -Force | Out-Null
-foreach ($imageName in @('extension-workbench.png','extension-theme.png')) { Copy-Item -LiteralPath (Join-Path $projectRoot ('docs\images\' + $imageName)) -Destination $imagePath }
+foreach ($imageName in @('extension-workbench.png','extension-theme.png','navigation-applications.png')) { Copy-Item -LiteralPath (Join-Path $projectRoot ('docs\images\' + $imageName)) -Destination $imagePath }
 $versionOutput = & (Join-Path $packagePath 'toolhub.exe') '--version'
 if ($LASTEXITCODE -ne 0) { throw 'CLI version check failed' }
 @{schema='toolhub.package/v1';build_id=$BuildId;version=$versionOutput;configuration=$Configuration;created_at=(Get-Date).ToUniversalTime().ToString('o');unsigned=$true;binaries=@('toolhub.exe','toolhubd.exe','toolhub-desktop.exe')} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $packagePath 'package.json') -Encoding utf8NoBOM

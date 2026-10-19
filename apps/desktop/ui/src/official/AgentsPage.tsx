@@ -8,25 +8,25 @@ import type { WorkbenchContext } from './Workbench'
 import { asRecord, parseMaybeJson, trustLevel, trustLabel, formatTs, toolTags, tagClass, StatusBadge } from './Workbench'
 
 const rpc = (method: string, params: unknown = {}) => invoke<any>('rpc', {method, params})
-export default function AgentsPage(props: WorkbenchContext) {
-  const { agents, error, agentHelpOpen, setAgentHelpOpen, notify, fail, refresh } = props
+export default function AgentsPage(props: WorkbenchContext & { guide?: boolean }) {
+  const { agents, notify, fail, refresh } = props
   return (
           <>
             <div className="topbar">
               <div>
-                <h1>智能体</h1>
+                <h1>{props.guide ? '接入说明' : '智能体'}</h1>
                 <p>连接和管理可使用 ToolHub 的 AI 智能体，让它们共享本机工具能力。</p>
               </div>
               <button
                 className="btn btn-primary"
-                onClick={() => setAgentHelpOpen((open) => !open)}
+                onClick={() => props.setPage(props.guide ? 'agents' : 'agent-guide')}
               >
-                接入说明
+                {props.guide ? '查看智能体' : '接入说明'}
               </button>
             </div>
             <div className="layout-1">
-              {agentHelpOpen && <AgentHelp notify={notify} fail={fail} refresh={() => void refresh('智能体列表已刷新')} />}
-              <div className="card card-pad">
+              {props.guide && <AgentHelp notify={notify} fail={fail} refresh={() => void refresh('智能体列表已刷新')} />}
+              {!props.guide && <div className="card card-pad">
                 {agents.length === 0 ? (
                   <div className="empty">
                     尚未检测到智能体或接入配置。
@@ -57,7 +57,7 @@ export default function AgentsPage(props: WorkbenchContext) {
                     ))}
                   </ul></>
                 )}
-              </div>
+              </div>}
             </div>
           </>
   )
