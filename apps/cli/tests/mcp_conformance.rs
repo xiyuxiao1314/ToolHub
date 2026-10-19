@@ -29,6 +29,7 @@ struct McpClient {
     daemon: Child,
     stdin: ChildStdin,
     lines: Receiver<String>,
+    first_response: bool,
     _dir: tempfile::TempDir,
 }
 impl McpClient {
@@ -37,10 +38,16 @@ impl McpClient {
         let db = dir.path().join("mcp.sqlite");
         let daemon = Command::new(binary("toolhubd"))
             .arg("--listen")
+            // This is an ordinary-client fixture. Do not pin/hash an unrelated
+            // adjacent desktop image or accept a real desktop as its controller.
+            .arg("--controller-image")
+            .arg(dir.path().join("no-controller-image"))
             .env("TOOLHUB_REGISTRY", &db)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stderr(Stdio::from(
+                std::fs::File::create(dir.path().join("daemon.stderr")).unwrap(),
+            ))
             .spawn()
             .unwrap();
         std::thread::sleep(Duration::from_millis(150));
@@ -50,7 +57,9 @@ impl McpClient {
             .env("TOOLHUBD_BIN", binary("toolhubd"))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::from(
+                std::fs::File::create(dir.path().join("client.stderr")).unwrap(),
+            ))
             .spawn()
             .unwrap();
         let stdin = child.stdin.take().unwrap();
@@ -73,6 +82,7 @@ impl McpClient {
             daemon,
             stdin,
             lines,
+            first_response: true,
             _dir: dir,
         };
         if ready {
@@ -90,13 +100,20 @@ impl McpClient {
         self.stdin.flush().unwrap();
     }
     fn read(&mut self) -> Value {
-        serde_json::from_str(
-            &self
-                .lines
-                .recv_timeout(Duration::from_secs(5))
-                .expect("bounded MCP response"),
-        )
-        .unwrap()
+        // The first response also includes native process launch and the
+        // production five-second managed-service readiness window. Allow cold
+        // CI startup overhead separately; subsequent protocol replies keep the
+        // original five-second bound and every semantic assertion is unchanged.
+        let timeout = if self.first_response { 15 } else { 5 };
+        self.first_response = false;
+        let line = self.lines.recv_timeout(Duration::from_secs(timeout))
+            .unwrap_or_else(|error| {
+                let log = |name| std::fs::read_to_string(self._dir.path().join(name))
+                    .unwrap_or_default().chars().take(4096).collect::<String>();
+                panic!("bounded MCP response: {error:?}; client={:?}; daemon={:?}; client stderr={}; daemon stderr={}",
+                    self.child.try_wait(), self.daemon.try_wait(), log("client.stderr"), log("daemon.stderr"));
+            });
+        serde_json::from_str(&line).unwrap()
     }
 }
 impl Drop for McpClient {
