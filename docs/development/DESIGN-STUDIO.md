@@ -1,42 +1,56 @@
 # 设计台 / Design Studio
 
-独立 v2 页面扩展，包 ID 为 community.design-studio，版本 0.1.0。需要 ToolHub 0.3.0-beta.6 的扩展本机存储 SDK；beta.5 不包含此接口。当前为本机可试用开发版，未发布 GitHub 安装包。
+`community.design-studio` 0.2.0，独立页面扩展，需要 ToolHub 0.3.0-beta.6 或更新版本。本轮为本机更新，未推送或发布 GitHub。
 
-## 从真实流程试用
+## 使用
 
-1. 扩展中心 → 扩展应用 → 设计台，也可用图钉固定到工作空间。
-2. 从 8 个预设选择一个起点，点击“应用预设”。
-3. 左侧组合页面结构、导航、视觉和交互效果；右侧设置名称、用途、平台、画幅、列数、密度、圆角、间距、强调色、动效、数据量和主题。
-4. 页面模块可以显示/隐藏，并用 ↑/↓ 调整顺序；主要内容必须保留。
-5. 在中间直接点击、展开、筛选、拖拽、滚动或平移缩放，核对真实效果。
-6. 下方切换配置 JSON、可运行 HTML、Agent 设计说明和参考边界，点击复制。浏览器拒绝剪贴板时会全选内容并明确提示手动复制。
-7. 为组合命名并保存为预设；自定义预设可重新应用、两次点击删除。JSON 可复制备份，再粘贴导入。导入只解析严格配置，不运行 HTML/JS。
+扩展中心 → 扩展应用 → 设计台。先看上方的可视化方向卡，点击即应用；可按视觉表达、空间探索、产品应用或移动体验筛选。点击“放大预览”隐藏编辑面板。预览只显示示例界面、图像和必要操作，设计解释和来源放在下方输出区。
 
-## 当前组合范围
+左侧组合布局、导航、视觉语言、内容语言和效果；右侧调整平台、画幅、列数、圆角、间距、颜色、时长、密度和模块顺序。切换 Android 自动选择手机画幅，Web/桌面选择桌面画幅，仍可手动改变画幅。Android 提供状态栏、内部滚动、底部导航和手势区；较宽画幅改用侧栏。平台外壳随同导出，Android HTML 仍为浏览器交互参考，不是 Compose 源码。
 
-- 6 种页面结构：卡片网格、Metro 磁贴、瀑布流、主从列表、无限画布、任务看板。
-- 4 种导航：侧边、紧凑栏、顶部、无导航。
-- 4 种视觉语言：简洁工作台、轻透 Fluent、杂志排版、硬边设计。
-- 6 种可叠加效果：卡片展开、悬停抬升、入场错峰、拖拽排序、搜索栏吸顶、焦点强调。
-- 3 种性能策略：标准渲染、动态高度虚拟列表、画布视口裁剪。
-- 5 种可排序模块与 8 个内置预设；最多 24 个自定义预设。
+下方可复制 JSON、同源渲染的完整 HTML 或 Agent 提示词。JSON 导入严格校验，不运行导入的脚本。自定义组合可命名保存；最多 24 个预设，每个扩展总计 32 KiB 本机存储。旧版 v1 配置会迁移为 v2，保留全部原字段，并补上项目摘要内容语言和散点画布。
 
-这些选项并非全部兼容。第一版虚拟化只用于主从列表；一万条数据需要虚拟列表。视口裁剪只用于画布。虚拟列表与画布不启用卡片拖拽排序；画布本身支持平移。切换结构时会显示调整原因，导出的配置始终反映实际预览。列数只用于网格、磁贴和瀑布流。
+## 十二个起点
 
-## 输出与边界
+| 方向 | 主要结构与视觉 |
+| --- | --- |
+| 沉浸封面墙 | 深色、窄缝、大小磁贴、封面与展开转场 |
+| 无界拼贴画布 | 世界坐标、大小磁贴 / 散点、平移缩放、真实视口裁剪 |
+| 纸上展览 | 暖纸底色、衬线标题、不等高封面、编辑式留白 |
+| 字体实验室 | 大字、酸性色块、硬边框线 |
+| 精密项目台 | 清晰的侧栏、摘要、状态与对齐 |
+| 万条素材目录 | 主从结构、动态高度虚拟列表、持久的展开状态 |
+| 流光工作流 | 轻透层次、任务分列、跨列拖动 |
+| 掌中灵感馆 | Android 手机外壳、触控尺寸、双列与底部导航 |
+| 电影感叙事 | 大幅作品、横向切幕、极简文字 |
+| 瑞士设计目录 | 编号、横线、大标题与缩略图 |
+| 横向摄影札记 | 横向滚动、交替比例与作品展开 |
+| 产品能力拼图 | 主次分明的 Bento 分区 |
 
-预览与独立 HTML 使用同一份验证配置和渲染/交互函数。HTML 可复制保存后用浏览器打开，不需要外部 CDN。平台选项改变 Agent 说明；Android 和桌面示例仍是浏览器交互参考，不冒充 Compose、Qt 或其他原生项目源码。
+十类布局、四类导航、五类视觉语言、三类内容语言和六类效果可组合。虚拟列表只适用于主从列表；一万条示例需要虚拟列表。视口裁剪只适用于画布；画布和虚拟列表关闭卡片拖拽排序。无效组合自动调整并显示原因，不以全量 DOM 冒充虚拟渲染。
 
-画布展示有限的示例节点，支持相机平移、缩放、复位和裁剪，不提供节点编辑、持久画布文档或协作。看板拖拽只改变演示项目顺序。搜索和筛选操作示例数据，不接入真实业务后端；虚拟化不代表网络分页。动画关闭及系统减少动态效果时不影响核心操作。
+## 参考研究
 
-代码输出是可运行设计参考，仍需 Agent 接入真实内容、业务状态、后端、加载与错误处理。不会安装 UI 库、执行本机程序、读取其他扩展数据或新增 MCP 工具。
+本轮查看了 [Godly](https://godly.website/)、[Siteinspire](https://www.siteinspire.com/)、[Awwwards 动态网格](https://www.awwwards.com/websites/dynamic-grid-layout-examples/) 和 [Codrops Creative Hub](https://tympanus.net/codrops/hub/)，结合以下具体参考：
 
-## 本机预设
+- [Folia](https://github.com/chthollyphile/folia-major)：用户指定的沉浸式内容墙与网格交互参考。
+- [Atelier North](https://atelier-north.crnacura.workers.dev/)：Codrops 2026 建筑工作室示例，观察编辑层级、留白与作品索引。
+- [Infinite Scroll GSAP Gallery](https://tympanus.net/Tutorials/InfiniteScrollGSAPGallery/)：2026 画廊和作品详情转场参考。
+- [Infinite Layers Grid](https://tympanus.net/Tutorials/InfiniteLayersGrid/) 与 [Grid to Fullscreen](https://tympanus.net/Tutorials/GridToFullscreenAnimations/)：空间网格与来源位置转场的技术参考。
+- [Android 自适应布局](https://developer.android.com/develop/ui/compose/layouts/adaptive/list-detail)、[Windows 布局](https://learn.microsoft.com/en-us/windows/apps/design/basics/)、[TanStack Virtual](https://tanstack.com/virtual/latest/docs/introduction)：平台与性能原则。
 
-草稿和预设保存在父 WebView 的 localStorage，每个包最多 32 KiB。卸载保留这份显示数据，重新安装同一包 ID 可恢复；清除该 WebView 配置文件会重置。预设不进入数据库或普通配置导出，请用 JSON 备份重要组合。并发窗口使用修订号检查，冲突时提示重新打开，防止覆盖另一窗口的保存。
+Godly 和 Siteinspire 的页面已实际浏览；Codrops 的部分直接演示在自动化浏览器中出现访问挑战，因此同时使用其公开文章、目录及示例内容核对，未声称逐项体验所有第三方动画。本扩展为原创代码和原创 SVG 视觉研究，不复制站点源码、品牌、专辑封面或捆绑第三方库。引用说明设计原则来源，不表示原站模板已原样移植。
 
-## 扩展开发
+## 交互与输出
 
-可编辑源在 extensions/design-studio/{manifest.json,view.html,view.css,preview.css,preview.js,view.js}。运行 `python scripts/build-design-studio.py` 生成 extensions/examples/design-studio.toolhub-extension.json；脚本检查 HTML/CSS/JS 与总包的原生限制，不联网。
+封面、字体和摘要可以独立于布局选择。非列表卡片通过来源位置动画进入作品详情；详情只保留作品图像、标题、分类和返回操作，Escape 返回并恢复焦点。长页面的详情使用视口内独立弹层，背景编辑区不可操作。系统减少动态效果或时长为零时直接切换；系统偏好在会话中变化也会生效。
 
-参考：[Windows 布局](https://learn.microsoft.com/en-us/windows/apps/design/basics/)、[tldraw 画布](https://tldraw.dev/examples/basic)、[Motion 布局动画](https://motion.dev/docs/react-layout-animations)、[TanStack 虚拟列表](https://tanstack.com/virtual/latest/docs/introduction)、[Android 自适应主从](https://developer.android.com/develop/ui/compose/layouts/adaptive/list-detail)。演示自行实现，不捆绑这些库；包与源代码采用 MIT。
+画布示例节点有限，支持无边界相机平移、缩放、复位和裁剪，不包含节点编辑或协作。横向画册使用原生滚动和吸附，不冒充真正无限数据源。看板排序仅作用于示例数据。图像均为离线 SVG，不请求远程素材；无需额外权限。
+
+预览和 HTML 共享验证、绘制及事件代码。Agent 输出包含当前参数、平台技术栈提示、视觉要求、性能要求与验收要求；引用仅在当前组合与所选起点对应时附加。实际产品仍需接入项目业务数据和状态。
+
+## 开发与验证
+
+源码：`extensions/design-studio/`。运行 `python scripts/build-design-studio.py` 生成 `extensions/examples/design-studio.toolhub-extension.json`。构建离线完成，分别检查 HTML 64 KiB、CSS 32 KiB、JS 64 KiB 和总包 256 KiB 限制。共享预览 CSS 在 HTML 的转义惰性 template 中保存，导出时读取，不需要内联脚本或降低原生 CSP。
+
+本机包可通过扩展预览与版本升级流程安装；不需要改数据库或授予执行能力。同一包 ID 保留本机草稿、预设及版本回滚快照。Windows 原生 WebView 验证见本轮交付记录；macOS 实际交互未验证。
