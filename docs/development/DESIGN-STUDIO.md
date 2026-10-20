@@ -1,18 +1,18 @@
 # 设计台 / Design Studio
 
-`community.design-studio` 0.3.0，独立页面扩展，需要 ToolHub 0.3.0-beta.6 或更新版本。0.3 为本轮本地开发版，未发布；[已发布的 0.2](https://github.com/xiyuxiao1314/ToolHub-Extensions/releases/tag/design-studio-v0.2.0) 与 [主程序 beta.6](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.6) 继续保留。
+`community.design-studio` 0.3.1，独立页面扩展，需要 ToolHub 0.3.0-beta.7 或更新版本。0.3.1 与 beta.7 为本轮本地开发版，未发布；[已发布的 0.2](https://github.com/xiyuxiao1314/ToolHub-Extensions/releases/tag/design-studio-v0.2.0) 与 [主程序 beta.6](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.6) 继续保留。
 
 ## 三步使用
 
 扩展中心 → 扩展应用 → 设计台。
 
 1. **选择预设**：从 12 个视觉方向、自己的预设或“无预设”开始。已有草稿可选“继续当前设计”。点击卡片只选择起点，进入下一步才应用，不会因浏览卡片就覆盖草稿。
-2. **预览微调**：预览在左，布局/效果和参数共用右侧面板。可修改平台、画幅、列数、圆角、间距、颜色、动效、密度和模块顺序，试用交互、保存预设。窄窗口通过“微调 / 返回预览”切换区域；放大预览可隐藏侧栏。
+2. **预览微调**：左侧是完整构图缩略图，点击缩略图或“预览设计”进入占满 ToolHub 窗口的交互预览，暂时隐藏两级导航、步骤条和参数。画面自动适应可用空间，不需要手动缩放或在预览外框内滚动。宿主顶部“返回设计台”始终可用；Escape 先关闭作品详情，再按一次返回微调。右侧按类别调整布局、效果和参数，保存预设；窄窗口可切换微调区域。
 3. **导出**：复制配置 JSON、完整可运行 HTML 或 Agent 设计说明。可粘贴导入已备份的配置；严格校验后返回微调，不执行导入脚本。
 
-顶部步骤条或底部上一步/下一步都可操作，支持键盘。返回同一起点不会重置已做的微调。预设选择页只有一层内容滚动；微调页预览和控制面板各自滚动，整个扩展文档不再滚动。滚轮沿原生滚动处理，不使用拦截滚轮的平滑模拟。
+顶部步骤条或底部上一步/下一步都可操作，支持键盘。返回同一起点不会重置已做的微调。微调页不再使用两个长滚动面板：静态概览完整适配，布局与效果按分类选择，参数按名称、平台、排布、留白、视觉和模块分组。完整预览在同一 iframe 内切换显示，没有页面重载或配置改写。预览外框无滚动条；虚拟列表、横向画册、Android 内容区等示例本身的滚动行为继续保留，画布仍支持平移和缩放。预设选择页保留单层原生内容滚动。
 
-界面只保留预览、基本信息和操作，设计思路及来源放在导出区。自定义预设最多 24 个，每个扩展总计 32 KiB 本机显示数据。0.2 的草稿、命名预设和 v1 配置继续兼容；升级不改变存储或配置 schema。
+界面只保留预览、基本信息和操作，设计思路及来源放在导出区。自定义预设最多 24 个，每个扩展总计 32 KiB 本机显示数据。0.2 / 0.3.0 的草稿、命名预设和 v1 配置继续兼容；升级不改变存储或配置 schema。
 
 ## 组合范围
 
@@ -50,3 +50,5 @@ Android 会选择手机画幅，并显示状态栏、底部导航和手势区；
 研究参考：[Godly](https://godly.website/)、[Siteinspire](https://www.siteinspire.com/)、[Awwwards](https://www.awwwards.com/websites/dynamic-grid-layout-examples/)、[Codrops Creative Hub](https://tympanus.net/codrops/hub/)、[Folia](https://github.com/chthollyphile/folia-major)、[Atelier North](https://atelier-north.crnacura.workers.dev/)、[画廊转场](https://tympanus.net/Tutorials/InfiniteScrollGSAPGallery/)。代码与 SVG 研究均为原创，不复用第三方品牌、封面或源码；引用说明原则来源。部分 Codrops 直接演示有浏览器访问挑战，上一轮通过公开目录和内容核对。平台/性能参考：[Windows](https://learn.microsoft.com/en-us/windows/apps/design/basics/)、[Android](https://developer.android.com/develop/ui/compose/layouts/adaptive/list-detail)、[TanStack Virtual](https://tanstack.com/virtual/latest/docs/introduction)。
 
 本轮在 Windows 原生 WebView2 验证；macOS 实机交互尚未验证。
+
+完整预览使用宿主新增的显示接口 `toolhub.presentation.set(true/false)`，并监听已验证来源的 `toolhub:presentation` 事件。只改变当前扩展的显示区域，不开放本机执行、文件、网络、弹窗、原生窗口控制或浏览器全屏权限。宿主保留固定退出按钮并恢复背景焦点/交互；停用、卸载、更新或导航离开都会清理显示状态。逻辑画幅为桌面 1280、平板 850、手机 390 CSS 像素，依据完整内容高度等比适配；极长的标准列表会缩小，检查大量条目请使用虚拟列表。独立 HTML 保留真实页面尺寸与原有交互。

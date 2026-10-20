@@ -1,10 +1,12 @@
 import {chromium} from 'playwright'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+const restartPreset='重启验收预设-'+crypto.randomUUID().slice(0,6);
 const browser=await chromium.connectOverCDP(process.env.STUDIO_CDP)
 const page=browser.contexts()[0].pages()[0];page.setDefaultTimeout(15000)
 const rpc=(method,params={})=>page.evaluate(({method,params})=>window.__TAURI_INTERNALS__.invoke('rpc',{method,params}),{method,params})
 const status=await rpc('status');assert.equal(status.registry_path.replaceAll('\\','/').toLowerCase(),process.env.STUDIO_REGISTRY.replaceAll('\\','/').toLowerCase());assert(!status.registry_path.replaceAll('\\','/').includes('/.toolhub/'))
+if(await page.locator('.extension-presentation-bar button').count())await page.locator('.extension-presentation-bar button').click();
 const previous=(await rpc('extension.list')).find(row=>row.package.id==='test.studio-storage');if(previous)await rpc('extension.remove',{id:previous.package.id,expected_digest:previous.digest})
 await page.evaluate(()=>window.dispatchEvent(new Event('toolhub:extensions-changed')))
 await page.getByRole('navigation',{name:'一级导航',exact:true}).getByRole('button',{name:'扩展中心',exact:true}).click()
@@ -19,7 +21,7 @@ assert.equal(written.revision,own.revision+1)
 await assert.rejects(()=>frame.evaluate((element,{data,revision})=>toolhub.storage.set(data,revision),own))
 await assert.rejects(()=>frame.evaluate((element,revision)=>toolhub.storage.set('中'.repeat(12000),revision),written.revision))
 assert.deepEqual(await frame.evaluate(()=>toolhub.storage.get()),written)
-const packageId='test.studio-storage'
+const packageId='test.studio-storage-'+crypto.randomUUID().slice(0,8)
 const pkg={schema:'toolhub.extension/v2',id:packageId,name:'隔离存储验收',description:'Only QA fixture',version:'1.0.0',author:'ToolHub QA',license:'MIT',platforms:['windows'],min_toolhub_version:'0.3.0-beta.6',skills:[],views:[{id:packageId+'.page',label:'隔离存储验收',icon:'◈',order:99,html:'<h1>隔离存储验收</h1>',css:'',script:''}]}
 const preview=await rpc('extension.preview',{package:pkg});await rpc('extension.install',{package:pkg,digest:preview.digest,source:'local'});await page.evaluate(()=>window.dispatchEvent(new Event('toolhub:extensions-changed')))
 await page.getByRole('navigation',{name:'一级导航',exact:true}).getByRole('button',{name:'扩展中心',exact:true}).click()
@@ -33,7 +35,7 @@ await other.evaluate(()=>toolhub.storage.set({value:'other-only'},0))
 const current=(await rpc('extension.list')).find(row=>row.package.id===packageId)
 await rpc('extension.set_enabled',{id:packageId,expected_digest:current.digest,enabled:false})
 await assert.rejects(()=>other.evaluate(()=>toolhub.storage.set({value:'must-not-write'},1)))
-assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('th.extension-state.v1.test.studio-storage'))),{revision:1,data:{value:'other-only'}})
+assert.deepEqual(await page.evaluate(id=>JSON.parse(localStorage.getItem('th.extension-state.v1.'+id)),packageId),{revision:1,data:{value:'other-only'}})
 await rpc('extension.set_enabled',{id:packageId,expected_digest:current.digest,enabled:true})
 assert.deepEqual(await other.evaluate(()=>toolhub.storage.get()),{revision:1,data:{value:'other-only'}})
 await rpc('extension.remove',{id:packageId,expected_digest:current.digest})
@@ -42,8 +44,8 @@ await page.evaluate(()=>window.dispatchEvent(new Event('toolhub:extensions-chang
 await page.getByRole('navigation',{name:'二级导航',exact:true}).getByRole('button',{name:'扩展应用',exact:true}).click()
 await page.locator('.application-card').filter({has:page.getByRole('heading',{name:'设计台',exact:true})}).getByRole('button',{name:'打开应用'}).click()
 const final=page.frameLocator('iframe');await final.getByText('本机预设已就绪',{exact:true}).waitFor()
-await final.locator('#step-next').click();await final.locator('#preset-name').fill('重启验收预设');await final.locator('#save-preset').click();await final.getByText('预设已保存。',{exact:true}).waitFor();await final.locator('#step-next').click()
+await final.locator('#step-next').click();await final.locator('#preset-name').fill(restartPreset);await final.locator('#save-preset').click();await final.getByText('预设已保存。',{exact:true}).waitFor();await final.locator('#step-next').click()
 await final.getByRole('button',{name:'复制当前内容',exact:true}).click();await final.getByText('已复制。',{exact:true}).waitFor()
 console.log('PASS native storage revision conflicts, UTF-8 quota, package isolation, disable/remove revocation, recovery and actual clipboard copy')
-fs.writeFileSync(process.env.STUDIO_STORAGE_REPORT,JSON.stringify({passed:true,revision_conflicts:true,utf8_quota:true,package_isolation:true,revocation:true,copy:true,restart_preset:'重启验收预设'},null,2))
+fs.writeFileSync(process.env.STUDIO_STORAGE_REPORT,JSON.stringify({passed:true,revision_conflicts:true,utf8_quota:true,package_isolation:true,revocation:true,copy:true,restart_preset:restartPreset},null,2))
 await browser.close()

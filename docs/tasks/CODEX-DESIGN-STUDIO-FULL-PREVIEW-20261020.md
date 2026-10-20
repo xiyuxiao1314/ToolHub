@@ -1,0 +1,7 @@
+# Design Studio full-window preview
+
+Core base 3a55c41ca56b8af2457ac986eeb53a0b73f2597f; independent extension base bca26f3761aa06138b1212773d13689fd1d53834. Branch codex/design-studio-full-preview. Owner rejects the cropped, scrollable embedded preview and requests an explicit button opening the complete composition. Codex owns this bounded implementation without delegation.
+
+Scope: Design Studio 0.3.1, static contained overview, explicit complete preview, compact inspector sections, desktop presentation surface and authenticated display-only SDK. No execution/network/file permissions, sandbox/CSP changes, registry schema or policy changes. New display API ships in local host beta.7; package declares that minimum. Sources, generated example, standalone package/catalog and usage/validation docs stay aligned. No GitHub publication or main merge.
+
+Acceptance: full composition fits without preview scrollbars; preview button covers both navigation levels and host heading; host-owned return remains available; Escape closes detail before returning to edit; exact config/draft/custom presets persist; no iframe reload on enter/exit; resize/platform/device and canvas/virtual/modal/drag retain behavior. Inspector uses bounded sections instead of one long list. Validate real native WebView wheel/geometry, lifecycle/source-token/digest guards, exports/model checks, UI typecheck/build and current app upgrade with backups. Windows verified; macOS explicitly unverified. Local integrated commits, package, exact revisions and evidence recorded.

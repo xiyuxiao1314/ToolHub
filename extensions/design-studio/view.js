@@ -2,7 +2,7 @@
   'use strict';
   const DS=globalThis.DesignStudio,root=document.getElementById('design-studio'),find=id=>document.getElementById(id);
   let config=DS.clone(DS.defaultConfig),presets=[],revision=0,loaded=false,writable=false,output='json',dispose=()=>{},saveQueue=Promise.resolve(),autosave;
-  let step=1,choice='none',appliedChoice='',hasDraft=false;
+  let step=1,choice='none',appliedChoice='',hasDraft=false,presenting=false;
   const emptyConfig=DS.validate({...DS.clone(DS.defaultConfig),title:'未命名设计',purpose:'我的应用',layout:'grid',navigation:'none',appearance:'clean',contentStyle:'projects',canvasMode:'scatter',effects:[],performance:'standard',modules:['content'],columns:3,radius:8,gap:16,accent:'#2563eb',duration:240,dataSize:12,dark:false});
   const moduleOrder=['hero','search','filters','content','footer'];
   const symbols={grid:'▦',metro:'▰',masonry:'▥',list:'☷',spotlight:'◨',filmstrip:'▱',index:'≡',bento:'⊞',canvas:'⌘',kanban:'▤',sidebar:'▕',rail:'⊞',top:'▔',none:'□',immersive:'◐',covers:'◧',typographic:'Aa',projects:'▤',clean:'○',glass:'◒',editorial:'Aa',brutalist:'▣'};
@@ -33,13 +33,13 @@
   function library(){
     const container=find('library-content');container.replaceChildren();
     for(const [key,label]of [['layout','页面结构'],['navigation','导航结构'],['appearance','视觉语言'],['contentStyle','内容语言']]){
-      const section=document.createElement('details');section.className='library-section';section.open=true;
-      const summary=document.createElement('summary');summary.textContent=label;const choices=document.createElement('div');choices.className='library-choices';
-      for(const [value,name]of Object.entries(DS.lists[key])){const button=document.createElement('button');button.type='button';button.className='library-choice';button.setAttribute('aria-label',name);button.setAttribute('aria-pressed',String(config[key]===value));const symbol=document.createElement('span');symbol.className='choice-symbol';symbol.textContent=symbols[value];symbol.setAttribute('aria-hidden','true');const text=document.createElement('span');text.textContent=name;button.append(symbol,text);button.addEventListener('click',()=>{config[key]=value;const normalized=DS.normalize(config);config=normalized.config;message(normalized.notes.join(' '));render(true);});choices.append(button);}section.append(summary,choices);container.append(section);
+      const section=document.createElement('details');section.className='lib-section';section.open=true;section.hidden=find('library-category').value!==key;
+      const summary=document.createElement('summary');summary.textContent=label;const choices=document.createElement('div');choices.className='lib-choices';
+      for(const [value,name]of Object.entries(DS.lists[key])){const button=document.createElement('button');button.type='button';button.className='lib-choice';button.setAttribute('aria-label',name);button.setAttribute('aria-pressed',String(config[key]===value));const symbol=document.createElement('span');symbol.className='choice-symbol';symbol.textContent=symbols[value];symbol.setAttribute('aria-hidden','true');const text=document.createElement('span');text.textContent=name;button.append(symbol,text);button.addEventListener('click',()=>{config[key]=value;const normalized=DS.normalize(config);config=normalized.config;message(normalized.notes.join(' '));render(true);});choices.append(button);}section.append(summary,choices);container.append(section);
     }
-    const effects=document.createElement('details');effects.className='library-section';effects.open=true;const summary=document.createElement('summary');summary.textContent='交互与动态效果';const effectRows=document.createElement('div');effectRows.className='library-effects';
+    const effects=document.createElement('details');effects.className='lib-section';effects.open=true;effects.hidden=find('library-category').value!=='effects';const summary=document.createElement('summary');summary.textContent='交互与动态效果';const effectRows=document.createElement('div');effectRows.className='effects';
     for(const [key,name]of Object.entries(DS.lists.effects)){const label=document.createElement('label');const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=config.effects.includes(key);checkbox.setAttribute('aria-label',name);checkbox.disabled=key==='drag'&&(config.layout==='canvas'||config.performance==='virtual');checkbox.addEventListener('change',()=>{config.effects=checkbox.checked?[...config.effects,key]:config.effects.filter(id=>id!==key);render(true);});label.append(checkbox,document.createTextNode(name));effectRows.append(label);}effects.append(summary,effectRows);container.append(effects);
-    const performance=document.createElement('details');performance.className='library-section';performance.open=true;const title=document.createElement('summary');title.textContent='性能策略';const select=document.createElement('select');select.setAttribute('aria-label','性能策略');select.style.width='100%';
+    const performance=document.createElement('details');performance.className='lib-section';performance.open=true;performance.hidden=find('library-category').value!=='performance';const title=document.createElement('summary');title.textContent='性能策略';const select=document.createElement('select');select.setAttribute('aria-label','性能策略');select.style.width='100%';
     Object.entries(DS.lists.performance).forEach(([value,name])=>{const option=document.createElement('option');option.value=value;option.textContent=name;option.disabled=(value==='virtual'&&config.layout!=='list')||(value==='culling'&&config.layout!=='canvas');select.append(option);});select.value=config.performance;select.addEventListener('change',()=>{config.performance=select.value;const next=DS.normalize(config);config=next.config;message(next.notes.join(' '));render(true);});performance.append(title,select);container.append(performance);
     find('effect-count').textContent='结构 × 内容 × 动效';
   }
@@ -68,8 +68,8 @@
     const container=find('design-collection'),filter=find('collection-filter').value;container.replaceChildren();
     const rows=[{id:'none',name:'无预设',config:emptyConfig,category:'all'},...(hasDraft?[{id:'draft',name:'继续当前设计',config,category:'all'}]:[]),...DS.presets.map(p=>({...p,id:'builtin:'+p.id,category:directions[p.id][0]})),...presets.map(p=>({...p,id:'user:'+p.id,category:'user'}))];
     for(const preset of rows){if(filter!=='all'&&preset.category!==filter&&preset.id!=='none'&&preset.id!=='draft')continue;
-      const button=document.createElement('button');button.type='button';button.className='direction-card d-'+preset.id.replace('builtin:','');button.dataset.choice=preset.id;button.setAttribute('aria-pressed',String(choice===preset.id));button.disabled=!loaded;button.setAttribute('aria-label',preset.name);
-      const mini=document.createElement('span');mini.className='direction-mini';mini.setAttribute('aria-hidden','true');
+      const button=document.createElement('button');button.type='button';button.className='tile d-'+preset.id.replace('builtin:','');button.dataset.choice=preset.id;button.setAttribute('aria-pressed',String(choice===preset.id));button.disabled=!loaded;button.setAttribute('aria-label',preset.name);
+      const mini=document.createElement('span');mini.className='mini';mini.setAttribute('aria-hidden','true');
       if(preset.id==='none')mini.textContent='＋';else if(preset.id==='draft')mini.textContent='↗';else for(let i=0;i<6;i++){const tile=document.createElement('i');if(preset.config.contentStyle==='typographic')tile.textContent=['A','a','字','R','M','02'][i];mini.append(tile);}
       const name=document.createElement('strong');name.textContent=preset.name;button.append(mini,name);button.addEventListener('click',()=>{choice=preset.id;container.querySelectorAll('button').forEach(row=>row.setAttribute('aria-pressed',String(row===button)));updateSteps();});container.append(button);
     }
@@ -87,7 +87,7 @@
       const preset=choice==='none'?{config:emptyConfig}:choice==='draft'?{config}:DS.presets.find(p=>'builtin:'+p.id===choice)||presets.find(p=>'user:'+p.id===choice);
       if(!preset)return;config=DS.clone(preset.config);appliedChoice=choice;hasDraft=true;message('');scheduleSave();
     }
-    dispose();dispose=()=>{};step=next;root.classList.remove('preview-maximized','editor-open');find('maximize-preview').textContent='放大预览';find('maximize-preview').setAttribute('aria-pressed','false');find('toggle-editor').setAttribute('aria-pressed','false');updateSteps();
+    dispose();dispose=()=>{};step=next;root.classList.remove('preview-maximized','editor-open');find('maximize-preview').textContent='预览设计 ↗';find('maximize-preview').setAttribute('aria-pressed','false');find('toggle-editor').setAttribute('aria-pressed','false');updateSteps();
     if(step===1)collection();if(step===2){render(false);if(choice===appliedChoice)find('preview-container').scrollTop=0;}if(step===3)updateOutput();
     if(focus)find('step-'+step+'-title').focus({preventScroll:true});
   }
@@ -98,7 +98,7 @@
   function render(save){
     const focusLabel=document.activeElement?.getAttribute('aria-label');dispose();library();modules();controls();
     find('preview-container').classList.toggle('is-mobile',config.viewport==='mobile');find('preview-container').classList.toggle('is-tablet',config.viewport==='tablet');
-    if(step===2)dispose=DS.render(find('studio-export'),config);else dispose=()=>{};
+    if(step===2){dispose=DS.render(find('studio-export'),config);fitPreview();}else dispose=()=>{};
     find('preview-title').textContent=DS.lists.layout[config.layout];find('preview-summary').textContent=DS.lists.platform[config.platform]+' · '+DS.lists.appearance[config.appearance];updateOutput();updateSteps();
     if(focusLabel&&document.activeElement===document.body)[...root.querySelectorAll('[aria-label]')].find(element=>element.getAttribute('aria-label')===focusLabel)?.focus({preventScroll:true});if(save)scheduleSave();
   }
@@ -121,8 +121,16 @@
   for(const group of ['[data-step]','[data-editor-tab]']){const buttons=[...root.querySelectorAll(group)];buttons.forEach((button,index)=>button.addEventListener('keydown',event=>{const offset=event.key==='ArrowRight'?1:event.key==='ArrowLeft'?-1:0;if(offset){event.preventDefault();const next=buttons[(index+offset+buttons.length)%buttons.length];next.focus();next.click();}}));}
   find('design-collection').addEventListener('keydown',event=>{const button=event.target.closest('[data-choice]');if(!button)return;const cards=[...find('design-collection').querySelectorAll('button')],offset=event.key==='ArrowRight'?1:event.key==='ArrowLeft'?-1:0;if(offset){event.preventDefault();cards[(cards.indexOf(button)+offset+cards.length)%cards.length].focus();}});
   find('copy-output').addEventListener('click',()=>{const text=find('output-text');text.focus();text.select();try{if(document.execCommand('copy')){message('已复制。');return;}}catch{}message('已全选，请按 Ctrl+C（macOS：Command+C）。');});
-  find('maximize-preview').addEventListener('click',()=>{const full=root.classList.toggle('preview-maximized');find('maximize-preview').textContent=full?'返回微调':'放大预览';find('maximize-preview').setAttribute('aria-pressed',String(full));});
-  find('replay-motion').addEventListener('click',()=>{dispose();dispose=DS.render(find('studio-export'),config);});
+  let fitFrame=0;
+  function fitPreview(){cancelAnimationFrame(fitFrame);fitFrame=requestAnimationFrame(()=>{if(step!==2)return;const pane=find('preview-container'),screen=find('studio-export'),fit=find('preview-fit'),width=config.viewport==='mobile'?390:config.viewport==='tablet'?850:1280;screen.style.width=width+'px';const height=Math.max(1,screen.scrollHeight),padding=presenting?24:20,scale=Math.min((pane.clientWidth-padding)/width,(pane.clientHeight-padding)/height);fit.style.width=width+'px';fit.style.height=height+'px';fit.style.transform='translate(-50%,-50%) scale('+Math.max(.01,scale)+')';fit.dataset.scale=String(scale);});}
+  const previewObserver=new ResizeObserver(fitPreview);previewObserver.observe(find('preview-container'));previewObserver.observe(find('studio-export'));
+  async function preview(){if(!globalThis.toolhub?.presentation){message('请更新 ToolHub 宿主以使用完整预览。',true);return;}try{await toolhub.presentation.set(true);}catch(error){message(String(error.message||error),true);}}
+  window.addEventListener('toolhub:presentation',event=>{presenting=event.detail.expanded;root.classList.toggle('presenting',presenting);find('preview-fit').inert=!presenting;find('maximize-preview').setAttribute('aria-pressed',String(presenting));if(step===2){dispose();dispose=DS.render(find('studio-export'),config);fitPreview();}if(!presenting&&step===2)find('maximize-preview').focus({preventScroll:true});});
+  document.addEventListener('keydown',event=>{if(presenting&&event.key==='Escape'&&!event.defaultPrevented&&!document.querySelector('.p-modal-host')){event.preventDefault();void toolhub.presentation.set(false).catch(error=>message(String(error.message||error),true));}});
+  find('maximize-preview').addEventListener('click',preview);find('open-preview').addEventListener('click',preview);
+  find('library-category').addEventListener('change',library);
+  find('parameter-category').addEventListener('change',()=>{for(const group of root.querySelectorAll('[data-parameter-group]'))group.hidden=group.dataset.parameterGroup!==find('parameter-category').value;});
+  find('replay-motion').addEventListener('click',()=>{dispose();dispose=DS.render(find('studio-export'),config);fitPreview();});
   let previousFocus;const closeImport=()=>{find('import-panel').hidden=true;previousFocus?.focus();};
   find('import-config').addEventListener('click',()=>{previousFocus=document.activeElement;find('import-panel').hidden=false;find('import-error').textContent='';find('import-text').focus();});find('cancel-import').addEventListener('click',closeImport);
   find('confirm-import').addEventListener('click',()=>{try{const text=find('import-text').value;if(new TextEncoder().encode(text).length>32768)throw Error('配置最多 32 KiB');config=DS.validate(JSON.parse(text));choice=appliedChoice='draft';hasDraft=true;closeImport();changeStep(2);render(true);message('');}catch(error){find('import-error').textContent=String(error.message||error);}});

@@ -153,3 +153,14 @@
   .workbench-layout-top .primary-link{padding:7px;font-size:10px;gap:5px}.workbench-layout-top .primary-link svg{width:18px}.workbench-layout-top .rail-collapse{display:none}.workbench-layout-top .primary-links{gap:3px}
 }
 @media(max-height:620px){.primary-rail{padding-top:12px;gap:12px}.primary-link{min-height:56px;padding-block:9px;gap:4px}.secondary-heading h2{margin-top:12px}.secondary-panel{padding-top:16px;gap:13px}.navigation-status{padding-block:10px}}
+
+.extension-frame-surface{min-width:0}
+.extension-presenting .workbench-main{container-type:normal}
+.extension-frame-surface.is-presenting{position:fixed;inset:0;z-index:900;display:flex;flex-direction:column;background:#121615}
+.extension-frame-surface.is-presenting>.extension-frame{height:0!important;flex:1;min-height:0;border:0;border-radius:0;width:100%}
+.extension-presentation-bar{height:42px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 18px;background:#171c1b;color:#e3e9e5;border-bottom:1px solid #ffffff16;font:12px 'Segoe UI','Microsoft YaHei',sans-serif}
+.extension-presentation-bar strong{font-weight:500;display:flex;align-items:center;gap:12px}
+.extension-presentation-bar strong span{font-size:10px;color:#a4b0a9;font-weight:400}
+.extension-presentation-bar button{border:1px solid #ffffff29;border-radius:6px;color:#e3e9e5;background:#ffffff08;padding:5px 10px;font:inherit;cursor:pointer}
+.extension-presentation-bar button:hover{background:#ffffff16}
+.extension-presentation-bar button:focus-visible{outline:2px solid #d4ef9e;outline-offset:2px}

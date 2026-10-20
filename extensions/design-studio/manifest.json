@@ -2,15 +2,15 @@
   "schema": "toolhub.extension/v2",
   "id": "community.design-studio",
   "name": "设计台",
-  "version": "0.3.0",
-  "description": "从预设或空白开始，分步预览、微调并导出布局、HTML 和 Agent 设计说明。",
+  "version": "0.3.1",
+  "description": "选择预设、微调并打开完整画面预览，导出布局、HTML 和 Agent 设计说明。",
   "author": "ToolHub community",
   "license": "MIT",
   "platforms": [
     "windows",
     "macos"
   ],
-  "min_toolhub_version": "0.3.0-beta.6",
+  "min_toolhub_version": "0.3.0-beta.7",
   "permissions": [],
   "skills": [],
   "views": [

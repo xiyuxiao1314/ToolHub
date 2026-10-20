@@ -59,6 +59,8 @@ await toolhub.navigate('tools'); // 只能导航到当前已启用页面
 
 beta.6 新增可选的显示状态接口 `toolhub.storage.get()` → `{revision,data}`、`toolhub.storage.set(data,expectedRevision)` → 新快照。它是包专属的父 WebView localStorage，不是 THP 方法；最大 32 KiB UTF-8 数据，不接受包 ID、磁盘路径或后端设置名。每次读取/写入前重新核对包仍已启用且摘要相同，写入修订号不符则拒绝。清除 WebView 数据会重置；卸载保留，重新安装相同包 ID 可恢复。旧页面 SDK 保持兼容，不新增本机执行、网络或文件权限。需要此功能的包应声明 min_toolhub_version ≥ 0.3.0-beta.6；并发保存要串行处理并使用最新 revision。设计台的实际用法见 [设计台](DESIGN-STUDIO.md)。
 
+beta.7 增加显示接口 `toolhub.presentation.set(true/false)` 和宿主管理的 `toolhub:presentation` 事件 `{expanded}`。同一隔离 iframe 可以暂时覆盖整个工作台；宿主保留固定返回栏，背景暂停交互，退出/导航/卸载时恢复。进入时核对来源、token、当前已启用包和摘要；参数必须为布尔值。此接口不调用浏览器/操作系统全屏，不增加文件、网络、执行或原生窗口权限，CSP 与 sandbox 不变。需要此接口的包声明 min_toolhub_version ≥ 0.3.0-beta.7。
+
 | 页面权限 | 可调用方法 |
 | --- | --- |
 | tools.read | registry.search、registry.inspect_tool、registry.inspect_instance、resolve.capability、capability.list |

@@ -10,3 +10,15 @@ See [contracts, lifecycle and bridge methods](../../docs/development/EXTENSIONS.
 ## Native CLI forms (beta.4)
 
 A package may declare `cli` alongside optional views/theme/skills. The host renders a navigation page and typed file/choice controls, then previews and authorizes one exact execution. This is **not a JavaScript SDK execution method**: frame code cannot call extension.cli_preview/start or arbitrary execute.tool. See `extensions/examples/ffmpeg.toolhub-extension.json` and the CLI section of `docs/development/EXTENSIONS.md`. Agents discover the included portable Skill through existing generic MCP tools.
+
+## Full-window presentation (beta.7)
+
+`await toolhub.presentation.set(true)` expands the current isolated view over the workbench; `set(false)` returns. This is a display-only request, not browser/OS fullscreen or native-window authority. The host retains its return bar, verifies source/token/current enabled package and digest on entry, and restores background interaction on exit/unmount. Existing iframe and its display state remain mounted. A host-managed `toolhub:presentation` event exposes `{expanded:boolean}` so the page can hide its editor chrome and restore it when the host return button is used. Treat the event as display state, never authorization for execution. Require min_toolhub_version >= 0.3.0-beta.7 and detect `toolhub.presentation` when supporting older hosts. Sandbox and CSP remain unchanged.
+
+```js
+previewButton.onclick = () => toolhub.presentation.set(true);
+window.addEventListener('toolhub:presentation', event => {
+  document.body.classList.toggle('previewing', event.detail.expanded);
+});
+// A child document must handle Escape itself; DOM key events do not cross frames.
+```
