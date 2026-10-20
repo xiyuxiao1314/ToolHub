@@ -64,7 +64,7 @@
     return {id:'project-'+index,name:names[index%12]+(index>=12?' '+(index+1):''),subtitle:['QUIET ARCHITECTURE','LETTERS FROM THE HILLS','AFTER THE SUN','SOFT ECHOES','BOTANICAL STUDIES','THE ORDER OF LIGHT','FLOATING ARCHIVE','SUNDAY WANDER'][index%8],type:['design','development','assets'][index%3],label:['设计','开发','素材'][index%3],index};
   }
   function card(item,c) {
-    return `<article class="p-item p-study-${item.index%8}" data-id="${item.id}" data-index="${item.index}" data-type="${item.type}"${c.effects.includes('drag')?' draggable="true"':''}><button type="button" class="p-item-main" aria-expanded="false">${c.contentStyle==='covers'?artwork(item.index):''}${c.contentStyle==='typographic'?'<span class="p-poster-word" aria-hidden="true">'+['FORM','野生','MAKE','遊','IDEA','空間'][item.index%6]+'</span>':''}<span class="p-item-tag">${item.label} / ${String(item.index+1).padStart(2,'0')}</span><span class="p-item-copy"><small class="p-item-subtitle">${item.subtitle}</small><h3>${escapeHtml(item.name)}</h3><small class="p-item-hint">${c.effects.includes('expand')?'探索作品 ↗':'查看项目 ↗'}</small></span></button><div class="p-item-more" hidden>${item.subtitle} / ${item.label}</div></article>`;
+    return `<article class="p-item p-study-${item.index%8}" data-id="${item.id}" data-index="${item.index}" data-type="${item.type}"${c.effects.includes('drag')?' draggable="true"':''}><button type="button" class="p-item-main" aria-expanded="false"${c.effects.includes('drag')?' draggable="true"':''}>${c.contentStyle==='covers'?artwork(item.index):''}${c.contentStyle==='typographic'?'<span class="p-poster-word" aria-hidden="true">'+['FORM','野生','MAKE','遊','IDEA','空間'][item.index%6]+'</span>':''}<span class="p-item-tag">${item.label} / ${String(item.index+1).padStart(2,'0')}</span><span class="p-item-copy"><small class="p-item-subtitle">${item.subtitle}</small><h3>${escapeHtml(item.name)}</h3><small class="p-item-hint">${c.effects.includes('expand')?'探索作品 ↗':'查看项目 ↗'}</small></span></button><div class="p-item-more" hidden>${item.subtitle} / ${item.label}</div></article>`;
   }
   function canvasPosition(index,c) {
     const unit=150,gap=c.gap;
@@ -74,23 +74,34 @@
     return {x:(x+(group%3)*6)*unit,y:(y+Math.floor(group/3)*3)*unit,w:w*unit-gap,h:h*unit-gap};
   }
   function installStage(root,c,signal) {
-    let layer=null,origin=null,busy=false;const surface=root.closest('#design-studio')||root,wasInert=surface.inert;
+    let layer=null,origin=null,phase='closed',generation=0,flights=[];
+    const surface=root.closest('#design-studio')||root,wasInert=surface.inert;
     const motion=()=>!matchMedia('(prefers-reduced-motion: reduce)').matches&&c.duration>0;
-    async function close(){
-      if(!layer||busy)return;busy=true;const active=layer,target=origin,panel=active.querySelector('.p-expanded'),art=panel.querySelector('.p-expanded-art');
-      if(motion()&&target?.isConnected){const a=art.getBoundingClientRect(),b=target.getBoundingClientRect();await art.animate([{transform:'none'},{transform:`translate(${b.x-a.x}px,${b.y-a.y}px) scale(${b.width/a.width},${b.height/a.height})`,opacity:.4}],{duration:c.duration,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'}).finished.catch(()=>{});}
-      active.remove();if(layer!==active)return;layer=null;surface.inert=wasInert;target?.querySelector('button')?.setAttribute('aria-expanded','false');target?.querySelector('button')?.focus({preventScroll:true});busy=false;
+    const stop=()=>{for(const item of flights){item.animation.cancel();item.node.remove();}flights=[];};
+    const restore=()=>{generation++;stop();layer?.remove();layer=null;phase='closed';surface.inert=wasInert;origin?.querySelector('button')?.setAttribute('aria-expanded','false');origin?.querySelector('button')?.focus({preventScroll:true});};
+    function fly(art,from,to){
+      const node=document.createElement('div');node.className='p-flight';node.innerHTML=art.innerHTML;Object.assign(node.style,{left:to.x+'px',top:to.y+'px',width:to.width+'px',height:to.height+'px',borderRadius:c.radius+'px'});layer.append(node);
+      const transform=rect=>`translate(${rect.x-to.x}px,${rect.y-to.y}px) scale(${rect.width/to.width},${rect.height/to.height})`;
+      const animation=node.animate([{transform:transform(from)},{transform:transform(to)}],{duration:c.duration,easing:'cubic-bezier(.2,.8,.2,1)',fill:'both'});flights.push({node,animation});return animation.finished.catch(()=>{});
     }
-    const open=element=>{
-      if(layer||busy)return;origin=element;element.querySelector('button').setAttribute('aria-expanded','true');const item=sample(Number(element.dataset.index)),a=element.getBoundingClientRect();
-      layer=document.createElement('div');layer.className='ds p-modal-host p-'+c.appearance+(c.dark?' p-dark':'');for(const key of ['--p-accent','--p-radius','--p-ms'])layer.style.setProperty(key,getComputedStyle(root).getPropertyValue(key));layer.innerHTML=`<div class="p-stage-layer"><section class="p-expanded" role="dialog" aria-modal="true" aria-label="${escapeHtml(item.name)} · 作品详情" tabindex="-1"><button type="button" class="p-close" aria-label="关闭作品详情">×</button><div class="p-expanded-art">${c.contentStyle==='covers'?artwork(item.index):'<span class="p-expanded-type">'+escapeHtml(item.subtitle.split(' ')[0])+'</span>'}</div><div class="p-expanded-copy"><small>SELECTED WORK / ${String(item.index+1).padStart(2,'0')}</small><h2>${escapeHtml(item.name)}</h2><p>${item.subtitle}</p><span>${item.label} / MUSE STUDIES</span><button type="button" class="p-back">返回作品墙 ↙</button></div></section></div>`;
-      document.body.append(layer);surface.inert=true;const panel=layer.querySelector('.p-expanded'),art=panel.querySelector('.p-expanded-art'),b=art.getBoundingClientRect();
-      if(motion()){art.animate([{transform:`translate(${a.x-b.x}px,${a.y-b.y}px) scale(${a.width/b.width},${a.height/b.height})`},{transform:'none'}],{duration:c.duration,easing:'cubic-bezier(.2,.8,.2,1)'});layer.querySelector('.p-expanded-copy').animate([{opacity:0,translate:'0 18px'},{opacity:1,translate:'0 0'}],{duration:c.duration,delay:c.duration*.3,fill:'both'});}
-      panel.focus({preventScroll:true});
+    async function close(){
+      if(!layer||phase==='closing')return;
+      if(phase==='opening'||!motion()||!origin?.isConnected){restore();return;}
+      phase='closing';const id=++generation,panel=layer.querySelector('.p-expanded'),art=panel.querySelector('.p-expanded-art'),from=art.getBoundingClientRect(),to=origin.getBoundingClientRect();
+      if(to.bottom<0||to.top>innerHeight||to.right<0||to.left>innerWidth){restore();return;}
+      const finished=fly(art,from,to);panel.style.visibility='hidden';await finished;if(id===generation)restore();
+    }
+    const open=async element=>{
+      if(layer)return;origin=element;phase='opening';const id=++generation,item=sample(Number(element.dataset.index)),from=element.getBoundingClientRect();element.querySelector('button').setAttribute('aria-expanded','true');
+      layer=document.createElement('div');layer.className='ds p-modal-host p-'+c.appearance+(c.dark?' p-dark':'');for(const key of ['--p-accent','--p-radius','--p-ms'])layer.style.setProperty(key,getComputedStyle(root).getPropertyValue(key));
+      layer.innerHTML=`<div class="p-stage-layer"><section class="p-expanded" role="dialog" aria-modal="true" aria-label="${escapeHtml(item.name)} · 作品详情" tabindex="-1"><button type="button" class="p-close" aria-label="关闭作品详情">×</button><div class="p-expanded-art">${c.contentStyle==='covers'?artwork(item.index):'<span class="p-expanded-type">'+escapeHtml(item.subtitle.split(' ')[0])+'</span>'}</div><div class="p-expanded-copy"><small>SELECTED WORK / ${String(item.index+1).padStart(2,'0')}</small><h2>${escapeHtml(item.name)}</h2><p>${item.subtitle}</p><span>${item.label} / MUSE STUDIES</span><button type="button" class="p-back">返回作品墙 ↙</button></div></section></div>`;
+      document.body.append(layer);surface.inert=true;const panel=layer.querySelector('.p-expanded'),art=panel.querySelector('.p-expanded-art'),copy=layer.querySelector('.p-expanded-copy');panel.focus({preventScroll:true});
+      if(motion()){art.style.opacity='0';copy.style.opacity='0';await fly(art,from,art.getBoundingClientRect());if(id!==generation)return;stop();art.style.opacity='1';copy.style.opacity='1';}
+      if(id===generation)phase='open';
     };
     document.addEventListener('click',event=>{if(layer?.contains(event.target)&&(event.target.closest('.p-close,.p-back')||event.target.classList.contains('p-stage-layer')))close();},{signal});
     document.addEventListener('keydown',event=>{if(!layer)return;if(event.key==='Escape'){event.preventDefault();close();}if(event.key==='Tab'){const buttons=[...layer.querySelectorAll('button')],first=buttons[0],last=buttons.at(-1);if(event.shiftKey&&(document.activeElement===first||document.activeElement===layer.querySelector('.p-expanded'))){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}}},{signal});
-    open.dispose=()=>{if(layer)surface.inert=wasInert;layer?.remove();layer=null;};return open;
+    open.dispose=()=>{generation++;stop();if(layer)surface.inert=wasInert;layer?.remove();layer=null;phase='closed';};return open;
   }
   function markup(c) {
     const nav=`<nav class="p-nav" aria-label="示例应用导航"><div class="p-wordmark">${c.navigation==='rail'?'◧':escapeHtml(c.title)}</div>${['项目','收藏','归档'].map((label,i)=>`<button type="button" data-nav="${label}" class="${i===0?'is-active':''}" aria-pressed="${i===0}">${label}</button>`).join('')}</nav>`;
@@ -171,5 +182,3 @@
   ].map(([id,name,overrides])=>({id,name,config:validate({...clone(defaultConfig),...overrides})}));
   globalThis.DesignStudio=Object.freeze({lists,defaultConfig,presets,clone,validate,normalize,render,exportHtml,agentPrompt});
 })();
-
-

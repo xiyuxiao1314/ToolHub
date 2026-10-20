@@ -13,3 +13,6 @@
 
 .ds.p-modal-host{position:fixed;inset:0;z-index:50;container-type:normal;width:auto;max-width:none;min-height:0;border:0;border-radius:0;background:transparent;overflow:visible}
 
+
+.ds .p-flight{position:fixed;z-index:2;pointer-events:none;isolation:isolate;overflow:hidden;transform-origin:0 0}.ds .p-flight .p-art{width:100%;height:100%;position:absolute;inset:0;z-index:0;scale:1!important}.ds.p-modal-host .p-stage-layer{z-index:1}.ds .p-expanded{max-height:calc(100dvh - 32px);grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);overflow:hidden}.ds .p-expanded-art{min-height:220px;height:min(58dvh,450px)}.ds .p-expanded-copy{min-height:0;max-height:calc(100dvh - 60px);overflow:auto;overflow-wrap:anywhere}.ds .p-expanded-copy h2{max-width:100%}
+@media(max-width:600px){.ds .p-expanded{grid-template-columns:1fr;grid-template-rows:minmax(120px,35dvh) minmax(0,1fr)}.ds .p-expanded-art{height:100%;min-height:0}.ds .p-expanded-copy{padding:20px;max-height:50dvh}}

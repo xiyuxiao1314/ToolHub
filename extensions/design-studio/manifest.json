@@ -2,8 +2,8 @@
   "schema": "toolhub.extension/v2",
   "id": "community.design-studio",
   "name": "设计台",
-  "version": "0.2.0",
-  "description": "12 个精选设计方向，组合 10 类布局、封面与字体语言、平台自适应和真实动效，生成可运行 HTML 与 Agent 提示词，保存本机预设。",
+  "version": "0.3.0",
+  "description": "从预设或空白开始，分步预览、微调并导出布局、HTML 和 Agent 设计说明。",
   "author": "ToolHub community",
   "license": "MIT",
   "platforms": [
