@@ -117,8 +117,3 @@ try{
  await page.evaluate(()=>{if(window.__qaOriginalInvoke)window.__TAURI_INTERNALS__.invoke=window.__qaOriginalInvoke}).catch(()=>{})
  await browser.close()
 }
-
-
-
-
-

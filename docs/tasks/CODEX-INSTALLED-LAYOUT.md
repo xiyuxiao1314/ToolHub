@@ -8,7 +8,7 @@ Scope: desktop `Extensions.tsx`, workbench CSS, UI verification and this deliver
 
 Acceptance: no outer scrolling in normal desktop windows, no native selects on Installed, pagination and selection remain consistent under resize/filter/remove/import, complete management controls and keyboard dismissal remain usable. Verify isolated UI and native WebView, then build and activate locally while preserving production extension states and library data. Windows verification only; macOS remains unverified.
 
-Status: implemented and verified locally on branch `codex/extensions-installed-layout`; pending owner visual acceptance. No GitHub push or release.
+Status: implemented and verified locally on branch `codex/extensions-installed-layout`. The owner authorized GitHub submission on 2026-10-21. No new Release was requested.
 
 Owner summary: 已安装扩展改为窗口内分页管理，类型与平台使用按钮筛选，详情分标签，并修复安装后选中项丢失与弹窗焦点问题。
 
@@ -51,5 +51,4 @@ Built and checksum-verified `dist/toolhub-extensions-installed-20261021-1` (63 f
 
 Backed up production SQLite/display storage, checked no active jobs, then compared all installed package versions/digests/enabled states, appearance preferences, extension display-state fingerprints and library records after activation. Preserved 47 tool instances, 7 programs, 3 Skills, 1 artifact package and 0 artifact roots; startup may refresh tool timestamps only. No MCP configuration edit.
 
-macOS native verification is unavailable on this Windows machine. Long source/Skill text still uses the bounded detail area; extreme windows shorter than the tested 600 px are outside this acceptance matrix. GitHub publication remains a separate owner action after visual acceptance. Exact base/head and installed-binary SHA-256 are recorded in the local delivery manifest.
-
+macOS native verification is unavailable on this Windows machine. Long source/Skill text still uses the bounded detail area; extreme windows shorter than the tested 600 px are outside this acceptance matrix. The owner authorized pushing this batch to GitHub main on 2026-10-21. Exact base/head and installed-binary SHA-256 are recorded in the local delivery manifest.

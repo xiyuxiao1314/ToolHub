@@ -45,4 +45,3 @@ try{
  const child=spawn(process.execPath,[path.join(here,'verify-installed-manager.mjs')],{stdio:'inherit',env:{...process.env,TOOLHUB_INSTALLED_CDP:'http://127.0.0.1:19335',TOOLHUB_INSTALLED_REGISTRY:registry,TOOLHUB_INSTALLED_FIXTURE:'yes',TOOLHUB_INSTALLED_OUTPUT:output}})
  const code=await new Promise(r=>child.on('exit',r));if(code!==0)process.exitCode=code??1
 }finally{await browser?.close();server.close();await native.close()}
-
