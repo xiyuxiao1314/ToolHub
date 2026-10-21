@@ -19,7 +19,7 @@ export default function Navigation(props: Props) {
   const info = GROUPS.find(item => item.id === group)!
   const matches = (item: NavItem) => `${item.label} ${item.extension?.package.name ?? ''}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
   const entries = groupItems(nav, group, prefs.pins).filter(matches)
-  const apps = group === 'extensions' ? nav.filter(isApplication).filter(matches) : []
+  const apps = group === 'extensions' ? nav.filter(isApplication) : []
   const packages = new Map<string, NavItem[]>()
   apps.forEach(item => {
     const key = item.extension!.package.id
@@ -50,11 +50,18 @@ export default function Navigation(props: Props) {
           <button className="navigation-add" onClick={() => navigate('extension-apps', 'extensions')}>＋ 浏览扩展应用</button>
         </>}
         {group === 'extensions' && <>
-          <div className="navigation-section-label navigation-section-spaced">应用页面 <span>{apps.length}</span></div>
-          {[...packages].map(([id, items]) => <details className="navigation-package" key={id} open={query.trim() || items.some(item => item.id === page) ? true : undefined}>
-            <summary title={items[0].extension!.package.name}><span>{items[0].extension!.package.name}</span><small>{items.length}</small></summary>{items.map(row)}
-          </details>)}
-          {!apps.length && <p className="navigation-hint">{query ? '没有匹配的应用页面' : '启用页面或 CLI 扩展后显示在这里。'}</p>}
+          <div className="navigation-section-label navigation-section-spaced">应用页面 <span>{apps.filter(matches).length}</span></div>
+          {[...packages].map(([id, items]) => {
+            const visible = items.filter(matches)
+            if (!visible.length) return null
+            // Group by the installed package's full page count, not search results.
+            // A one-page application is already a complete navigation destination.
+            if (items.length === 1) return row(items[0])
+            return <details className="navigation-package" key={id} open={query.trim() || items.some(item => item.id === page) ? true : undefined}>
+              <summary title={items[0].extension!.package.name}><span>{items[0].extension!.package.name}</span><small>{visible.length}</small></summary>{visible.map(row)}
+            </details>
+          })}
+          {!apps.some(matches) && <p className="navigation-hint">{query ? '没有匹配的应用页面' : '启用页面或 CLI 扩展后显示在这里。'}</p>}
         </>}
         {!entries.length && group !== 'extensions' && group !== 'workspace' && <p className="navigation-hint">没有匹配的功能</p>}
       </nav></div>

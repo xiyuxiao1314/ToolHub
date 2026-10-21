@@ -43,7 +43,7 @@ async function layoutCheck() {
   return geometry
 }
 try {
-  await page.waitForFunction(() => !!window.__TAURI_INTERNALS__ && document.querySelectorAll('.secondary-link').length >= 6)
+  await page.waitForFunction(() => !!window.__TAURI_INTERNALS__ && document.querySelectorAll('.primary-link').length === 4)
   const status = await rpc('status')
   assert.equal(path.resolve(status.registry_path).toLowerCase(), path.resolve(process.env.TOOLHUB_NAV_REGISTRY).toLowerCase(), 'Connected desktop uses a different registry')
   assert(!/[\\/]\.toolhub[\\/]registry\.sqlite$/i.test(status.registry_path), 'Refusing the default production registry')
@@ -89,6 +89,9 @@ try {
   assert.equal(await primary().getByRole('button').count(), 4)
   assert.equal(await secondary().getByRole('button', { name: '石墨', exact: true }).count(), 0)
   await page.screenshot({ path: path.join(output, 'applications.png') })
+  assert.equal(await page.locator('.navigation-package').count(), 0)
+  assert.equal(await secondary().getByRole('button', { name: '媒体工坊', exact: true }).count(), 1)
+  pass('single-page CLI and page extensions are direct links; no duplicate package header')
   pass('CLI and page application directory; themes do not create destinations')
   const media = page.locator('.application-card').filter({ has: page.getByRole('heading', { name: '媒体工坊', exact: true }) })
   await media.getByRole('button', { name: '固定到工作空间：媒体工坊', exact: true }).click()
@@ -108,7 +111,7 @@ try {
   await page.locator('.application-card').nth(177).waitFor()
   assert.equal(await page.locator('.application-card').count(), 178)
   assert.equal(await primary().getByRole('button').count(), 4)
-  assert.equal(await page.locator('.navigation-package').count(), 24)
+  assert.equal(await page.locator('.navigation-package').count(), 22)
   await page.getByRole('textbox', { name: '筛选二级导航' }).fill('21-7')
   assert.equal(await secondary().locator('.secondary-link').count(), 1)
   await go('验收页面 21-7'); await heading('验收页面 21-7')
