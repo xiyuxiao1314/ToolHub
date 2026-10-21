@@ -22,3 +22,8 @@ window.addEventListener('toolhub:presentation', event => {
 });
 // A child document must handle Escape itself; DOM key events do not cross frames.
 ```
+
+
+## Editable presets and document export (beta.8)
+
+`toolhub.storage` retains its package namespace/revision semantics and now permits 1 MiB UTF-8 JSON (previously 32 KiB). Clearing the WebView profile still removes this state; export important data. `await toolhub.files.exportText(name, text)` opens a native Save dialog and returns true after a successful write, false on cancel. Filenames must be plain .md/.json/.txt names (no paths, controls or alternate streams); content is limited to 2 MiB UTF-8. The iframe cannot select a destination or read its path. Source/token/current enabled package and digest are checked; native code rechecks after the dialog. Only one export request per mounted frame may be pending. The SDK waits up to five minutes for this user dialog. Sandbox/CSP and execution/network permissions stay unchanged. Require min_toolhub_version >= 0.3.0-beta.8 and feature-detect toolhub.files. Import may use a user-selected browser File input; never execute imported content.

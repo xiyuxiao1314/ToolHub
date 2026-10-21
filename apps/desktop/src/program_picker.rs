@@ -196,12 +196,16 @@ pub async fn save_bundle_file(
     window: tauri::WebviewWindow,
     name: String,
 ) -> Result<Option<String>, String> {
-    save_file(window, name, false).await
+    save_file(window, name, false, false).await
+}
+pub async fn save_text_document(window: tauri::WebviewWindow, name: String) -> Result<Option<String>, String> {
+    save_file(window, name, false, true).await
 }
 async fn save_file(
     window: tauri::WebviewWindow,
     name: String,
     media: bool,
+    text: bool,
 ) -> Result<Option<String>, String> {
     #[cfg(windows)]
     {
@@ -238,7 +242,9 @@ async fn save_file(
                     )
                     .map_err(|e| e.to_string())?;
                 dialog
-                    .SetTitle(if media {
+                    .SetTitle(if text {
+                        w!("导出扩展文档")
+                    } else if media {
                         w!("保存媒体处理结果")
                     } else {
                         w!("导出 ToolHub 通用能力包")
@@ -248,7 +254,7 @@ async fn save_file(
                     .SetFileName(&HSTRING::from(&name))
                     .map_err(|e| e.to_string())?;
                 dialog
-                    .SetDefaultExtension(&HSTRING::from(if media {
+                    .SetDefaultExtension(&HSTRING::from(if media || text {
                         name.rsplit('.').next().unwrap_or("mp4")
                     } else {
                         "json"
@@ -256,12 +262,12 @@ async fn save_file(
                     .map_err(|e| e.to_string())?;
                 dialog
                     .SetFileTypes(&[COMDLG_FILTERSPEC {
-                        pszName: if media {
+                        pszName: if text { w!("文本预设") } else if media {
                             w!("媒体文件")
                         } else {
                             w!("ToolHub 能力包")
                         },
-                        pszSpec: if media {
+                        pszSpec: if text { w!("*.md;*.json;*.txt") } else if media {
                             w!("*.*")
                         } else {
                             w!("*.toolhub-skill.json")
@@ -291,14 +297,14 @@ async fn save_file(
         let _ = window;
         #[cfg(target_os = "macos")]
         return tauri::async_runtime::spawn_blocking(move || {
-            let _ = media;
+            let _ = (media, text);
             crate::macos::choose("save", &name)
         })
         .await
         .map_err(|e| e.to_string())?;
         #[cfg(not(target_os = "macos"))]
         {
-            let _ = name;
+            let _ = (name, text);
             Err("当前平台暂不支持能力包导出选择器".into())
         }
     }
@@ -352,7 +358,7 @@ pub async fn pick_cli_path(
         return Err("invalid media filename".into());
     }
     if save {
-        return save_file(window, name, true).await;
+        return save_file(window, name, true, false).await;
     }
     #[cfg(windows)]
     {

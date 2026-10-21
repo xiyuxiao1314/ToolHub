@@ -11,7 +11,7 @@ mod extensions;
 mod installation;
 mod integration;
 mod market;
-use extension_frame::{extension_view_url, FrameServer};
+use extension_frame::{extension_export_text, extension_view_url, FrameServer};
 use extensions::{extension_catalog, extension_export, extension_pick, extension_repository};
 use market::{market_add, market_export, market_inspect, market_list, market_pick, market_share};
 #[cfg(target_os = "macos")]
@@ -273,6 +273,7 @@ fn main() {
             extension_repository,
             extension_catalog,
             extension_view_url,
+            extension_export_text,
             extension_pick,
             extension_export,
             market_list,

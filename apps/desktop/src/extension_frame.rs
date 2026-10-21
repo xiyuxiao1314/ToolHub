@@ -237,3 +237,67 @@ mod tests {
         assert!(!js.contains("__TOKEN__"));
     }
 }
+
+// Only the privileged parent may invoke this command. The child supplies content,
+// never a destination: the native Save dialog owns that selection.
+fn validate_text_export(name: &str, text: &str) -> Result<(), String> {
+    if name.is_empty() || name.len() > 180 || name.chars().any(|c| c.is_control() || "/\\:*?\"<>|".contains(c))
+        || !["md", "json", "txt"].contains(&name.rsplit('.').next().unwrap_or("")) {
+        return Err("invalid text filename".into());
+    }
+    if text.len() > 2 * 1024 * 1024 || text.contains('\0') { return Err("invalid text content or size".into()); }
+    Ok(())
+}
+#[tauri::command]
+pub async fn extension_export_text(window: tauri::WebviewWindow, id: String, expected_digest: String, name: String, text: String) -> Result<bool, String> {
+    validate_text_export(&name, &text)?;
+    package(&id, &expected_digest)?;
+    let Some(path) = crate::program_picker::save_text_document(window, name).await? else { return Ok(false); };
+    package(&id, &expected_digest)?;
+    let selected = std::path::Path::new(&path);
+    let selected_name = selected.file_name().and_then(|name| name.to_str()).ok_or("invalid export destination")?;
+    validate_text_export(selected_name, &text)?;
+    write_text_document(selected, &text)?;
+    Ok(true)
+}
+fn write_text_document(path: &std::path::Path, text: &str) -> Result<(), String> {
+    if let Ok(meta) = std::fs::symlink_metadata(path) {
+        #[cfg(windows)]
+        let linked = { use std::os::windows::fs::MetadataExt; meta.file_attributes() & 0x400 != 0 };
+        #[cfg(not(windows))]
+        let linked = meta.file_type().is_symlink();
+        if linked || !meta.is_file() { return Err("cannot overwrite a link or non-regular file".into()); }
+    }
+    let mut file=std::fs::OpenOptions::new().write(true).create(true).truncate(true).open(path).map_err(|e|e.to_string())?;
+    file.write_all(text.as_bytes()).map_err(|e|e.to_string())?;
+    file.sync_all().map_err(|e|e.to_string())?;
+    Ok(())
+}
+#[cfg(test)]
+mod text_export_tests {
+    use super::*;
+    #[test]
+    fn selected_text_file_round_trips_and_non_files_are_preserved() {
+        let root=std::env::temp_dir().join(format!("toolhub-text-export-{}",uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
+        let path=root.join("我的预设 [1].md");
+        let contents="# 提示词\nUnicode 与 [变量]\n<script>纯文本</script>\n";
+        write_text_document(&path,contents).unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(),contents);
+        write_text_document(&path,"replacement").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(),"replacement");
+        assert!(write_text_document(&root,"bad").is_err());
+        assert!(root.is_dir());
+        std::fs::remove_file(path).unwrap();
+        std::fs::remove_dir(root).unwrap();
+    }
+    #[test]
+    fn only_bounded_text_and_plain_filenames_are_exported() {
+        assert!(validate_text_export("我的预设 [1].md", "# 示例\n正文").is_ok());
+        for name in ["../secret.md", "C:\\file.md", "x.exe", "a/b.json", "bad\n.md", "a:stream.md"] {
+            assert!(validate_text_export(name, "text").is_err());
+        }
+        assert!(validate_text_export("x.md", &"中".repeat(700_000)).is_err());
+        assert!(validate_text_export("x.md", "bad\0text").is_err());
+    }
+}

@@ -132,3 +132,8 @@ v2 新增可选 `cli`：`{id,label,icon,order,tool_definition,actions}`。`cli.i
 面板用现有后台任务接口读取本扩展拥有的任务，显示状态/耗时，原生取消按钮复用核心取消机制。结束后可以查看限量日志和定位实际输出；当前没有百分比/逐行直播日志。失败/取消可能留下不完整文件，保留由用户处理。任务状态跨 daemon 重启保留，stdout/stderr 仅在当前服务内存保存。
 
 Windows 原生执行需要对应 beta.4 宿主；macOS 可预览/复制流程，仍不提供身份绑定执行，实体 Mac 的新选择器未验收。Linux 无桌面发布承诺。独立扩展目录与宿主代码可分开发版；安装扩展从不替换核心二进制或调整 MCP 连接。
+
+
+## Editable presets and document export (beta.8)
+
+`toolhub.storage` retains its package namespace/revision semantics and now permits 1 MiB UTF-8 JSON (previously 32 KiB). Clearing the WebView profile still removes this state; export important data. `await toolhub.files.exportText(name, text)` opens a native Save dialog and returns true after a successful write, false on cancel. Filenames must be plain .md/.json/.txt names (no paths, controls or alternate streams); content is limited to 2 MiB UTF-8. The iframe cannot select a destination or read its path. Source/token/current enabled package and digest are checked; native code rechecks after the dialog. Only one export request per mounted frame may be pending. The SDK waits up to five minutes for this user dialog. Sandbox/CSP and execution/network permissions stay unchanged. Require min_toolhub_version >= 0.3.0-beta.8 and feature-detect toolhub.files. Import may use a user-selected browser File input; never execute imported content.

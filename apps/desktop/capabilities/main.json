@@ -34,6 +34,7 @@
     "allow-extension-pick",
     "allow-extension-export",
     "allow-extension-view-url",
+    "allow-extension-export-text",
     "allow-pick-cli-path",
     "allow-extension-repository"
   ]

@@ -28,7 +28,7 @@ export default function ExtensionFrame({item,navigate,notify}:{item:NavItem;navi
     return()=>{document.documentElement.classList.remove('extension-presenting');previous.forEach(([element,inert])=>{element.inert=inert});window.removeEventListener('keydown',key)}
   },[presenting,token])
   useEffect(()=>{
-    let active=true,inFlight=0
+    let active=true,inFlight=0,exporting=false
     const listener=async(e:MessageEvent)=>{
       const m=e.data
       if(e.source!==frame.current?.contentWindow||m?.channel!=='toolhub.sdk'||m.token!==token||!Number.isSafeInteger(m.id)||m.id<1)return
@@ -44,8 +44,14 @@ export default function ExtensionFrame({item,navigate,notify}:{item:NavItem;navi
           if(m.expanded){const current=await rpc('extension.list');if(!active||!current.some((row:any)=>row.enabled&&row.package.id===extension.package.id&&row.digest===extension.digest))throw Error('Extension disabled, removed or updated')}
           if(active)setPresenting(m.expanded);respond({result:true})
         }
+        else if(m.type==='exportText'){
+          if(exporting)throw Error('A file export is already open')
+          if(typeof m.name!=='string'||typeof m.text!=='string'||new TextEncoder().encode(m.text).length>2097152)throw Error('Invalid text export')
+          exporting=true
+          try{respond({result:await invoke('extension_export_text',{id:extension.package.id,expectedDigest:extension.digest,name:m.name,text:m.text})})}finally{exporting=false}
+        }
         else if(m.type==='storage'){
-          if(JSON.stringify(m.data??null).length>65536)throw Error('Extension storage payload too large')
+          if(JSON.stringify(m.data??null).length>1048576)throw Error('Extension storage payload too large')
           const current=await rpc('extension.list')
           if(!active||!current.some((row:any)=>row.enabled&&row.package.id===extension.package.id&&row.digest===extension.digest))throw Error('Extension disabled, removed or updated')
           respond({result:extensionState(localStorage,extension.package.id,m.operation,m.revision,m.data)})

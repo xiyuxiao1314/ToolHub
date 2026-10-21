@@ -11,6 +11,7 @@ fn main() {
             "extension_repository",
             "extension_catalog",
             "extension_view_url",
+        "extension_export_text",
             "extension_pick",
             "extension_export",
             "market_list",

@@ -231,6 +231,12 @@
           "markdownDescription": "Enables the extension_export command without any pre-configured scope."
         },
         {
+          "description": "Enables the extension_export_text command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-extension-export-text",
+          "markdownDescription": "Enables the extension_export_text command without any pre-configured scope."
+        },
+        {
           "description": "Enables the extension_pick command without any pre-configured scope.",
           "type": "string",
           "const": "allow-extension-pick",
@@ -403,6 +409,12 @@
           "type": "string",
           "const": "deny-extension-export",
           "markdownDescription": "Denies the extension_export command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the extension_export_text command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-extension-export-text",
+          "markdownDescription": "Denies the extension_export_text command without any pre-configured scope."
         },
         {
           "description": "Denies the extension_pick command without any pre-configured scope.",
