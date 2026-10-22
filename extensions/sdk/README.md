@@ -32,3 +32,9 @@ window.addEventListener('toolhub:presentation', event => {
 ## Navigation icons (beta.8)
 
 Page/CLI `icon` strings may use `prompt`, `media` and `design` for host-rendered line icons. Secondary navigation renders them in the same 20×20 CSS pixel box and stroke style as kernel destinations. Existing ❞/▶/◧ declarations remain compatible through glyph aliases. Unknown glyphs retain a square centered fallback; requested icon size is respected in application cards and pin controls as well. This is presentation-only and grants no permissions.
+
+## Bounded photo copies (beta.9)
+
+`toolhub.images` stores only JPEG display copies in the parent WebView IndexedDB, scoped to the calling package after source/token/current enabled digest checks. `list()` returns `{revision,images,bytes,limit}` metadata; `get(id,'wall'|'display')` returns `{id,dataUrl}`; `add({name,width,height,wallWidth,wallHeight,display,wall},revision)` returns `{id,revision,duplicate}`; `remove(id,revision)` returns `{revision}`. Display/wall are JPEG data URLs, validated against actual JPEG dimensions and byte limits. IDs are content hashes, not filenames or paths. Adds/removals are atomic and revision checked; duplicates preserve existing records and revision.
+
+Limits: 50 copies / 32 MiB per package, 128 MiB aggregate; display at most 1920 pixels per side / 768 KiB; wall at most 768 pixels per side / 128 KiB. Metadata and pixels are separate stores so list does not load the album. The child selects files with its browser File input and compresses copies locally; no native file read/path, original deletion, remote content or new execution authority is provided. CSP remains data-image only. Require beta.9 and feature-detect toolhub.images. Uninstall retains the namespace; explicitly removing an image removes its stored copies. Clearing the WebView profile removes all copies, so keep original photographs independently. This data is not part of registry/settings JSON backups.

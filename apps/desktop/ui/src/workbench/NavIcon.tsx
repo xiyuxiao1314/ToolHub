@@ -18,6 +18,7 @@ const paths: Record<string, string> = {
   pin: 'M9 3h6l-1 6 4 4v2H6v-2l4-4z M12 15v7',
   collapse: 'M4 4h16v16H4z M9 4v16 M15 9l-3 3 3 3',
   arrow: 'M5 12h14 M14 7l5 5-5 5',
+  gallery: 'M3 4h18v16H3z M3 15l5-5 5 5 3-3 5 5 M16 8h.01',
   prompt: 'M4 4h16v12H9l-5 4V4z M8 8h8 M8 12h5',
   media: 'M4 4h16v16H4z M9 8l7 4-7 4z',
   design: 'M4 4h16v16H4z M4 10h16 M10 10v10',

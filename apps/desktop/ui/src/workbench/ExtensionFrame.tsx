@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import type { NavItem } from './host'
 import { rpc } from './host'
 import { extensionState } from './extensionStorage'
+import { extensionImages } from './extensionImages'
 export default function ExtensionFrame({item,navigate,notify}:{item:NavItem;navigate:(id:string)=>void;notify:(m:string)=>void}){
   const frame=useRef<HTMLIFrameElement>(null),surface=useRef<HTMLDivElement>(null),[url,setUrl]=useState(''),[error,setError]=useState(''),[presenting,setPresenting]=useState(false)
   const token=useMemo(()=>crypto.randomUUID(),[item.id,item.extension?.digest])
@@ -49,6 +50,12 @@ export default function ExtensionFrame({item,navigate,notify}:{item:NavItem;navi
           if(typeof m.name!=='string'||typeof m.text!=='string'||new TextEncoder().encode(m.text).length>2097152)throw Error('Invalid text export')
           exporting=true
           try{respond({result:await invoke('extension_export_text',{id:extension.package.id,expectedDigest:extension.digest,name:m.name,text:m.text})})}finally{exporting=false}
+        }
+        else if(m.type==='images'){
+          if(JSON.stringify(m.image??null).length>1300000)throw Error('Image payload too large')
+          const current=await rpc('extension.list')
+          if(!active||!current.some((row:any)=>row.enabled&&row.package.id===extension.package.id&&row.digest===extension.digest))throw Error('Extension disabled, removed or updated')
+          respond({result:await extensionImages(extension.package.id,m)})
         }
         else if(m.type==='storage'){
           if(JSON.stringify(m.data??null).length>1048576)throw Error('Extension storage payload too large')
