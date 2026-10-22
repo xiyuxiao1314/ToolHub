@@ -50,7 +50,7 @@
 .secondary-link>svg,.navigation-glyph{flex-shrink:0}
 .secondary-link>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .secondary-row.is-current .secondary-link{color:var(--accent);font-weight:600}
-.navigation-glyph{display:inline-flex;align-items:center;justify-content:center;width:20px;font-size:19px;line-height:1.2}
+.navigation-icon{display:block;flex-shrink:0}.navigation-glyph{display:inline-flex;flex-shrink:0;align-items:center;justify-content:center;width:20px;height:20px;font-size:20px;line-height:1}
 .navigation-pin{display:grid;place-items:center;padding:7px;border-radius:6px;opacity:0;flex-shrink:0;margin-right:3px;color:var(--muted)}
 .secondary-row:hover .navigation-pin,.secondary-row:focus-within .navigation-pin,.navigation-pin.is-pinned{opacity:1}
 .navigation-pin:hover,.navigation-pin.is-pinned,.application-pin.is-pinned{color:var(--accent)}

@@ -1,0 +1,13 @@
+# Prompt icons / production integration delivery — 2026-10-22
+
+Base editor: 9a3959291106dd1f7c0c5843583df584def4d837. Navigation repair 8e02835fd659405ec11e422e9b5b13a1b1b494cc retained by cherry-pick ea2679a on codex/prompt-icons-production. New UI correction: generic named prompt/media/design line icons, compatibility aliases for old glyph declarations, square fallback sizing. Independent AI Prompts 1.1.0 now requests the named prompt icon. No additional execution/network authority.
+
+Passed: UI typecheck/Vite build; all 18 desktop Rust tests, including real UTF-8 export writes and bounds; isolated package storage regression; 48 prompt Markdown / full JSON round trips, malformed/quota/conflict tests; six-package catalog/checksum validation. Actual isolated Windows WebView validated add/edit/delete/undo, reload persistence and selected Markdown import. Actual QA and production measured all three app icons at 20×20 CSS pixels, zero vertical center delta and identical label starts; single-page direct links retained.
+
+Build correction: after switching workspace versions, the reused release root still exposed a beta.7 CLI/daemon. Rebuilt CLI/daemon with fresh link metadata, checked actual CLI beta.8 and successful daemon compatibility preview before packaging. Do not infer executable versions solely from Cargo source/freshness output.
+
+Local installed build prompt-library-20261022-1 is beta.8; AI Prompts was formally upgraded 1.0.0→1.1.0 with expected digest and same package ID. Backup/idle-job check preceded activation. Current shortcut/current.json and existing login task updated by standard installer; startup enable choice retained. Ten other extensions' digests, versions, enable state and appearance unchanged. All 47 tool instances, seven programs, three Skills and one artifact package preserved (scan timestamps may refresh). Agent MCP configs untouched. Prior build retained for rollback. Program reopened at AI Prompts; visible new/edit/import/export controls enabled.
+
+Native Save picker E2E remains unverified: it was triggered in isolated QA, but Computer Use did not expose its owned modal as a targetable window. No successful native-picker interaction or native-export-success claim. The bounded native UTF-8 writer and pure-data round trips passed. macOS interaction unverified. User requested production replacement; installed with these recorded limits. No GitHub push/release in this task.
+
+Private evidence/screenshot/exact head manifest: D:/codex/toolhub-prompts-production-20261022. Synthetic QA prompt rows never entered production. Source/data backups remain local.
