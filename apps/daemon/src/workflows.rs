@@ -2,7 +2,9 @@ use super::execution_jobs::{invalid, policy_action, policy_scope, text};
 use super::*;
 
 pub(super) fn is_extended(name: &str) -> bool {
-    name.starts_with("extension.")
+    name.starts_with("skill.distribution.")
+        || name == "skill.offer"
+        || name.starts_with("extension.")
         || name.starts_with("artifact.")
         || matches!(
             name,
@@ -108,6 +110,7 @@ impl DaemonService {
         params: &Value,
     ) -> Result<Value, ProtocolError> {
         match name {
+            name if name.starts_with("skill.distribution.") || name == "skill.offer" => self.dispatch_skill_distribution(name, params),
             name if name.starts_with("extension.") => self.dispatch_extension(name, params),
             name if name.starts_with("program.") => self.dispatch_program(name, params),
             name if name.starts_with("artifact.") => self.dispatch_artifact(name, params),
@@ -650,6 +653,7 @@ impl DaemonService {
     }
     pub(super) fn resolve_skill(&mut self, params: &Value) -> Result<Value, ProtocolError> {
         let id = text(params, "id")?;
+        if let Some(view)=self.inspect_distributed(id)? { return Ok(view); }
         if let Some((owner, bundle)) = self.extension_skill(id)? {
             let mut view = self.skill_view(
                 &bundle.manifest,
@@ -773,6 +777,7 @@ impl DaemonService {
         std::fs::read_to_string(path).ok()
     }
     pub(super) fn list_skill_inventory(&mut self) -> Result<Value, ProtocolError> {
+        let distributed=self.distributed_inventory()?;
         let rows = self.registry.list_skills().map_err(db_err)?;
         let mut list = vec![];
         for (id, name, schema, manifest) in rows {
@@ -783,7 +788,7 @@ impl DaemonService {
                 .unwrap_or(
                     json!({"status":"malformed","reusable":false,"issues":["历史条目格式不完整"]}),
                 );
-            list.push(json!({"id":id,"name":name,"schema":schema,"manifest":m,"compatibility":compatibility}));
+            list.push(json!({"id":id,"name":name,"schema":schema,"manifest":m,"compatibility":compatibility,"source_path":self.registry.db.conn.query_row("SELECT path FROM skills WHERE id=?1",[&id],|r|r.get::<_,Option<String>>(0)).ok().flatten()}));
         }
         for (owner, bundle) in self.extension_skills()? {
             let manifest = &bundle.manifest;
@@ -793,6 +798,7 @@ impl DaemonService {
                 "manifest":manifest,"compatibility":view["compatibility"],"extension_id":owner}),
             );
         }
+        list.extend(distributed);
         Ok(json!(list))
     }
     pub(super) fn resolver_preferences(

@@ -36,3 +36,7 @@ Database schema and manifest/wire representations must share the same reviewed m
 ## User-selected program entries
 
 ProgramCandidate describes a potential project file/command entrypoint and its observable evidence; it carries no AI authorship assertion or tool trust. ProgramEntry adds user-confirmed name, arguments, favorite and launch metadata. Selection grants bind a candidate/file/folder to an authenticated controller principal in daemon memory. New entries and changed paths require such a grant; existing entry IDs allow metadata edits. A batch save validates all drafts and commits atomically; duplicate file paths or identical command/cwd pairs are rejected. Availability is recomputed from the actual file/work directory. These entities do not change ToolDefinition/ToolInstance recognition, resolution or policy.
+
+## Skill collection and distribution
+
+A Collected Skill identifies an immutable full-directory content digest, source path/host/link, human-confirmed scope and version. A Target identifies one host and Skill root. A Deployment records the exact version/digest written to one target; it is not proof of host loading. An Offer is optional uncollected metadata. History records bounded outcomes and preserves conflicts. These records do not change tool trust or Agent authorization.

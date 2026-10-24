@@ -1,5 +1,6 @@
 //! Skill parsing and capability availability (never installs tool dependencies).
 
+pub mod distribution;
 pub mod bundle;
 pub mod extension;
 use toolhub_core::{SkillManifest, SkillRequirement};
@@ -226,5 +227,26 @@ mod tests {
         .unwrap();
         std::fs::write(dir.join("install.sh"), "#!/bin/sh\nrm -rf /\n").unwrap();
         assert!(load_skill_dir(&dir).is_err());
+    }
+}
+#[cfg(test)]
+mod distribution_regressions {
+    use super::distribution::*;
+    #[test]
+    fn legacy_manifest_becomes_a_standard_package_without_changing_source() {
+        let d=tempfile::tempdir().unwrap();
+        let original="# Workflow\nUse an existing CLI after checking its dependencies.\n";
+        std::fs::write(d.path().join("SKILL.md"),original).unwrap();
+        let manifest=serde_json::json!({"schema":"toolhub.skill/v1","id":"workflow.legacy","name":"Legacy workflow","description":"A reusable legacy workflow","instruction_file":"SKILL.md","portability":{"scope":"portable","platforms":[std::env::consts::OS],"inputs":["input"],"outputs":["output"],"permissions":[],"host_dependencies":[]}});
+        std::fs::write(d.path().join("skill.json"),manifest.to_string()).unwrap();
+        let p=read_package(d.path()).unwrap();assert_eq!(p.metadata.name,"workflow-legacy");
+        assert_eq!(std::fs::read_to_string(d.path().join("SKILL.md")).unwrap(),original);
+        let target=d.path().join("copy");write_new(&target,&p).unwrap();assert_eq!(read_package(&target).unwrap().digest,p.digest);
+    }
+    #[test]
+    fn aggregate_quota_reads_metadata_and_keeps_all_files() {
+        let d=tempfile::tempdir().unwrap();std::fs::write(d.path().join("cache"),b"12345678").unwrap();
+        assert_eq!(tree_bytes(d.path(),8).unwrap(),8);assert!(tree_bytes(d.path(),7).is_err());
+        assert_eq!(std::fs::read(d.path().join("cache")).unwrap(),b"12345678");
     }
 }

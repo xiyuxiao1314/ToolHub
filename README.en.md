@@ -366,3 +366,7 @@ The [FFmpeg media workshop](extensions/examples/ffmpeg.toolhub-extension.json) a
 [ToolHub-Extensions](https://github.com/xiyuxiao1314/ToolHub-Extensions) is a separate public catalog with type/tag/platform filters and checksummed manifests. Open it from the desktop extension manager, review a package, then import explicitly.
 
 Project dependency discovery: [Electron adapter](docs/development/PROJECT_DEPENDENCIES.md) (beta.6).
+
+### Skill collection and distribution (local beta.10)
+
+Install a Skill in its original host first, then optionally collect and distribute its complete folder through ToolHub. Track source revisions, individual destinations and history; new hosts can receive selected existing packages. Preserve local edits and distinguish file delivery from actual host loading. See [the detailed guide (Chinese)](docs/development/SKILL-DISTRIBUTION.md).

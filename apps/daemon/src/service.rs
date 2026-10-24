@@ -7,6 +7,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 #[path = "agent_diagnostics.rs"]
 mod agent_diagnostics;
+#[path = "skill_distribution.rs"]
+mod skill_distribution;
 #[path = "artifacts.rs"]
 mod artifacts;
 #[path = "execution_jobs.rs"]

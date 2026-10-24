@@ -89,7 +89,7 @@ fn pick(
             } else if bundle {
                 w!("选择 ToolHub 通用能力包 JSON 文件")
             } else if skill {
-                w!("选择含 skill.json 和 SKILL.md 的技能目录")
+                w!("选择 Skill 目录（含 SKILL.md）")
             } else if directory {
                 w!("选择命令工作目录")
             } else {
@@ -146,7 +146,7 @@ pub async fn pick_skill_folder(window: tauri::WebviewWindow) -> Result<Option<St
         let _ = window;
         #[cfg(target_os = "macos")]
         return tauri::async_runtime::spawn_blocking(|| {
-            crate::macos::choose("folder", "选择含 skill.json 和 SKILL.md 的技能目录")
+            crate::macos::choose("folder", "选择 Skill 目录（含 SKILL.md）")
         })
         .await
         .map_err(|e| e.to_string())?;

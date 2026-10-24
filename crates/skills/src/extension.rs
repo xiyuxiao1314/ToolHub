@@ -646,6 +646,8 @@ mod design_studio_contract_tests {
         assert!(package.cli.is_none());
         assert_eq!(package.views.len(), 1);
         assert!(!package.compatible("windows", "0.3.0-beta.5"));
-        assert!(package.compatible("windows", "0.3.0-beta.6"));
+        assert!(!package.compatible("windows", "0.3.0-beta.6"));
+        assert!(package.compatible("windows", "0.3.0-beta.7"));
+        assert!(package.compatible("windows", "0.3.0-beta.10"));
     }
 }

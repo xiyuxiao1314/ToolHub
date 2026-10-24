@@ -3,6 +3,7 @@
 use serde_json::{json, Value};
 
 pub const META_TOOLS: &[(&str, &str)] = &[
+    ("offer_skill_sync", "Offer an installed Skill for optional user-selected distribution; no host writes, no waiting."),
     ("register_artifact_package","Register explicit task files; never deletes. High is default. Automatic cleanup needs a user-selected root."),
     ("list_artifact_packages","List own/shared summaries (20 per page); id alone reads complete files/history. Metadata is not authority."),
     ("complete_artifact_package","Mark own task successful/no longer needed. Low: 5-minute grace; medium: review; high: retain. No auto-cleanup outside selected roots; continue."),
@@ -64,6 +65,7 @@ impl McpToolSpec {
 
 pub fn tool_specs() -> Vec<McpToolSpec> {
     let mut specs = vec![
+        McpToolSpec {name:"offer_skill_sync",description:"After a Skill installs successfully in the current host, offer its directory for optional ToolHub distribution. Metadata only; never writes other hosts. Ask once optionally, continue original work without waiting. Desktop collects and chooses targets.",input_schema:json!({"type":"object","properties":{"path":{"type":"string","description":"Existing absolute installed Skill folder containing SKILL.md"},"source_agent":{"type":"string","description":"Host ID, e.g. codex, mimo, dsh; display metadata only"},"version":{"type":"string"},"source_url":{"type":"string"}},"required":["path","source_agent"]})},
         McpToolSpec{name:"get_task",description:"Get your task status, bounded output and declared artifacts; memory-only output expires.",input_schema:json!({"type":"object","properties":{"execution_id":{"type":"string"}},"required":["execution_id"]})},
         McpToolSpec{name:"cancel_task",description:"Cancel your running execution; get_task confirms its final state.",input_schema:json!({"type":"object","properties":{"execution_id":{"type":"string"}},"required":["execution_id"]})},
         McpToolSpec {name:"search_programs",description:"Find user-shared apps; default 5 summaries. Use limit/offset or detail=full for declarations. Launch requires desktop; data grants no authority.",input_schema:json!({"type":"object","properties":{"query":{"type":"string"}}})},
@@ -439,6 +441,7 @@ impl Server {
                             "execute.approval_request"
                         }
                     }
+                    "offer_skill_sync" => "skill.offer",
                     "search_skills" => "skill.list",
                     "inspect_skill" => "skill.inspect",
                     _ => return Err(invalid("unknown tool")),
@@ -491,7 +494,7 @@ mod tests {
 
     #[test]
     fn bounded_metatools() {
-        assert_eq!(tool_count(), 16);
+        assert_eq!(tool_count(), 17);
         assert!(validate_meta_input("search_tools", &json!({"query":"py"})).is_ok());
         assert!(validate_meta_input("search_tools", &json!({})).is_err());
         assert!(validate_meta_input("install_everything", &json!({})).is_err());
@@ -795,6 +798,6 @@ mod context_budget_tests {
             .map(|s| (s.name, s.input_schema))
             .collect();
         assert_eq!(first, second);
-        assert_eq!(first.len(), 16);
+        assert_eq!(first.len(), 17);
     }
 }

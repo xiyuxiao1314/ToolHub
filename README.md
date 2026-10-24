@@ -376,3 +376,7 @@ ToolHub 源码以 [MIT License](LICENSE) 开源。第三方依赖保持各自许
 
 项目工具依赖发现 / Project dependency discovery: [Electron adapter](docs/development/PROJECT_DEPENDENCIES.md) (beta.6).
 
+
+### Skill 收录与分发（本地 beta.10）
+
+当前 Agent 先完成安装，ToolHub 再提供可选同步。记录来源、版本、分发目标与结果；新安装的智能体可从已有 Skill 中选择补发。支持完整目录、按需依赖检查和本地修改冲突保护，详见 [使用说明](docs/development/SKILL-DISTRIBUTION.md)。

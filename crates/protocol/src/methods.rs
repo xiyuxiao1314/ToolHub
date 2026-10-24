@@ -2,6 +2,16 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Method {
+    SkillOffer,
+    SkillDistributionList,
+    SkillDistributionDiscover,
+    SkillDistributionPreview,
+    SkillDistributionCollect,
+    SkillDistributionSync,
+    SkillDistributionTarget,
+    SkillDistributionTargetRemove,
+    SkillDistributionDismiss,
+
     ExtensionList,
     ExtensionPreferences,
     ExtensionInvoke,
@@ -101,6 +111,16 @@ pub enum Method {
 }
 
 pub const METHOD_NAMES: &[(&str, Method)] = &[
+    ("skill.offer", Method::SkillOffer),
+    ("skill.distribution.list", Method::SkillDistributionList),
+    ("skill.distribution.discover", Method::SkillDistributionDiscover),
+    ("skill.distribution.preview", Method::SkillDistributionPreview),
+    ("skill.distribution.collect", Method::SkillDistributionCollect),
+    ("skill.distribution.sync", Method::SkillDistributionSync),
+    ("skill.distribution.target", Method::SkillDistributionTarget),
+    ("skill.distribution.target_remove", Method::SkillDistributionTargetRemove),
+    ("skill.distribution.dismiss", Method::SkillDistributionDismiss),
+
     ("extension.list", Method::ExtensionList),
     ("extension.preferences", Method::ExtensionPreferences),
     ("extension.invoke", Method::ExtensionInvoke),

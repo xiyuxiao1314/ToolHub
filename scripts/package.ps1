@@ -16,7 +16,7 @@ foreach ($helper in @('install-local.ps1','maintenance.ps1','maintenance.py')) {
 Copy-Item -LiteralPath (Join-Path $projectRoot 'docs\development\PACKAGE.md') -Destination (Join-Path $packagePath 'README.md')
 $guidePath = Join-Path $packagePath 'docs\development'
 New-Item -ItemType Directory -Path $guidePath -Force | Out-Null
-foreach ($guideName in @('EXTENSIONS.md','ARTIFACTS.md','STORAGE.md','PROJECT_DEPENDENCIES.md','DESIGN-STUDIO.md')) { Copy-Item -LiteralPath (Join-Path $projectRoot ('docs\development\' + $guideName)) -Destination $guidePath }
+foreach ($guideName in @('EXTENSIONS.md','ARTIFACTS.md','STORAGE.md','PROJECT_DEPENDENCIES.md','DESIGN-STUDIO.md','SKILL-DISTRIBUTION.md')) { Copy-Item -LiteralPath (Join-Path $projectRoot ('docs\development\' + $guideName)) -Destination $guidePath }
 $imagePath = Join-Path $packagePath 'docs\images'
 New-Item -ItemType Directory -Path $imagePath -Force | Out-Null
 foreach ($imageName in @('extension-workbench.png','extension-theme.png','navigation-applications.png')) { Copy-Item -LiteralPath (Join-Path $projectRoot ('docs\images\' + $imageName)) -Destination $imagePath }

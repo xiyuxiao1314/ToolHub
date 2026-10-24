@@ -61,3 +61,7 @@ The owner-approved hierarchical shell (2026-10-19 local development) keeps four 
 
 
 The beta.4 workbench adds an optional declarative CLI contribution: extension-owned metadata and argv templates, host-owned native forms and a controller-only preview/start API, and the existing daemon execution pipeline under an ordinary extension identity. Generic iframe scripts retain their previous limited bridge. The FFmpeg package is externalizable independently of core code and includes one portable Agent workflow; no per-plugin MCP tools are generated.
+
+## Owner-approved Skill distribution (2026-10-24)
+
+Host-native installation precedes an optional metadata-only Agent offer. The Skills feature owns controller-only immutable snapshots and whole-directory distribution, in the shared registry plus bounded adjacent files. Per-target digest checks preserve local edits. Display metadata and host IDs grant no execution or MCP configuration authority. Summary listing performs no all-library file hashing; selected inspection and writes recheck files. See docs/development/SKILL-DISTRIBUTION.md.

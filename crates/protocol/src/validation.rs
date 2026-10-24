@@ -16,6 +16,10 @@ pub fn validate_method_params(request: &JsonRpcRequest) -> Result<(), ProtocolEr
             .as_object()
             .ok_or_else(|| invalid("named object params required".into()))?
     };
+    if request.method.starts_with("skill.distribution.") || request.method == "skill.offer" {
+        if serde_json::to_vec(params).map_or(true, |b|b.len()>16384) { return Err(invalid("Skill sync parameters exceed 16 KiB".into())); }
+        return Ok(());
+    }
     if request.method.starts_with("extension.") {
         return validate_extension(&request.method, params);
     }

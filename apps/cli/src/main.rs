@@ -149,6 +149,8 @@ enum EnvCmd {
 
 #[derive(Subcommand)]
 enum SkillCmd {
+    /// Offer a successfully installed local Skill for optional desktop distribution.
+    Offer { path: std::path::PathBuf, #[arg(long)] source_agent: String, #[arg(long)] version: Option<String>, #[arg(long)] source_url: Option<String> },
     List,
     Inspect { id: String },
     Register { path: std::path::PathBuf },
@@ -338,6 +340,7 @@ fn run(cli: &Cli) -> anyhow::Result<()> {
             SettingsCmd::Set { path } => call(&mut client, "settings.set", read_json(path)?)?,
         },
         Commands::Skill { cmd } => match cmd {
+            SkillCmd::Offer { path, source_agent, version, source_url } => call(&mut client,"skill.offer",json!({"path":path,"source_agent":source_agent,"version":version.as_deref().unwrap_or_default(),"source_url":source_url.as_deref().unwrap_or_default()}))?,
             SkillCmd::List => call(&mut client, "skill.list", json!({}))?,
             SkillCmd::Inspect { id } => call(&mut client, "skill.inspect", json!({"id": id}))?,
             SkillCmd::Register { path } => {

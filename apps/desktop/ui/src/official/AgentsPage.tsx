@@ -17,6 +17,7 @@ export default function AgentsPage(props: WorkbenchContext & { guide?: boolean }
                 <h1>{props.guide ? '接入说明' : '智能体'}</h1>
                 <p>连接和管理可使用 ToolHub 的 AI 智能体，让它们共享本机工具能力。</p>
               </div>
+              <button className="btn" onClick={()=>props.setPage("skills")}>Skill 同步与目录</button>
               <button
                 className="btn btn-primary"
                 onClick={() => props.setPage(props.guide ? 'agents' : 'agent-guide')}
