@@ -234,7 +234,7 @@ mod distribution_regressions {
     use super::distribution::*;
     #[test]
     fn legacy_manifest_becomes_a_standard_package_without_changing_source() {
-        let d=tempfile::tempdir().unwrap();
+        let d=tempfile::tempdir_in(std::env::temp_dir().canonicalize().unwrap()).unwrap();
         let original="# Workflow\nUse an existing CLI after checking its dependencies.\n";
         std::fs::write(d.path().join("SKILL.md"),original).unwrap();
         let manifest=serde_json::json!({"schema":"toolhub.skill/v1","id":"workflow.legacy","name":"Legacy workflow","description":"A reusable legacy workflow","instruction_file":"SKILL.md","portability":{"scope":"portable","platforms":[std::env::consts::OS],"inputs":["input"],"outputs":["output"],"permissions":[],"host_dependencies":[]}});
@@ -245,7 +245,7 @@ mod distribution_regressions {
     }
     #[test]
     fn aggregate_quota_reads_metadata_and_keeps_all_files() {
-        let d=tempfile::tempdir().unwrap();std::fs::write(d.path().join("cache"),b"12345678").unwrap();
+        let d=tempfile::tempdir_in(std::env::temp_dir().canonicalize().unwrap()).unwrap();std::fs::write(d.path().join("cache"),b"12345678").unwrap();
         assert_eq!(tree_bytes(d.path(),8).unwrap(),8);assert!(tree_bytes(d.path(),7).is_err());
         assert_eq!(std::fs::read(d.path().join("cache")).unwrap(),b"12345678");
     }
