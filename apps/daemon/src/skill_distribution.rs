@@ -770,6 +770,12 @@ impl DaemonService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // macOS exposes TMPDIR through /var -> /private/var. Fixtures must use
+    // the physical parent; production continues rejecting every symlink ancestor.
+    fn fixture_dir() -> tempfile::TempDir {
+        let parent = std::env::temp_dir().canonicalize().unwrap();
+        tempfile::tempdir_in(parent).unwrap()
+    }
     fn source(path: &Path, name: &str, body: &str) {
         fs::create_dir_all(path.join("references")).unwrap();
         fs::write(
@@ -820,7 +826,7 @@ mod tests {
     }
     #[test]
     fn installed_offer_never_copies_or_blocks_and_controller_gate() {
-        let d = tempfile::tempdir().unwrap();
+        let d = fixture_dir();
         let src = d.path().join("source");
         source(&src, "test-flow", "Read reference");
         let mut s = service(d.path());
@@ -859,7 +865,7 @@ mod tests {
     }
     #[test]
     fn legacy_load_flag_is_unknown_without_rewriting_saved_history() {
-        let d = tempfile::tempdir().unwrap();
+        let d = fixture_dir();
         let mut s = service(d.path());
         let mut state = s.distribution_state().unwrap();
         state.history.push(
@@ -877,7 +883,7 @@ mod tests {
     }
     #[test]
     fn full_package_multi_host_reopen_and_new_host_backfill() {
-        let d = tempfile::tempdir().unwrap();
+        let d = fixture_dir();
         let src = d.path().join("source");
         source(&src, "test-flow", "Read reference");
         let mut s = service(d.path());
@@ -910,7 +916,7 @@ mod tests {
     }
     #[test]
     fn stale_revision_source_guard_and_local_edits_survive() {
-        let d = tempfile::tempdir().unwrap();
+        let d = fixture_dir();
         let src = d.path().join("source");
         source(&src, "test-flow", "v1");
         let mut s = service(d.path());
@@ -949,7 +955,7 @@ mod tests {
     }
     #[test]
     fn managed_update_keeps_backup_and_duplicate_is_idempotent() {
-        let d = tempfile::tempdir().unwrap();
+        let d = fixture_dir();
         let src = d.path().join("source");
         source(&src, "test-flow", "v1");
         let mut s = service(d.path());
@@ -977,7 +983,7 @@ mod tests {
     }
     #[test]
     fn host_specific_and_unmanaged_conflicts_never_overwrite() {
-        let d = tempfile::tempdir().unwrap();
+        let d = fixture_dir();
         let src = d.path().join("source");
         source(&src, "test-flow", "Call image_gen");
         let mut s = service(d.path());
@@ -1005,7 +1011,7 @@ mod tests {
     }
     #[test]
     fn target_unavailable_tampered_snapshot_and_bounded_history() {
-        let d = tempfile::tempdir().unwrap();
+        let d = fixture_dir();
         let src = d.path().join("source");
         source(&src, "test-flow", "v1");
         let mut s = service(d.path());
@@ -1040,7 +1046,7 @@ mod tests {
     fn directory_junction_is_rejected_at_source_and_target() {
         // Symbolic links require a privileged test environment; existing link metadata is handled
         // by both FILE_ATTRIBUTE_REPARSE_POINT and is_symlink, not followed by the walker.
-        let d = tempfile::tempdir().unwrap();
+        let d = fixture_dir();
         source(&d.path().join("source"), "test-flow", "body");
         if std::os::windows::fs::symlink_dir(d.path().join("source"), d.path().join("link")).is_ok()
         {

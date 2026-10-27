@@ -383,6 +383,12 @@ pub fn preview_directory(root: &Path) -> Result<Metadata> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // macOS exposes TMPDIR through /var -> /private/var. Fixtures must use
+    // the physical parent; production continues rejecting every symlink ancestor.
+    fn fixture_dir() -> tempfile::TempDir {
+        let parent = std::env::temp_dir().canonicalize().unwrap();
+        tempfile::tempdir_in(parent).unwrap()
+    }
     fn fixture(root: &Path) {
         fs::create_dir_all(root.join("references")).unwrap();
         fs::write(root.join("SKILL.md"),"---\nname: test-flow\ndescription: >-\n  Test workflow\n  with a reference.\n---\nRead references/a.md").unwrap();
@@ -390,7 +396,7 @@ mod tests {
     }
     #[test]
     fn complete_package_digest_and_bounded_parser() {
-        let d = tempfile::tempdir().unwrap();
+        let d = fixture_dir();
         fixture(d.path());
         let p = read_package(d.path()).unwrap();
         assert_eq!(p.metadata.description, "Test workflow with a reference.");
@@ -405,7 +411,7 @@ mod tests {
     }
     #[test]
     fn credentials_size_and_supporting_host_reference() {
-        let d = tempfile::tempdir().unwrap();
+        let d = fixture_dir();
         fixture(d.path());
         fs::write(d.path().join("references/a.md"), "call image_gen").unwrap();
         assert!(!read_package(d.path())
@@ -428,6 +434,19 @@ mod tests {
         ] {
             assert!(metadata(s).is_err());
         }
+    }
+    #[cfg(unix)]
+    #[test]
+    fn physical_temp_parent_works_but_custom_symlink_ancestors_are_rejected() {
+        let d = fixture_dir();
+        let physical = d.path().join("physical");
+        fixture(&physical);
+        assert!(read_package(&physical).is_ok());
+        let alias = d.path().join("alias");
+        std::os::unix::fs::symlink(&physical, &alias).unwrap();
+        assert!(checked_dir(&alias).is_err());
+        assert!(checked_dir(&alias.join("references")).is_err());
+        assert!(read_package(&alias).is_err());
     }
 }
 
@@ -464,4 +483,6 @@ pub fn tree_bytes(root: &Path, budget: u64) -> Result<u64> {
     let mut total = 0;
     visit(root, &mut total, &mut 0, budget)?;
     Ok(total)
+
+
 }
