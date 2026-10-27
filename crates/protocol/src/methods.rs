@@ -2,6 +2,9 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Method {
+    ServiceConsolidate,
+    ServicePageUrl,
+    ServiceRegister, ServiceList, ServiceStart, ServiceStop, ServiceRestart, ServiceConfigure, ServiceRemove, ServiceProxyStatus, ServiceProxyConfigure,
     SkillOffer,
     SkillDistributionList,
     SkillDistributionDiscover,
@@ -111,6 +114,13 @@ pub enum Method {
 }
 
 pub const METHOD_NAMES: &[(&str, Method)] = &[
+    ("service.consolidate",Method::ServiceConsolidate),
+    ("service.page_url",Method::ServicePageUrl),
+    ("service.register",Method::ServiceRegister),("service.list",Method::ServiceList),
+    ("service.start",Method::ServiceStart),("service.stop",Method::ServiceStop),
+    ("service.restart",Method::ServiceRestart),("service.configure",Method::ServiceConfigure),
+    ("service.remove",Method::ServiceRemove),("service.proxy_status",Method::ServiceProxyStatus),
+    ("service.proxy_configure",Method::ServiceProxyConfigure),
     ("skill.offer", Method::SkillOffer),
     ("skill.distribution.list", Method::SkillDistributionList),
     ("skill.distribution.discover", Method::SkillDistributionDiscover),

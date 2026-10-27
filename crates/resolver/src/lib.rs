@@ -219,17 +219,20 @@ pub fn resolve(
         };
         preference_rank(&a.instance_id)
             .cmp(&preference_rank(&b.instance_id))
+            .then_with(|| b.cwd_match.cmp(&a.cwd_match))
             .then_with(|| {
-                score(b)
-                    .partial_cmp(&score(a))
-                    .unwrap_or(std::cmp::Ordering::Equal)
+                let stable=|c:&CandidateInstance|c.version.as_deref().is_some_and(|v|!v.split('+').next().unwrap_or(v).contains('-'));
+                stable(b).cmp(&stable(a))
             })
             .then_with(|| match (&a.version, &b.version) {
                 (Some(a), Some(b)) => {
                     toolhub_core::compare_versions(b, a).unwrap_or(std::cmp::Ordering::Equal)
                 }
+                (Some(_),None)=>std::cmp::Ordering::Less,
+                (None,Some(_))=>std::cmp::Ordering::Greater,
                 _ => std::cmp::Ordering::Equal,
             })
+            .then_with(|| score(b).partial_cmp(&score(a)).unwrap_or(std::cmp::Ordering::Equal))
             .then_with(|| a.path.cmp(&b.path))
     });
 
@@ -246,7 +249,7 @@ pub fn resolve(
         }
     } else {
         format!(
-            "selected {} from {} candidates using project/version/trust/path rules; selection is not execution authority",
+            "selected {} from {} candidates using explicit/project preference, newest stable eligible version, then trust/path rules; selection is not execution authority",
             candidates[0].name,
             candidates.len()
         )
@@ -413,4 +416,14 @@ mod tests {
         assert_eq!(out.selected.unwrap().instance_id, "old");
         assert_eq!(out.rejected.len(), 1);
     }
+    #[test]
+    fn ten_python_copies_select_one_latest_stable_eligible_without_distrusting_older() {
+        let reg=CapabilityRegistry::with_core_taxonomy();let req=CapabilityRequirement{capability:CapabilityId::new("language.python.execute").unwrap(),version:None,optional:false};
+        let mut candidates=(0..7).map(|n|inst(&format!("old{n}"),&format!("C:/Program Files/Python{n}/python.exe"),"verified",Some(&format!("3.{}",7+n)),None)).collect::<Vec<_>>();
+        candidates.push(inst("latest","D:/python/python.exe","known",Some("3.14.0"),None));candidates.push(inst("preview","D:/preview/python.exe","verified",Some("3.15.0-rc.1"),None));candidates.push(inst("untrusted","D:/fake/python.exe","unknown",Some("9.0.0"),None));
+        let out=resolve(&reg,&req,candidates.clone(),&ResolvePrefs::default());assert_eq!(out.selected.unwrap().instance_id,"latest");assert_eq!(out.alternatives.len(),8);assert_eq!(out.rejected.len(),1);assert_eq!(candidates[0].trust,"verified");
+        let prefs=ResolvePrefs{preferred_instances:vec!["old0".into()],..Default::default()};assert_eq!(resolve(&reg,&req,candidates.clone(),&prefs).selected.unwrap().instance_id,"old0");
+        let constrained=CapabilityRequirement{version:Some("<3.14".into()),..req};assert_eq!(resolve(&reg,&constrained,candidates,&ResolvePrefs::default()).selected.unwrap().version.as_deref(),Some("3.13"));
+    }
+
 }

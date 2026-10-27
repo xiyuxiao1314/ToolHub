@@ -238,7 +238,7 @@ impl DaemonService {
             revision.to_string(),
             serde_json::to_string(&self.policy.rules).map_err(json_err)?,
             serde_json::to_string(&context).map_err(json_err)?,
-            row.trust,
+            row.trust.clone(),
             row.status,
             id.into(),
             request.timeout_ms.to_string(),
@@ -252,6 +252,7 @@ impl DaemonService {
         }
         let hash = toolhub_executor::hash_file(&executable)
             .map_err(|_| ProtocolError::new(ErrorCode::Unavailable, "cannot hash executable"))?;
+        if !toolhub_recognizer::native_signature::binding_valid(&row.trust,&executable,&hash) {return Err(ProtocolError::denied("signature-verified executable changed; rescan before execution"));}
         let env_digest = toolhub_executor::env_digest(&toolhub_executor::sanitize_env(
             &request.env_overrides,
             &[],

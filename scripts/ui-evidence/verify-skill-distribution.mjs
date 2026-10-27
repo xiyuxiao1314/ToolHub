@@ -19,15 +19,15 @@ try {
  await p.getByRole('heading',{name:'分发到智能体',exact:true}).waitFor();
  const row=name=>p.locator('.sd-target-row').filter({has:p.getByText(name,{exact:true})});
  await row('QA-Codex').getByRole('checkbox').check();await row('QA-MiMo').getByRole('checkbox').check();await p.getByRole('button',{name:'同步所选智能体',exact:true}).click();
- await row('QA-Codex').getByText('已写入 · 待宿主重载',{exact:true}).waitFor();assert(fs.readFileSync(targetRoot+'/QA-MiMo/alpha-flow/scripts/test.py','utf8').includes('must never execute'));
+ await row('QA-Codex').getByText('已同步',{exact:true}).waitFor();assert(fs.readFileSync(targetRoot+'/QA-MiMo/alpha-flow/scripts/test.py','utf8').includes('must never execute'));
  // New host after collection, followed by ordinary selection/backfill.
  inventory=await rpc('skill.distribution.list');inventory=await rpc('skill.distribution.target',{revision:inventory.revision,root:targetRoot+'/QA-dsh',host_id:'dsh',name:'QA-dsh'});
- await p.getByRole('button',{name:'刷新状态',exact:true}).click();await row('QA-dsh').getByRole('checkbox').check();await p.getByRole('button',{name:'同步所选智能体',exact:true}).click();await row('QA-dsh').getByText('已写入 · 待宿主重载',{exact:true}).waitFor();
+ await p.getByRole('button',{name:'刷新状态',exact:true}).click();await row('QA-dsh').getByRole('checkbox').check();await p.getByRole('button',{name:'同步所选智能体',exact:true}).click();await row('QA-dsh').getByText('已同步',{exact:true}).waitFor();
  // Update still-managed copy, but preserve a local edit at a different target.
  const old=inventory.packages[0].digest;fs.appendFileSync(fixture+'/alpha-flow/SKILL.md','\nUpdated instructions.\n');fs.writeFileSync(targetRoot+'/QA-MiMo/alpha-flow/references/check.md','MANUAL EDIT');
  await p.getByRole('button',{name:'更新来源',exact:true}).click();await p.getByLabel('版本（可留空）').fill('1.1.0');await p.getByRole('button',{name:'收录并选择同步目标 →',exact:true}).click();
  await row('QA-MiMo').getByText('本地有差异',{exact:true}).waitFor();assert.equal(await row('QA-MiMo').getByRole('checkbox').isDisabled(),true);
- await row('QA-dsh').getByRole('checkbox').check();await p.getByRole('button',{name:'同步所选智能体',exact:true}).click();await row('QA-dsh').getByText('已写入 · 待宿主重载',{exact:true}).waitFor();assert.equal(fs.readFileSync(targetRoot+'/QA-MiMo/alpha-flow/references/check.md','utf8'),'MANUAL EDIT');
+ await row('QA-dsh').getByRole('checkbox').check();await p.getByRole('button',{name:'同步所选智能体',exact:true}).click();await row('QA-dsh').getByText('已同步',{exact:true}).waitFor();assert.equal(fs.readFileSync(targetRoot+'/QA-MiMo/alpha-flow/references/check.md','utf8'),'MANUAL EDIT');
  // Fill library for real paged navigation without reading unrelated host Skill bodies.
  for(const name of ['beta-flow','charlie-flow','delta-flow','echo-flow','foxtrot-flow','golf-flow']){inventory=await rpc('skill.distribution.list');const preview=await rpc('skill.distribution.preview',{path:fixture+'/'+name});await rpc('skill.distribution.collect',{revision:inventory.revision,path:fixture+'/'+name,source_agent:'codex',scope:'portable',expected_digest:preview.digest});}
  await p.getByRole('button',{name:'返回列表',exact:true}).click();await p.getByRole('button',{name:'刷新状态',exact:true}).click();await p.waitForFunction(()=>document.querySelectorAll('.sd-skill').length===4);await p.getByRole('button',{name:'下一页',exact:true}).click();await p.waitForFunction(()=>document.querySelectorAll('.sd-skill').length===3);

@@ -10,7 +10,7 @@
     <img alt="Status beta" src="https://img.shields.io/badge/status-beta-orange" />
   </p>
   <p><strong>简体中文</strong> | <a href="README.en.md">English</a></p>
-  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.6">下载 v0.3.0-beta.6</a> · <a href="#界面预览">界面预览</a> · <a href="#接入-ai-agent">Agent 接入</a> · <a href="#从源码构建">源码构建</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">反馈问题</a></p>
+  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.13">下载 v0.3.0-beta.13</a> · <a href="#界面预览">界面预览</a> · <a href="#接入-ai-agent">Agent 接入</a> · <a href="#从源码构建">源码构建</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">反馈问题</a></p>
 </div>
 
 [![M8ven Score](https://m8ven.ai/badge/mcp/xiyuxiao1314-toolhub-q0hzms?v=605fc85d6d6538d906e384fc8a7e66c1)](https://m8ven.ai/mcp/xiyuxiao1314-toolhub-q0hzms?s=readme)
@@ -59,7 +59,7 @@ ToolHub 使用已有工具，工具发现不依赖 AI 服务；它不会自动�
 
 ### 扩展工作台
 
-七个官方功能可独立装卸；第三方包可新增导航、交互页和主题。本节截图来自 v0.3.0-beta.3 Windows 独立验收实例；这些扩展工作台能力已包含在当前 beta.6 发布中。
+八个官方功能可独立装卸；第三方包可新增导航、交互页和主题。本节截图来自 v0.3.0-beta.3 Windows 独立验收实例；这些扩展工作台能力已包含在当前 beta.13 发布中。
 
 ![扩展工作台：官方模块、安装管理和界面恢复](docs/images/extension-workbench.png)
 
@@ -71,13 +71,17 @@ ToolHub 使用已有工具，工具发现不依赖 AI 服务；它不会自动�
 
 ![设计台：组合、实时预览与平台参数](docs/images/design-studio.png)
 
-16 个 MCP 工具现已全部提供四项行为标注，协议测试使用独立注册表逐项调用。查询会保存 Agent 最近活动时间，因此采用保守的非严格只读标记；详见 [MCP 行为标注与外部报告说明](docs/development/MCP-ANNOTATIONS.md)。
+19 个 MCP 工具现已全部提供四项行为标注，协议测试使用独立注册表逐项调用。查询会保存 Agent 最近活动时间，因此采用保守的非严格只读标记；详见 [MCP 行为标注与外部报告说明](docs/development/MCP-ANNOTATIONS.md)。
+
+## beta.13 更新
+
+新增服务监控、稳定进程跟踪、默认浏览器打开服务地址和可调刷新间隔；Skill 支持完整目录收录、逐宿主分发与冲突记录。系统 cURL 原生核验及最新稳定候选选择继续受执行策略约束。详见 [版本说明](docs/releases/v0.3.0-beta.13.md)。
 
 ## 当前功能
 
 | 模块 | 已实现的功能 |
 | --- | --- |
-| 扩展工作台 | 两级导航、七个官方功能独立启停/装卸，第三方页面、导航、主题、布局、编辑和回滚 |
+| 扩展工作台 | 两级导航、八个官方功能独立启停/装卸，第三方页面、导航、主题、布局、编辑和回滚 |
 | 设计台 | 12 个视觉方向、10 类布局、平台适配、实时预览与可运行代码、Agent 说明和本机预设 |
 | 工具 | 本机扫描、名称/路径/任务搜索、能力解析、版本与环境查看、可用性检查、默认路径选择 |
 | 项目依赖 | 从明确选定的项目发现 Electron，区分完整安装与缺失包/二进制，多项目、多版本及路径去重 |
@@ -86,6 +90,7 @@ ToolHub 使用已有工具，工具发现不依赖 AI 服务；它不会自动�
 | 列表 | 按工具合并或显示安装实例，分类筛选，每页 6 / 12 / 24 项，分页和每页数量记忆 |
 | 实用程序 | 识别 FFmpeg、FFprobe、7-Zip、ImageMagick、Pandoc、Tesseract、Poppler 等媒体、文档与自动化工具 |
 | 产物 | 按任务组成文件包、管理目录只读扫描、勾选收录、低/中/高优先级、5 分钟撤销期、系统回收站和清理历史 |
+| 服务监控 | 官方可卸载扩展；已登记服务与子进程、原生图标、端口、手动停止/重启、明确设置运行时限；代理只读观察。详见 [说明](docs/development/SERVICE-MONITOR.md) |
 | 程序架 | 文件或命令入口、工作目录、参数、收藏、后台启动、打开目录、失效路径提示 |
 | Agent 提交 | 通过 MCP 提交新应用的启动入口，进入待确认列表，用户勾选并审核后收录 |
 | 智能体 | 宿主检测、已配置连接和历史握手/调用记录，接入模板与 MCP 连接检查 |
@@ -123,7 +128,7 @@ Agent 查询 ToolHub：本机已有工具 / 通用 Skill / 对应能力
 | 中 | 完成后由接入的 Agent 检查用途和依赖，提交理由；等待 5 分钟后回收 |
 | 高 | 人工保留或手动移入回收站，Agent 不能降级或删除 |
 
-自动清理只在用户选定且启用的管理目录内进行；人工保留优先。所有清理调用系统回收站，不提供永久删除或失败后的删除兜底。文件改变、已知引用或占用会暂缓。扫描不能证明 Agent 来源，也不能代替依赖判断。Windows 已做真实回收站验证；macOS Finder 适配仍需原机验证。此功能已包含在 v0.3.0-beta.6 发布包中。
+自动清理只在用户选定且启用的管理目录内进行；人工保留优先。所有清理调用系统回收站，不提供永久删除或失败后的删除兜底。文件改变、已知引用或占用会暂缓。扫描不能证明 Agent 来源，也不能代替依赖判断。Windows 已做真实回收站验证；macOS Finder 适配仍需原机验证。此功能已包含在 v0.3.0-beta.13 发布包中。
 
 完整流程和接口见 [产物管理](docs/development/ARTIFACTS.md)。
 
@@ -137,7 +142,7 @@ Windows 的“自动批准工具执行”默认开启：已信任且策略允许
 
 市场当前是随应用发布的本地能力包目录，可导入、预览、收录和分享 `.toolhub-skill.json`。内置包涉及媒体压缩/探测、音频提取、图片转换、PDF 文本/OCR、文档转换、归档解压和 CSV 数据检查。应用内没有账号、付费内容或自动安装依赖；另有公开的 [扩展目录](https://github.com/xiyuxiao1314/ToolHub-Extensions)，支持浏览筛选后明确导入。
 
-当前 beta.6 已采用扩展工作台架构：工具、程序、产物、环境、Skill、市场和任务成为默认启用的七个官方功能扩展，可安装、停用、卸载、编辑和回滚；卸载保留用户数据。独立 v2 包可以增加导航和 HTML/CSS/JavaScript 页面，也可以更换主题、导航布局和密度。智能体接入、权限和恢复入口保留在核心。参见 [扩展开发与使用说明](docs/development/EXTENSIONS.md)。
+当前 beta.13 已采用扩展工作台架构：工具、程序、产物、环境、Skill、市场和任务成为默认启用的八个官方功能扩展，可安装、停用、卸载、编辑和回滚；卸载保留用户数据。独立 v2 包可以增加导航和 HTML/CSS/JavaScript 页面，也可以更换主题、导航布局和密度。智能体接入、权限和恢复入口保留在核心。参见 [扩展开发与使用说明](docs/development/EXTENSIONS.md)。
 
 扩展架构已随 beta.6 发布。第三方页面使用受限 SDK，不能直接启动程序或清理文件，任意本机后台插件尚不支持。
 
@@ -145,14 +150,14 @@ Agent 上下文也已优化：MCP 搜索默认返回 5 条摘要，完整信息�
 
 ## 下载与平台支持
 
-当前开源预览版为 **v0.3.0-beta.6**。所有文件在 [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.6) 的 Assets 中下载。
+当前开源预览版为 **v0.3.0-beta.13**。所有文件在 [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.13) 的 Assets 中下载。
 
 | 你的系统 | 推荐下载 | 说明 |
 | --- | --- | --- |
-| Windows 10 / 11，64 位 | `ToolHub-v0.3.0-beta.6-windows-x64.zip` | 桌面、CLI、daemon 和能力包；本机原生验证 |
-| Mac，Apple Silicon（M 系列） | `ToolHub-v0.3.0-beta.6-macos-arm64.dmg` | macOS 13+；预览支持，另附 ZIP |
-| Mac，Intel | `ToolHub-v0.3.0-beta.6-macos-x64.dmg` | macOS 13+；预览支持，另附 ZIP |
-| 只需 CLI / MCP 服务 | `ToolHub-CLI-v0.3.0-beta.6-<平台>.zip` | 包含 CLI 和配对 daemon，不含桌面审批界面 |
+| Windows 10 / 11，64 位 | `ToolHub-v0.3.0-beta.13-windows-x64.zip` | 桌面、CLI、daemon 和能力包；本机原生验证 |
+| Mac，Apple Silicon（M 系列） | `ToolHub-v0.3.0-beta.13-macos-arm64.dmg` | macOS 13+；预览支持，另附 ZIP |
+| Mac，Intel | `ToolHub-v0.3.0-beta.13-macos-x64.dmg` | macOS 13+；预览支持，另附 ZIP |
+| 只需 CLI / MCP 服务 | `ToolHub-CLI-v0.3.0-beta.13-<平台>.zip` | 包含 CLI 和配对 daemon，不含桌面审批界面 |
 | 独立扩展与源码 | [ToolHub-Extensions Releases](https://github.com/xiyuxiao1314/ToolHub-Extensions/releases) | 设计台、FFmpeg、主题与页面包单独发布，安装前可审阅源码 |
 | 校验文件 | `SHA256SUMS.txt` | 对照 SHA-256 检查下载文件完整性 |
 
@@ -254,7 +259,7 @@ VS Code 使用 `servers` 结构；桌面接入说明内有对应模板。配置�
 
 [toolhub-integration/SKILL.md](skills/toolhub-integration/SKILL.md) 是通用接入指引。支持 Skill 的宿主可把它安装在自己的 Skill 目录，不支持 Skill 的宿主可把它作为任务指引。填写本机安装路径后，要求 Agent：先搜索工具或解析能力，检查实例，再按权限使用；完成应用后提交待确认入口。
 
-网关公开 16 个固定元工具，避免把每个软件都展开成一个 MCP 工具：
+网关公开 19 个固定元工具，避免把每个软件都展开成一个 MCP 工具：
 
 | 用途 | MCP 工具 |
 | --- | --- |
@@ -263,6 +268,8 @@ VS Code 使用 `servers` 结构；桌面接入说明内有对应模板。配置�
 | 后台任务 | `get_task`、`cancel_task` |
 | 通用 Skill | `search_skills`、`inspect_skill` |
 | 产物包 | `register_artifact_package`、`list_artifact_packages`、`complete_artifact_package`、`review_artifact_package` |
+| Skill 可选同步 | `offer_skill_sync` |
+| 服务观察（Windows） | `register_service`、`list_services` |
 | 项目应用 | `propose_program`、`search_programs` |
 
 宿主名称与历史记录用于显示，不能授予执行权限。`propose_program` 只提交声明，不会保存、启动或信任该程序；共享给 Agent 的程序信息也不等于执行授权。
@@ -350,7 +357,7 @@ scripts/              本机安装、验证、原生发布打包
 docs/                 系统设计、实现说明、历史开发与验证记录
 ```
 
-[系统设计](docs/design/TOOLHUB_SYSTEM_DESIGN.md) 描述完整产品方向，其中部分目标尚未实现；当前功能以本 README 与 [版本说明](docs/releases/v0.3.0-beta.6.md) 为准。
+[系统设计](docs/design/TOOLHUB_SYSTEM_DESIGN.md) 描述完整产品方向，其中部分目标尚未实现；当前功能以本 README 与 [版本说明](docs/releases/v0.3.0-beta.13.md) 为准。
 
 ## 已知限制与后续方向
 

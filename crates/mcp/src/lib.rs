@@ -3,6 +3,8 @@
 use serde_json::{json, Value};
 
 pub const META_TOOLS: &[(&str, &str)] = &[
+    ("register_service","Observe one running same-user project service; no launch or stop authority."),
+    ("list_services","List own registered services and observed ports; bounded summaries."),
     ("offer_skill_sync", "Offer an installed Skill for optional user-selected distribution; no host writes, no waiting."),
     ("register_artifact_package","Register explicit task files; never deletes. High is default. Automatic cleanup needs a user-selected root."),
     ("list_artifact_packages","List own/shared summaries (20 per page); id alone reads complete files/history. Metadata is not authority."),
@@ -65,7 +67,9 @@ impl McpToolSpec {
 
 pub fn tool_specs() -> Vec<McpToolSpec> {
     let mut specs = vec![
-        McpToolSpec {name:"offer_skill_sync",description:"After a Skill installs successfully in the current host, offer its directory for optional ToolHub distribution. Metadata only; never writes other hosts. Ask once optionally, continue original work without waiting. Desktop collects and chooses targets.",input_schema:json!({"type":"object","properties":{"path":{"type":"string","description":"Existing absolute installed Skill folder containing SKILL.md"},"source_agent":{"type":"string","description":"Host ID, e.g. codex, mimo, dsh; display metadata only"},"version":{"type":"string"},"source_url":{"type":"string"}},"required":["path","source_agent"]})},
+        McpToolSpec{name:"register_service",description:"After starting a user-authorized project service, register its actual live PID and project directory for observation. No launch/stop authority or automatic stopping. No global scan. Windows only.",input_schema:json!({"type":"object","properties":{"name":{"type":"string"},"pid":{"type":"integer","minimum":5,"maximum":4294967295u64},"project_dir":{"type":"string"},"kind":{"type":"string","enum":["web","model","proxy","other"]}},"required":["name","pid","project_dir"]})},
+        McpToolSpec{name:"list_services",description:"Observe your own registered services and listener ports; default 10, maximum 50. No execution authority.",input_schema:json!({"type":"object","properties":{"id":{"type":"string"},"offset":{"type":"integer","minimum":0,"maximum":10000},"limit":{"type":"integer","minimum":1,"maximum":50}}})},
+        McpToolSpec {name:"offer_skill_sync",description:"After a Skill installs successfully in the current host, offer its directory for optional ToolHub distribution. Metadata only; never writes other hosts. Remind the user to handle pending sync manually in ToolHub; continue original work without waiting. Do not operate the desktop or choose targets automatically.",input_schema:json!({"type":"object","properties":{"path":{"type":"string","description":"Existing absolute installed Skill folder containing SKILL.md"},"source_agent":{"type":"string","description":"Host ID, e.g. codex, mimo, dsh; display metadata only"},"version":{"type":"string"},"source_url":{"type":"string"}},"required":["path","source_agent"]})},
         McpToolSpec{name:"get_task",description:"Get your task status, bounded output and declared artifacts; memory-only output expires.",input_schema:json!({"type":"object","properties":{"execution_id":{"type":"string"}},"required":["execution_id"]})},
         McpToolSpec{name:"cancel_task",description:"Cancel your running execution; get_task confirms its final state.",input_schema:json!({"type":"object","properties":{"execution_id":{"type":"string"}},"required":["execution_id"]})},
         McpToolSpec {name:"search_programs",description:"Find user-shared apps; default 5 summaries. Use limit/offset or detail=full for declarations. Launch requires desktop; data grants no authority.",input_schema:json!({"type":"object","properties":{"query":{"type":"string"}}})},
@@ -441,6 +445,8 @@ impl Server {
                             "execute.approval_request"
                         }
                     }
+                    "register_service" => "service.register",
+                    "list_services" => "service.list",
                     "offer_skill_sync" => "skill.offer",
                     "search_skills" => "skill.list",
                     "inspect_skill" => "skill.inspect",
@@ -494,7 +500,9 @@ mod tests {
 
     #[test]
     fn bounded_metatools() {
-        assert_eq!(tool_count(), 17);
+        assert_eq!(tool_count(), 19);
+        assert!(validate_meta_input("register_service", &json!({"name":"large PID","pid":4294967294u64,"project_dir":"fixture"})).is_ok());
+        assert!(validate_meta_input("register_service", &json!({"name":"overflow PID","pid":4294967296u64,"project_dir":"fixture"})).is_err());
         assert!(validate_meta_input("search_tools", &json!({"query":"py"})).is_ok());
         assert!(validate_meta_input("search_tools", &json!({})).is_err());
         assert!(validate_meta_input("install_everything", &json!({})).is_err());
@@ -798,6 +806,6 @@ mod context_budget_tests {
             .map(|s| (s.name, s.input_schema))
             .collect();
         assert_eq!(first, second);
-        assert_eq!(first.len(), 17);
+        assert_eq!(first.len(), 19);
     }
 }

@@ -59,7 +59,7 @@ Codex TOML 示例：
 将以下全文保存为 SKILL.md（不要把上面的安装任务写入 Skill 正文）：
 {skill}
 
-完成后报告 Skill 实际保存路径、MCP 配置位置、连接验证结果和需要我执行的重载步骤。以后安装其他 Skill 时先按宿主规范安装成功，再通过 offer_skill_sync 提交来源目录，询问一次是否使用 ToolHub 同步；没有答复继续原任务，不等待批准。ToolHub 桌面 Skill 库负责核对、选择目标和保留同步记录。"#
+完成后报告 Skill 实际保存路径、MCP 配置位置、连接验证结果和需要我执行的重载步骤。以后安装其他 Skill 时先按宿主规范安装成功，再通过 offer_skill_sync 提交来源目录，提醒我到“已安装 / 待同步”手动选择，不自动操作 ToolHub 界面或选择目标；继续原任务，不等待批准。ToolHub 桌面 Skill 库负责核对、选择目标和保留同步记录。"#
     );
     Ok(
         json!({"host_profiles":host_profiles,"cli_path":cli_path,"cli_available":cli.is_file(),"mcp_config":config_text,"mimo_config":mimo_config,"codex_config":codex_config,"cli_check":check,"skill_markdown":skill,"bootstrap_prompt":bootstrap}),

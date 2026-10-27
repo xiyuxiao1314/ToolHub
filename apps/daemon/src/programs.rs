@@ -20,8 +20,8 @@ pub(super) struct ProgramEntry {
     #[serde(default)]
     pub(super) metadata: toolhub_core::program_metadata::ProgramMetadata,
     favorite: bool,
-    last_launched: Option<String>,
-    launch_count: u64,
+    pub(super) last_launched: Option<String>,
+    pub(super) launch_count: u64,
 }
 
 pub(super) fn identity(c: &ProgramCandidate) -> String {
@@ -245,6 +245,11 @@ impl DaemonService {
                     Some(Value::Bool(value)) => *value,
                     _ => return Err(invalid("terminal 必须为布尔值")),
                 };
+                #[cfg(windows)]
+                if !terminal && self.module_enabled("services")? && !Path::new(&self.program_entry(id)?.candidate.path).extension().is_some_and(|e|e.eq_ignore_ascii_case("lnk")) {
+                    let (service_id,pid)=self.launch_monitored_program(id)?;
+                    return Ok(json!({"service_id":service_id,"pid":pid,"submitted":true,"terminal":false}));
+                }
                 let mut entry = self.program_entry(id)?;
                 if !entry_available(&entry) {
                     return Err(invalid("启动文件或工作目录已失效，请重新选择"));
@@ -274,7 +279,7 @@ impl DaemonService {
         }
     }
 
-    fn program_entry(&self, id: &str) -> Result<ProgramEntry, ProtocolError> {
+    pub(super) fn program_entry(&self, id: &str) -> Result<ProgramEntry, ProtocolError> {
         let raw: Option<String> = self
             .registry
             .db

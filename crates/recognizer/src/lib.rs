@@ -1,6 +1,7 @@
 //! Tool recognition from static metadata and reviewed known probes only.
 //! Unknown executables are NEVER run (including --version/--help).
 
+pub mod native_signature;
 pub mod native_metadata;
 pub mod resources;
 
@@ -465,7 +466,14 @@ pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
             .unwrap(),
         );
     }
-    let confidence = if !corroborated {
+    let signature = if rule.definition_id == "org.curl.curl"
+        && native.format.as_deref()==Some("pe")
+        && native.original_filename.as_deref().is_some_and(|n|n.eq_ignore_ascii_case("curl.exe"))
+        && native.product.as_deref().is_some_and(|p|["curl","the curl executable"].contains(&p.to_ascii_lowercase().as_str())) {
+        native_signature::system_curl(Path::new(&candidate.path))
+    } else {None};
+    if let Some(ref proof)=signature {evidence.push(proof.clone());}
+    let confidence = if signature.is_some() {1.0} else if !corroborated {
         0.4
     } else if ambiguity.is_some() {
         0.6
@@ -473,7 +481,11 @@ pub fn recognize(candidate: &ScanCandidate) -> RecognitionResult {
         0.85
     };
     let confidence = validate_confidence(confidence).unwrap_or(0.35);
-    let trust = if corroborated
+    let trust = if signature.is_some() {
+        let mut record=TrustRecord::known(evidence.clone());
+        record.level=toolhub_core::TrustLevel::Verified;
+        record.reason=Some(native_signature::REASON.into());record
+    } else if corroborated
         && rule.definition_id != "org.electron.electron"
         && candidate.metadata.get("project_dependency").is_none()
     {
@@ -564,6 +576,10 @@ pub fn recognize_with_rules(
             confidence: 0.0,
             ambiguity: Some("not a full tool executable".into()),
         };
+    }
+    if candidate.file_name.as_deref().is_some_and(|n|n.eq_ignore_ascii_case("curl.exe")) {
+        let builtin=recognize(candidate);
+        if builtin.instance.as_ref().is_some_and(|i|i.trust.reason.as_deref()==Some(native_signature::REASON)) {return builtin;}
     }
     let file = candidate.file_name.as_deref().unwrap_or("");
     let Some(rule) = rules.iter().cloned().find(|r| {
@@ -841,5 +857,17 @@ mod tests {
         let r = recognize(&cand(&path.to_string_lossy()));
         assert!(!r.recognized);
         assert!(!UnknownProbeGuard::should_execute(&path.to_string_lossy()));
+    }
+}
+
+#[cfg(all(test,windows))]
+mod system_curl_regressions {
+    use super::*;
+    #[test]
+    fn actual_os_curl_gets_content_bound_verified_identity_without_execution() {
+        let path=Path::new(r"C:\Windows\System32\curl.exe");if !path.exists(){return;}
+        let candidate=ScanCandidate::from_path(path.to_string_lossy().to_string());
+        let r=recognize(&candidate);let i=r.instance.unwrap();assert_eq!(i.trust.level,toolhub_core::TrustLevel::Verified);assert_eq!(i.definition_id.as_str(),"org.curl.curl");
+        assert!(i.trust.evidence.iter().any(|e|e.source==EvidenceSource::CodeSignature));assert_eq!(i.version.as_deref(),native_metadata::read(path).version.as_deref());
     }
 }

@@ -1,0 +1,19 @@
+{
+  "schema": "toolhub.extension/v2",
+  "id": "toolhub.builtin.services",
+  "name": "服务监控",
+  "version": "0.1.0",
+  "description": "管理 ToolHub 启动或 Agent 登记的后台服务、端口与运行时限。",
+  "author": "ToolHub",
+  "license": "MIT",
+  "platforms": [
+    "windows"
+  ],
+  "min_toolhub_version": "0.3.0-beta.12",
+  "host_module": "services",
+  "navigation": {
+    "label": "服务监控",
+    "icon": "services",
+    "order": 25
+  }
+}

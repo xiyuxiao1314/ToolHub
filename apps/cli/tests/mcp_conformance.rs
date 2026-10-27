@@ -143,7 +143,7 @@ fn notifications_get_no_reply_and_null_id_is_request() {
     c.send(json!({"jsonrpc":"2.0","id":null,"method":"tools/list","params":{}}));
     let value = c.read();
     assert!(value["id"].is_null());
-    assert_eq!(value["result"]["tools"].as_array().unwrap().len(), 16);
+    assert_eq!(value["result"]["tools"].as_array().unwrap().len(), 19);
 }
 #[test]
 fn schema_types_enforced_and_recovery_after_malformed_json() {
@@ -153,7 +153,7 @@ fn schema_types_enforced_and_recovery_after_malformed_json() {
     c.send(json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_tools","arguments":{"query":false}}}));
     assert_eq!(c.read()["error"]["code"], -32602);
     c.send(json!({"jsonrpc":"2.0","id":3,"method":"tools/list","params":{}}));
-    assert_eq!(c.read()["result"]["tools"].as_array().unwrap().len(), 16);
+    assert_eq!(c.read()["result"]["tools"].as_array().unwrap().len(), 19);
 }
 #[test]
 fn tool_semantic_failure_is_content_and_is_error() {
@@ -231,7 +231,7 @@ fn call_tool(client: &mut McpClient, name: &str, arguments: Value, is_error: boo
 }
 
 #[test]
-fn all_sixteen_tools_route_through_isolated_daemon_and_preserve_authority() {
+fn all_meta_tools_route_through_isolated_daemon_and_preserve_authority() {
     let mut client = McpClient::spawn(true);
     let artifact_dir = tempfile::Builder::new()
         .prefix("mcp-artifact-fixture-")
@@ -310,6 +310,11 @@ fn all_sixteen_tools_route_through_isolated_daemon_and_preserve_authority() {
         json!({"id":"missing-skill"}),
         true,
     );
+    // Metadata offers neither distribute to another host nor grant service control.
+    call_tool(&mut client, "offer_skill_sync", json!({"path":task_root.join("absent-skill"),"source_agent":"conformance"}), true);
+    let services = call_tool(&mut client, "list_services", json!({}), !cfg!(windows));
+    if cfg!(windows) { assert_eq!(services["total"], 0); }
+    call_tool(&mut client, "register_service", json!({"name":"Invalid PID fixture","pid":4294967294u32,"project_dir":task_root}), true);
     let package = call_tool(
         &mut client,
         "register_artifact_package",

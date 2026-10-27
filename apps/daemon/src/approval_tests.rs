@@ -418,4 +418,16 @@ mod supported_platform {
         );
         assert!(prepare(&mut svc, params).is_err());
     }
+    #[test]
+    fn signature_bound_record_rejects_changed_hash_before_automatic_approval() {
+        let (_dir,mut svc,params)=fixture();
+        let row=svc.registry.get_instance("fixture.tool").unwrap().unwrap();
+        let canonical=std::fs::canonicalize(&row.path).unwrap();
+        let mut evidence=toolhub_core::Evidence::native(toolhub_core::EvidenceSource::CodeSignature,1.0,"synthetic stale signature record").unwrap();
+        evidence.detail=Some(json!({"canonical_path":canonical,"sha256":"stale-hash"}).to_string());
+        let mut record=toolhub_core::TrustRecord::known(vec![evidence]);record.level=toolhub_core::TrustLevel::Verified;record.reason=Some(toolhub_recognizer::native_signature::REASON.into());
+        svc.registry.db.conn.execute("UPDATE tool_instances SET trust_json=?1 WHERE id='fixture.tool'",[serde_json::to_string(&record).unwrap()]).unwrap();
+        let denied=call(&mut svc,"execute.approval_request",params,false);assert!(denied.error.unwrap().message.contains("signature-verified executable changed"));
+        let count:i64=svc.registry.db.conn.query_row("SELECT count(*) FROM execution_approvals",[],|r|r.get(0)).unwrap();assert_eq!(count,0);
+    }
 }

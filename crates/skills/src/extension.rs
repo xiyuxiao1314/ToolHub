@@ -6,6 +6,7 @@ use toolhub_recognizer::resources::{ResourcePackage, ResourceTool};
 pub const HOST_MODULES: &[&str] = &[
     "tools",
     "programs",
+    "services",
     "artifacts",
     "envs",
     "skills",

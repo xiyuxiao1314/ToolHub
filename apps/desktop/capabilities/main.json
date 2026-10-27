@@ -7,6 +7,7 @@
     "main"
   ],
   "permissions": [
+    "allow-open-service-page",
     "allow-rpc",
     "allow-app-versions",
     "allow-default-export-path-string",

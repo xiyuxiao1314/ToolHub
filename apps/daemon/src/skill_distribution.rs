@@ -163,10 +163,10 @@ impl DaemonService {
             .deployments
             .iter()
             .find(|d| d.skill_id == p.id && d.target_id == t.id);
-        json!({"target_id":t.id,"name":t.name,"path":Path::new(&t.root).join(&p.name),"status":match old {Some(d) if d.digest==p.digest=>"recorded",Some(_)=>"update_available",None=>"not_distributed"},"can_sync":old.is_none_or(|d|d.digest!=p.digest),"synced_at":old.map(|d|&d.synced_at),"loaded":false,"verification":"打开条目或同步时重新检查目标文件"})
+        json!({"target_id":t.id,"name":t.name,"path":Path::new(&t.root).join(&p.name),"status":match old {Some(d) if d.digest==p.digest=>"recorded",Some(_)=>"update_available",None=>"not_distributed"},"can_sync":old.is_none_or(|d|d.digest!=p.digest),"synced_at":old.map(|d|&d.synced_at),"loaded":null,"load_status":"unknown","verification":"打开条目或同步时重新检查目标文件"})
     }
     fn deployment_status(&self, state: &State, p: &Collected, t: &Target) -> Value {
-        let mut view = json!({"target_id":t.id,"host_id":t.host_id,"name":t.name,"root":t.root,"path":Path::new(&t.root).join(&p.name),"status":"not_distributed","can_sync":true,"reason":"","loaded":false});
+        let mut view = json!({"target_id":t.id,"host_id":t.host_id,"name":t.name,"root":t.root,"path":Path::new(&t.root).join(&p.name),"status":"not_distributed","can_sync":true,"reason":"","loaded":null,"load_status":"unknown"});
         if p.scope == "host_specific" && (p.source_agent.is_empty() || p.source_agent != t.host_id)
         {
             view["status"] = json!("incompatible");
@@ -395,7 +395,13 @@ impl DaemonService {
             })
             .collect();
         Ok(
-            json!({"revision":state.revision,"packages":packages,"targets":targets,"offers":state.offers.iter().filter(|o|o.status=="pending").collect::<Vec<_>>(),"history":state.history.iter().rev().collect::<Vec<_>>(),"history_limit":500}),
+            json!({"revision":state.revision,"packages":packages,"targets":targets,"offers":state.offers.iter().filter(|o|o.status=="pending").collect::<Vec<_>>(),"history":state.history.iter().rev().map(|h| {
+            let mut h=h.clone();
+            if h["action"]=="sync" && h.get("load_status").is_none() {
+                h["loaded"]=Value::Null;h["load_status"]=json!("unknown");
+            }
+            h
+        }).collect::<Vec<_>>(),"history_limit":500}),
         )
     }
     fn distribution_discover(&self, state: &State, params: &Value) -> Result<Value, ProtocolError> {
@@ -494,7 +500,7 @@ impl DaemonService {
             self.save_distribution(&mut state)?;
         }
         Ok(
-            json!({"id":id,"status":if already{"already_offered"}else{"offered"},"blocking":false,"host_files_written":false,"next":"安装完成后可询问一次是否通过 ToolHub 同步到其他智能体；没有答复继续原任务。桌面 Skill 库中可选择收录、目标与同步。"}),
+            json!({"id":id,"status":if already{"already_offered"}else{"offered"},"blocking":false,"host_files_written":false,"next":"提醒用户到 ToolHub 的 Skill 库 → 已安装 / 待同步自行选择收录与同步。不要自动操作界面或选择目标，继续原任务，不等待确认。"}),
         )
     }
     fn collect_skill(&mut self, state: &mut State, params: &Value) -> Result<(), ProtocolError> {
@@ -647,7 +653,7 @@ impl DaemonService {
                 }
                 Err(e) => ("failed", e),
             };
-            let row = json!({"at":now(),"action":"sync","skill":p.name,"skill_id":p.id,"target":t.name,"target_id":t.id,"path":Path::new(&t.root).join(&p.name),"version":p.version,"digest":p.digest,"status":status,"reason":reason,"loaded":false});
+            let row = json!({"at":now(),"action":"sync","skill":p.name,"skill_id":p.id,"target":t.name,"target_id":t.id,"path":Path::new(&t.root).join(&p.name),"version":p.version,"digest":p.digest,"status":status,"reason":reason,"loaded":null,"load_status":"unknown"});
             state.history.push(row.clone());
             results.push(row);
             // Persist each result; a later target failure never erases earlier outcomes.
@@ -655,7 +661,7 @@ impl DaemonService {
         }
         self.save_distribution(state)?;
         Ok(
-            json!({"results":results,"inventory":self.distribution_list(state,Some(&p.id))?,"note":"文件已写入不代表宿主已加载；请在目标智能体重载或新开会话核对。"}),
+            json!({"results":results,"inventory":self.distribution_list(state,Some(&p.id))?,"note":"同步结果已记录。若目标智能体尚未显示新 Skill，可刷新技能列表或新开会话；已能找到时无需操作。"}),
         )
     }
     fn write_deployment(
@@ -852,6 +858,24 @@ mod tests {
         assert!(!d.path().join("skill-distribution").exists());
     }
     #[test]
+    fn legacy_load_flag_is_unknown_without_rewriting_saved_history() {
+        let d = tempfile::tempdir().unwrap();
+        let mut s = service(d.path());
+        let mut state = s.distribution_state().unwrap();
+        state.history.push(
+            json!({"action":"sync","status":"written","loaded":false,"at":"2026-10-24T00:00:00Z"}),
+        );
+        s.save_distribution(&mut state).unwrap();
+        let before = s.registry.get_setting(KEY).unwrap();
+        let view = s
+            .dispatch_skill_distribution("skill.distribution.list", &json!({}))
+            .unwrap();
+        assert!(view["history"][0]["loaded"].is_null());
+        assert_eq!(view["history"][0]["load_status"], "unknown");
+        assert_eq!(view["history"][0]["status"], "written");
+        assert_eq!(s.registry.get_setting(KEY).unwrap(), before);
+    }
+    #[test]
     fn full_package_multi_host_reopen_and_new_host_backfill() {
         let d = tempfile::tempdir().unwrap();
         let src = d.path().join("source");
@@ -862,6 +886,8 @@ mod tests {
         let b = target(&mut s, &d.path().join("mimo-skills"), "mimo");
         let out = sync(&mut s, "shared.test-flow", &[a, b]);
         assert_eq!(out["results"][0]["status"], "written");
+        assert!(out["results"][0]["loaded"].is_null());
+        assert_eq!(out["results"][0]["load_status"], "unknown");
         assert_eq!(out["results"][1]["status"], "written");
         assert_eq!(
             fs::read(d.path().join("mimo-skills/test-flow/references/readme.md")).unwrap(),

@@ -2,7 +2,8 @@ use super::execution_jobs::{invalid, policy_action, policy_scope, text};
 use super::*;
 
 pub(super) fn is_extended(name: &str) -> bool {
-    name.starts_with("skill.distribution.")
+    name.starts_with("service.")
+        || name.starts_with("skill.distribution.")
         || name == "skill.offer"
         || name.starts_with("extension.")
         || name.starts_with("artifact.")
@@ -110,6 +111,7 @@ impl DaemonService {
         params: &Value,
     ) -> Result<Value, ProtocolError> {
         match name {
+            name if name.starts_with("service.") => self.dispatch_service(name, params),
             name if name.starts_with("skill.distribution.") || name == "skill.offer" => self.dispatch_skill_distribution(name, params),
             name if name.starts_with("extension.") => self.dispatch_extension(name, params),
             name if name.starts_with("program.") => self.dispatch_program(name, params),

@@ -3947,7 +3947,7 @@ checksum = "7d56353a2a665ad0f41a421187180aab746c8c325620617ad883a99a1cbe66d2"
 
 [[package]]
 name = "toolhub-agent-bridge"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "chrono",
  "hex",
@@ -3967,7 +3967,7 @@ dependencies = [
 
 [[package]]
 name = "toolhub-audit"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "chrono",
  "serde",
@@ -3978,7 +3978,7 @@ dependencies = [
 
 [[package]]
 name = "toolhub-cli"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "anyhow",
  "clap",
@@ -3992,7 +3992,7 @@ dependencies = [
 
 [[package]]
 name = "toolhub-core"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "chrono",
  "hex",
@@ -4001,12 +4001,13 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror 1.0.69",
+ "url",
  "uuid",
 ]
 
 [[package]]
 name = "toolhub-daemon"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4041,7 +4042,7 @@ dependencies = [
 
 [[package]]
 name = "toolhub-desktop"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "dirs 5.0.1",
  "hex",
@@ -4061,7 +4062,7 @@ dependencies = [
 
 [[package]]
 name = "toolhub-environment"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "serde",
  "serde_json",
@@ -4070,7 +4071,7 @@ dependencies = [
 
 [[package]]
 name = "toolhub-executor"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "chrono",
  "hex",
@@ -4084,7 +4085,7 @@ dependencies = [
 
 [[package]]
 name = "toolhub-ipc"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "hex",
  "libc",
@@ -4099,7 +4100,7 @@ dependencies = [
 
 [[package]]
 name = "toolhub-mcp"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "serde",
  "serde_json",
@@ -4110,7 +4111,7 @@ dependencies = [
 
 [[package]]
 name = "toolhub-policy"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "serde",
  "serde_json",
@@ -4119,7 +4120,7 @@ dependencies = [
 
 [[package]]
 name = "toolhub-protocol"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "chrono",
  "serde",
@@ -4131,7 +4132,7 @@ dependencies = [
 
 [[package]]
 name = "toolhub-recognizer"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "chrono",
  "hex",
@@ -4142,11 +4143,12 @@ dependencies = [
  "thiserror 1.0.69",
  "toolhub-core",
  "uuid",
+ "windows",
 ]
 
 [[package]]
 name = "toolhub-registry"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "chrono",
  "rusqlite",
@@ -4160,7 +4162,7 @@ dependencies = [
 
 [[package]]
 name = "toolhub-resolver"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "serde",
  "serde_json",
@@ -4169,7 +4171,7 @@ dependencies = [
 
 [[package]]
 name = "toolhub-scanner"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "dirs 5.0.1",
  "serde",
@@ -4186,7 +4188,7 @@ dependencies = [
 
 [[package]]
 name = "toolhub-skills"
-version = "0.3.0-beta.10"
+version = "0.3.0-beta.13"
 dependencies = [
  "hex",
  "serde",

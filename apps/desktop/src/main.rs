@@ -1,5 +1,7 @@
 //! Native desktop bridge to the authenticated shared user service.
 #![cfg_attr(windows, windows_subsystem = "windows")]
+mod service_page;
+use service_page::open_service_page;
 mod autostart;
 mod file_icon;
 mod startup_diagnostics;
@@ -293,6 +295,7 @@ fn main() {
             pick_skill_folder,
             builtin_skill_paths,
             open_program_folder,
+            open_service_page,
             pick_artifact_path,
             open_recycle_bin
         ])

@@ -75,3 +75,12 @@ Uninstall does not delete user files or records. Artifact module removal/disable
 ### Native CLI contribution boundary (beta.4)
 
 CLI manifests are reviewed executable configuration, not a new process sandbox. Static arguments may have semantics beyond declared input/output; reviewers must inspect them. Host-rendered file/choice controls do not grant sandboxed frame scripts native execution. The controller-only start command revalidates the installed package and exact canonical preview, issues a one-use request bound to the ordinary extension principal and reuses pinned execution/policy/trust checks. Unknown/blocked executables and policy denials remain denied even for explicit UI runs. No raw shell or arbitrary bridge execution was added. FFmpeg's shipped recipe limits input protocols to file/pipe, disables stdin and uses -n plus existing-output rejection. Cancellation can retain partial media; output is not automatically disposable. macOS controlled execution remains unsupported.
+
+## Native OS cURL verification (beta.11)
+
+The actual Windows system curl path, native product identity, trusted Microsoft embedded/catalog signature and current SHA256 can establish Verified provenance without executing the file. Its execution is additionally bound to the recorded canonical path/hash before authorization. Offline cached verification is not a malware or current vulnerability verdict. Name/path/AI assertions alone do not establish this trust; blocked/user decisions and existing pinned execution policy remain. See docs/development/NATIVE-TRUST.md.
+
+
+## Service monitor (beta.12)
+
+Owner-selected observation covers ToolHub launches, explicit Agent PID registrations and user-selected proxy ports only. Ordinary registration grants no execution/control authority. Process control and runtime deadlines require the verified desktop; isolated extension frames have no stop bridge. Native identity/job handles prevent PID/name-based bulk termination; proxy services remain read-only. Disable/uninstall/daemon restart cancels deadlines without killing processes. No proxy setting, tool trust or user file modification. See [service monitor](docs/development/SERVICE-MONITOR.md) for contracts, bounded observations, keeper lifecycle and Windows-only limitations.

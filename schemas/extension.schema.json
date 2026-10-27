@@ -188,6 +188,7 @@
       "enum": [
         "tools",
         "programs",
+        "services",
         "artifacts",
         "envs",
         "skills",

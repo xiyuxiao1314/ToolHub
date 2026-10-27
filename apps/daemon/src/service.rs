@@ -51,6 +51,9 @@ use toolhub_protocol::{ErrorCode, JsonRpcRequest, JsonRpcResponse, Method, Proto
 use toolhub_registry::{Registry, UpsertInstanceInput};
 use toolhub_resolver::{CandidateInstance, ResolvePrefs};
 
+#[path = "services.rs"]
+pub(crate) mod services;
+
 pub struct DaemonService {
     pub registry: Registry,
     pub policy: PolicyEngine,
@@ -75,6 +78,7 @@ pub struct DaemonService {
     pub seq: AtomicU64,
     pub registry_path: String,
     pub programs: programs::ProgramRuntime,
+    pub services: services::ServiceRuntime,
 }
 
 impl DaemonService {
@@ -147,10 +151,12 @@ impl DaemonService {
             seq: AtomicU64::new(1),
             registry_path: path.to_string_lossy().to_string(),
             programs: programs::ProgramRuntime::default(),
+            services: services::ServiceRuntime::default(),
         };
         service
             .ensure_workbench()
             .map_err(|e| anyhow::anyhow!(e.message))?;
+        service.service_monitor_init().map_err(|e| anyhow::anyhow!(e.message))?;
         Ok(service)
     }
 

@@ -18,9 +18,9 @@ for path in archives:
   code=top+'/' if opts.platform=='windows-x64' or cli else top+'/ToolHub.app/Contents/MacOS/'
   suffix='.exe' if opts.platform=='windows-x64' else ''
   for binary in (['toolhub','toolhubd'] if cli else ['toolhub','toolhubd','toolhub-desktop']):assert code+binary+suffix in names,binary
-  for module in ['tools','programs','artifacts','envs','skills','market','tasks']:assert assetroot+'extensions/official/'+module+'.toolhub-extension.json' in names,module
+  for module in ['tools','programs','artifacts','envs','skills','market','tasks','services']:assert assetroot+'extensions/official/'+module+'.toolhub-extension.json' in names,module
   for sample in ['ffmpeg','graphite','workspace','blender','design-studio']:assert assetroot+'extensions/examples/'+sample+'.toolhub-extension.json' in names,sample
-  for resource in ['extensions/sdk/runtime.js','skills/toolhub-integration/SKILL.md','skills/toolhub-integration/references/setup.md','schemas/extension.schema.json','docs/development/PROJECT_DEPENDENCIES.md','DEPENDENCIES.json','RELEASE-NOTES.md']:assert assetroot+resource in names,resource
+  for resource in ['extensions/sdk/runtime.js','skills/toolhub-integration/SKILL.md','skills/toolhub-integration/references/setup.md','schemas/extension.schema.json','docs/development/PROJECT_DEPENDENCIES.md','docs/development/SERVICE-MONITOR.md','docs/development/NATIVE-TRUST.md','docs/development/SKILL-DISTRIBUTION.md','skills/toolhub-integration/references/services.md','DEPENDENCIES.json','RELEASE-NOTES.md']:assert assetroot+resource in names,resource
   metadata=json.loads(archive.read(assetroot+'package.json'));assert metadata['version'] in [version,'toolhub '+version],metadata
   assert 'ffmpeg.exe' not in [n.split('/')[-1].lower() for n in names]
   assert 'electron.exe' not in [n.split('/')[-1].lower() for n in names]

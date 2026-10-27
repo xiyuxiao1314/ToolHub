@@ -1,0 +1,7 @@
+# Publish verified beta.13 — 2026-10-27
+
+Owner authorizes pushing the accepted local implementation to GitHub and updating stale release packages. Base: e066942, with ba21924 and e066942 also not yet on origin/main (3203807). Release branch: codex/release-v0.3.0-beta.13. Scope: preserve and publish the completed photo-storage, Skill distribution/notices, native trust and Service Monitor changes; update bilingual download/version docs and packaging checks. No private registries, proxy settings, backups, real photos or machine inventories may be committed or shipped.
+
+Acceptance: exact source revision pushed without force; matching native packages and SHA-256 manifest; Windows workspace/frontend/SDK/model/storage checks, plus successful native Windows/macOS CI before the corresponding assets are published. Current local beta.13 is already activated and owner-tested, so do not replace or restart it unnecessarily. Package/source changes are reviewable in this release branch; unverified physical Mac interactions remain labeled. This operational release does not consume a historical formal product-review round.
+
+Release integration found obsolete fixed-16 MCP test assertions and a generic integer validator accidentally capping service PIDs at 100000. Align the protocol tests with the 19-tool catalog, exercise each metadata tool through isolated IPC, and explicitly bound register_service to native u32 PIDs including overflow rejection. No authorization boundary is relaxed; actual process identity verification still applies.

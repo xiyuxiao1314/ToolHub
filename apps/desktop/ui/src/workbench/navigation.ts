@@ -7,7 +7,7 @@ export const GROUPS: { id: GroupId; label: string; description: string }[] = [
   { id: 'extensions', label: '扩展中心', description: '发现、管理与定制能力' },
   { id: 'settings', label: '设置', description: '管理 ToolHub 的运行方式' },
 ]
-const workspaceIds = new Set(['tools', 'programs', 'artifacts', 'envs', 'skills', 'tasks'])
+const workspaceIds = new Set(['tools', 'programs', 'services', 'artifacts', 'envs', 'skills', 'tasks'])
 export const isApplication = (item: NavItem) => !!(item.cli || item.view)
 export function groupFor(item?: NavItem): GroupId {
   if (item?.id === 'agents' || item?.id === 'agent-guide') return 'agents'

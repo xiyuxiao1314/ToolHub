@@ -100,6 +100,11 @@ fn response_for_bytes(
 }
 fn main() -> anyhow::Result<()> {
     #[cfg(windows)]
+    if std::env::args().nth(1).as_deref()==Some("--service-keeper") {
+        let name=std::env::args().nth(2).ok_or_else(||anyhow::anyhow!("missing job name"))?;
+        return service::services::native::keep_job_alive(&name).map_err(anyhow::Error::msg);
+    }
+    #[cfg(windows)]
     if service::programs::run_console_helper() {
         return Ok(());
     }
@@ -132,6 +137,7 @@ fn main() -> anyhow::Result<()> {
         let owned = Arc::clone(&service);
         std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_secs(10));
+            if let Err(error) = owned.lock().unwrap().service_monitor_tick() { tracing::warn!(code=?error.code,"Service monitor tick failed"); }
             if let Err(error) = owned.lock().unwrap().artifact_cleanup_tick() {
                 tracing::warn!(code=?error.code,"Artifact cleanup tick failed");
             }

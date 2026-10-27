@@ -1,6 +1,7 @@
 import { Component, lazy, Suspense, type ReactNode } from 'react'
 import type { WorkbenchContext } from '../official/Workbench'
 const pages:Record<string,React.LazyExoticComponent<React.ComponentType<any>>>={
+  services:lazy(()=>import('../Services')),
   tools:lazy(()=>import('../official/ToolsPage')),programs:lazy(()=>import('../Programs')),artifacts:lazy(()=>import('../Artifacts')),
   envs:lazy(()=>import('../official/EnvsPage')),skills:lazy(()=>import('../Skills')),market:lazy(()=>import('../Market')),tasks:lazy(()=>import('../official/TasksPage')),
   agents:lazy(()=>import('../official/AgentsPage')),settings:lazy(()=>import('../official/SettingsPage')),

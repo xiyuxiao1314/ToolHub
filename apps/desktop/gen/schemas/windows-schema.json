@@ -297,6 +297,12 @@
           "markdownDescription": "Enables the open_program_folder command without any pre-configured scope."
         },
         {
+          "description": "Enables the open_service_page command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-open-service-page",
+          "markdownDescription": "Enables the open_service_page command without any pre-configured scope."
+        },
+        {
           "description": "Enables the open_terminal command without any pre-configured scope.",
           "type": "string",
           "const": "allow-open-terminal",
@@ -475,6 +481,12 @@
           "type": "string",
           "const": "deny-open-program-folder",
           "markdownDescription": "Denies the open_program_folder command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the open_service_page command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-open-service-page",
+          "markdownDescription": "Denies the open_service_page command without any pre-configured scope."
         },
         {
           "description": "Denies the open_terminal command without any pre-configured scope.",

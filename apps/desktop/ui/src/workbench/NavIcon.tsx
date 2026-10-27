@@ -4,6 +4,7 @@ const paths: Record<string, string> = {
   extensions: 'M4 4h6v4a2 2 0 1 0 4 0V4h6v6h-4a2 2 0 1 0 0 4h4v6h-6v-4a2 2 0 1 0-4 0v4H4v-6h4a2 2 0 1 0 0-4H4z',
   settings: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z',
   tools: 'M4 8h16v12H4z M8 8V4h8v4 M4 12h16 M10 12v3h4v-3',
+  services: 'M3 12h4l3-8 4 16 3-8h4 M4 4h2 M18 20h2',
   programs: 'M4 4h16v13H4z M8 21h8 M12 17v4 M10 8l5 3-5 3z',
   artifacts: 'M3 7l9-4 9 4v11l-9 4-9-4z M3 7l9 4 9-4 M12 11v11 M8 5l9 4',
   envs: 'M4 7h16 M4 17h16 M8 4v6 M16 14v6',

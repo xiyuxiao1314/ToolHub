@@ -10,7 +10,7 @@
     <img alt="Beta status" src="https://img.shields.io/badge/status-beta-orange" />
   </p>
   <p><a href="README.md">简体中文</a> | <strong>English</strong></p>
-  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.6">Download v0.3.0-beta.6</a> · <a href="#screenshots">Screenshots</a> · <a href="#connect-an-ai-agent">Agent setup</a> · <a href="#build-from-source">Build from source</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">Report an issue</a></p>
+  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.13">Download v0.3.0-beta.13</a> · <a href="#screenshots">Screenshots</a> · <a href="#connect-an-ai-agent">Agent setup</a> · <a href="#build-from-source">Build from source</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">Report an issue</a></p>
 </div>
 
 [![M8ven Score](https://m8ven.ai/badge/mcp/xiyuxiao1314-toolhub-q0hzms?v=605fc85d6d6538d906e384fc8a7e66c1)](https://m8ven.ai/mcp/xiyuxiao1314-toolhub-q0hzms?s=readme)
@@ -21,7 +21,7 @@ Design Studio 0.2.0 is an optional extension with twelve visual directions, ten 
 
 ![Design Studio: composition, live preview and platform parameters](docs/images/design-studio.png)
 
-All sixteen MCP meta-tools declare four boolean behavior hints and are called by isolated daemon conformance tests. Queries persist client activity, so the complete calls are conservatively not strictly read-only/idempotent. See [behavior annotations and external assessment notes](docs/development/MCP-ANNOTATIONS.md).
+All nineteen MCP meta-tools declare four boolean behavior hints and are called by isolated daemon conformance tests. Queries persist client activity, so the complete calls are conservatively not strictly read-only/idempotent. See [behavior annotations and external assessment notes](docs/development/MCP-ANNOTATIONS.md).
 
 ## Why ToolHub?
 
@@ -67,17 +67,21 @@ Group temporary files, test records and backups by task, decide retention by pri
 
 ### Extension workbench
 
-Seven optional first-party features plus independently imported pages and themes. These screenshots are from an isolated v0.3.0-beta.3 Windows acceptance instance; these workbench features are included in the current beta.6 release.
+Eight optional first-party features plus independently imported pages and themes. These screenshots are from an isolated v0.3.0-beta.3 Windows acceptance instance; these workbench features are included in the current beta.13 release.
 
 ![Extension workbench: first-party feature lifecycle and appearance recovery](docs/images/extension-workbench.png)
 
 ![Graphite theme with top navigation and compact density](docs/images/extension-theme.png)
 
+## beta.13 updates
+
+New Service Monitor, stable process tracking, saved browser links and adjustable refresh intervals; full-folder Skill collection and per-host distribution with conflict history. Native Windows system cURL verification and newest-stable eligible resolution preserve execution policy. See [release notes](docs/releases/v0.3.0-beta.13.md).
+
 ## Current features
 
 | Module | Implemented features |
 | --- | --- |
-| Extension workbench | Seven optional official modules, custom pages/navigation/themes/layouts, local edits and rollback |
+| Extension workbench | Eight optional official modules, custom pages/navigation/themes/layouts, local edits and rollback |
 | Project dependencies | Selected-project Electron discovery, complete/missing states, multiple versions and canonical-path deduplication |
 | CLI panels | FFmpeg media workflow with host-rendered file selection, exact arguments and per-run confirmation |
 | Storage maintenance | Preview regenerable caches and recycle obsolete packages while protecting active/current/rollback references |
@@ -85,6 +89,7 @@ Seven optional first-party features plus independently imported pages and themes
 | Tool list | Group by tool or show individual installations; category filters; 6 / 12 / 24 items per page; saved page-size preferences |
 | Utilities | Recognize media, document and automation tools such as FFmpeg, FFprobe, 7-Zip, ImageMagick, Pandoc, Tesseract and Poppler |
 | Artifacts | Task-based file packages, read-only scans of selected directories, checkbox collection, low/medium/high priorities, a five-minute cancellation period, system Trash and cleanup history |
+| Service Monitor (Windows) | Registered processes, ports, stable linked entries, manual stop/restart, adjustable refresh, saved page URLs and read-only proxy status |
 | Program shelf | File or command launch entries, working directories, arguments, favorites, background launch, folder opening and invalid-path indicators |
 | Agent proposals | Submit application launch entries over MCP to a pending list; users select and review them before adding them |
 | Agents | Host detection, configured connections and historical handshakes/calls; setup templates and MCP connection checks |
@@ -116,7 +121,7 @@ The user selects, reviews and adds it to the program shelf
 
 The Artifacts page groups explicitly registered task files without moving them. Users choose managed directories and select read-only scan candidates; imported leftovers default to high priority. Four bounded MCP tools register/list packages, mark tasks complete, and submit medium-priority reviews. Low-priority files recycle only after successful completion and an explicit no-longer-needed declaration, followed by a five-minute cancellation period. Medium adds an Agent dependency/usage review; high and manually retained packages require a human decision.
 
-Cleanup goes to the system Recycle Bin/Trash with no permanent-delete fallback. Changed files, known ToolHub references and detected usage block cleanup. Filename matches do not establish Agent provenance or disposability. Windows native recycling is tested; the macOS Finder adapter requires native validation. This feature is included in the v0.3.0-beta.6 release assets. See [artifact lifecycle and API](docs/development/ARTIFACTS.md).
+Cleanup goes to the system Recycle Bin/Trash with no permanent-delete fallback. Changed files, known ToolHub references and detected usage block cleanup. Filename matches do not establish Agent provenance or disposability. Windows native recycling is tested; the macOS Finder adapter requires native validation. This feature is included in the v0.3.0-beta.13 release assets. See [artifact lifecycle and API](docs/development/ARTIFACTS.md).
 
 ### Automatic execution approval
 
@@ -128,22 +133,22 @@ A shared Skill describes a procedure that different agents can understand, such 
 
 The market is currently a local catalog shipped with the application. You can import, preview, add and share `.toolhub-skill.json` packages. Bundled packages cover media processing, image conversion/OCR, PDF text/OCR, document conversion, archive extraction and CSV checks. There is no account system, paid content or automatic dependency installation. A separate [public extension catalog](https://github.com/xiyuxiao1314/ToolHub-Extensions) supports browsing/filtering packages before explicit import.
 
-The current beta.6 release is an extension workbench. Tools, programs, artifacts, environments, Skills, the capability market and tasks are seven default-enabled official feature extensions, with install, disable, uninstall, local edits and rollback. User data survives removal. Independent v2 packages add navigation and isolated HTML/CSS/JavaScript pages, or change theme, layout and density. Agent connectivity, permissions and recovery stay in the kernel. See [extension contracts and development](docs/development/EXTENSIONS.md).
+The current beta.13 release is an extension workbench. Tools, programs, artifacts, environments, Skills, the capability market, tasks and service monitoring are eight default-enabled official feature extensions, with install, disable, uninstall, local edits and rollback. User data survives removal. Independent v2 packages add navigation and isolated HTML/CSS/JavaScript pages, or change theme, layout and density. Agent connectivity, permissions and recovery stay in the kernel. See [extension contracts and development](docs/development/EXTENSIONS.md).
 
-The extension workbench is included in the beta.6 release. Frontend plugins use a limited SDK without direct program launch or file cleanup. Arbitrary native/background plugin runtimes are not supported.
+The extension workbench is included in the beta.13 release. Frontend plugins use a limited SDK without direct program launch or file cleanup. Arbitrary native/background plugin runtimes are not supported.
 
 The development gateway defaults to five search summaries and loads full details on demand. Daily Agent instructions are separated from setup and advanced reference material. See [MCP context footprint](docs/development/MCP-CONTEXT.md) for measurements and limits.
 
 ## Downloads and platform support
 
-The current open-source preview is **v0.3.0-beta.6**. Download files from the Assets section of [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.6).
+The current open-source preview is **v0.3.0-beta.13**. Download files from the Assets section of [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.13).
 
 | Your system | Recommended download | Notes |
 | --- | --- | --- |
-| Windows 10 / 11, 64-bit | `ToolHub-v0.3.0-beta.6-windows-x64.zip` | Desktop, CLI, daemon and capability packages; native maintainer-host verification |
-| Mac, Apple Silicon (M series) | `ToolHub-v0.3.0-beta.6-macos-arm64.dmg` | macOS 13+; preview support; ZIP also available |
-| Mac, Intel | `ToolHub-v0.3.0-beta.6-macos-x64.dmg` | macOS 13+; preview support; ZIP also available |
-| CLI / MCP only | `ToolHub-CLI-v0.3.0-beta.6-<platform>.zip` | CLI and paired daemon; no desktop approval interface |
+| Windows 10 / 11, 64-bit | `ToolHub-v0.3.0-beta.13-windows-x64.zip` | Desktop, CLI, daemon and capability packages; native maintainer-host verification |
+| Mac, Apple Silicon (M series) | `ToolHub-v0.3.0-beta.13-macos-arm64.dmg` | macOS 13+; preview support; ZIP also available |
+| Mac, Intel | `ToolHub-v0.3.0-beta.13-macos-x64.dmg` | macOS 13+; preview support; ZIP also available |
+| CLI / MCP only | `ToolHub-CLI-v0.3.0-beta.13-<platform>.zip` | CLI and paired daemon; no desktop approval interface |
 | Independent extensions and source | [ToolHub-Extensions Releases](https://github.com/xiyuxiao1314/ToolHub-Extensions/releases) | Design Studio, FFmpeg, themes and pages are published separately; review source before importing |
 | Checksums | `SHA256SUMS.txt` | Compare SHA-256 values to check download integrity |
 
@@ -245,7 +250,7 @@ VS Code uses a `servers` structure; its template is available in the desktop int
 
 [toolhub-integration/SKILL.md](skills/toolhub-integration/SKILL.md) contains general integration instructions. Hosts with Skill support can install it in their own Skill directory; other hosts can use it as task instructions. Fill in your local installation path and ask the agent to search for tools or resolve capabilities, inspect actual instances, and use them under its permissions. After creating an application, it should submit a pending launch entry.
 
-The gateway exposes 16 fixed meta-tools rather than a separate MCP tool for every installed application:
+The gateway exposes 19 fixed meta-tools rather than a separate MCP tool for every installed application:
 
 | Purpose | MCP tools |
 | --- | --- |
@@ -254,6 +259,8 @@ The gateway exposes 16 fixed meta-tools rather than a separate MCP tool for ever
 | Background tasks | `get_task`, `cancel_task` |
 | Portable Skills | `search_skills`, `inspect_skill` |
 | Task artifacts | `register_artifact_package`, `list_artifact_packages`, `complete_artifact_package`, `review_artifact_package` |
+| Optional Skill distribution | `offer_skill_sync` |
+| Service observation (Windows) | `register_service`, `list_services` |
 | Project applications | `propose_program`, `search_programs` |
 
 Host names and historical observations are for display and do not grant execution permissions. `propose_program` only submits a declaration; it does not add, launch or trust a program. Sharing program information with an agent does not authorize its execution.
@@ -341,7 +348,7 @@ scripts/                 Local installation, verification and native release pac
 docs/                    Design, implementation notes and historical development/verification records
 ```
 
-The [system design](docs/design/TOOLHUB_SYSTEM_DESIGN.md) describes the full product direction, including goals not yet implemented. This README and the [release notes](docs/releases/v0.3.0-beta.6.md) describe the current feature set. Linked design and release documents are currently in Chinese or mixed languages.
+The [system design](docs/design/TOOLHUB_SYSTEM_DESIGN.md) describes the full product direction, including goals not yet implemented. This README and the [release notes](docs/releases/v0.3.0-beta.13.md) describe the current feature set. Linked design and release documents are currently in Chinese or mixed languages.
 
 ## Known limitations and next steps
 
@@ -367,6 +374,6 @@ The [FFmpeg media workshop](extensions/examples/ffmpeg.toolhub-extension.json) a
 
 Project dependency discovery: [Electron adapter](docs/development/PROJECT_DEPENDENCIES.md) (beta.6).
 
-### Skill collection and distribution (local beta.10)
+### Skill collection and distribution
 
 Install a Skill in its original host first, then optionally collect and distribute its complete folder through ToolHub. Track source revisions, individual destinations and history; new hosts can receive selected existing packages. Preserve local edits and distinguish file delivery from actual host loading. See [the detailed guide (Chinese)](docs/development/SKILL-DISTRIBUTION.md).

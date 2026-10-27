@@ -15,13 +15,17 @@ description: 需要本机 CLI、运行环境或媒体/文档工具时，查询 T
 
 ## Skill 安装后的可选同步
 
-为用户安装 Skill 时，先按当前宿主规则安装并验证成功，再用 offer_skill_sync 提交实际目录与 source_agent（宿主标识）。只询问一次是否通过 ToolHub 同步到其他智能体；没有答复继续原任务，不轮询等待。提交不写其他宿主，用户在 Skill 库核对通用性并选择目标后才下发。宿主专属能力不能跨宿主分发。按需读取 [Skill 同步](references/skills.md)。
+为用户安装 Skill 时，先按当前宿主规则安装并验证成功，再用 offer_skill_sync 提交实际目录与 source_agent（宿主标识）。提交后提醒用户到 ToolHub 的“已安装 / 待同步”自行选择；不自动打开或操作界面，不替用户选择目标，不等待确认。提交不写其他宿主，用户在 Skill 库核对通用性并选择目标后才下发。宿主专属能力不能跨宿主分发。按需读取 [Skill 同步](references/skills.md)。
 
 ## 执行与提交
 
 核对任务、工具、参数数组和 cwd 后 execute_tool；自动批准默认开启，以实际返回为准。approved 立即用完全相同的参数及凭证继续，pending 才等待桌面确认。不能绕过 denied、未知/阻止工具、宿主权限或无效凭证；检查 isError、status、exit_code。详细审批和后台任务按需读 [执行](references/execution.md)，不无限轮询。macOS 暂不支持受控执行/审批。
 
 完成并验证用户应用后，propose_program 只提交待确认元数据；用户勾选保存才收录，不自动启动。入口位于持久目录。需要参数示例时读 [程序入口](references/programs.md)。普通 Agent 不能伪造桌面选择或直接改 SQLite。
+
+## 长期服务
+
+为用户启动网页、模型等长期服务后，可用 register_service 登记实际 pid、项目目录和名称；代理 kind=proxy，仅供观察。登记不启动程序、不授予停止权限，不等待桌面确认。需要时 list_services 按需查询自己的状态，不轮询全库。详细流程见 [服务监控](references/services.md)。
 
 ## 产物管理
 

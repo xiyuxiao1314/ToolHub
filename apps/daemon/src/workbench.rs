@@ -20,6 +20,7 @@ impl DaemonService {
         let packages = catalog()?;
         let tx = self.registry.db.conn.transaction().map_err(sql_err)?;
         for p in packages {
+            if p.host_module.as_deref()==Some("services") && !cfg!(windows) {continue;}
             p.validate().map_err(|e| invalid(&e))?;
             let bytes = serde_json::to_vec(&p).map_err(json_err)?;
             use sha2::Digest;
@@ -52,7 +53,7 @@ impl DaemonService {
             .any(|(p, _, _)| p.host_module.as_deref() == Some(module)))
     }
     pub(super) fn require_feature(&self, method: &str) -> Result<(), ProtocolError> {
-        let module = if method.starts_with("program.") {
+        let module = if method.starts_with("service.") { Some("services") } else if method.starts_with("program.") {
             Some("programs")
         } else if method.starts_with("artifact.") {
             Some("artifacts")
@@ -300,7 +301,7 @@ mod tests {
                 .as_array()
                 .unwrap()
                 .len(),
-            7
+            if cfg!(windows) {8} else {7}
         );
         let file = dir.path().join(if cfg!(windows) {
             "start.cmd"

@@ -126,3 +126,8 @@ MCP search_tools, search_skills and search_programs default to five summary rows
 ## Skill distribution (beta.10)
 
 `skill.offer` accepts an existing absolute installed Skill directory, source_agent and optional version/source_url; returns a nonblocking offer ID, never target writes. MCP exposes it as `offer_skill_sync` (17 meta-tools total). Controller-only `skill.distribution.list/discover/preview/collect/sync/target/target_remove/dismiss` are bounded and reject unknown fields. Mutations require the current revision, collection and deployment require expected_digest. No force, script execution, host configuration changes or trust elevation. Search/inspect expose only portable collected packages; undeclared dependencies remain workflow_only.
+
+
+## Service monitor (beta.12)
+
+Owner-selected observation covers ToolHub launches, explicit Agent PID registrations and user-selected proxy ports only. Ordinary registration grants no execution/control authority. Process control and runtime deadlines require the verified desktop; isolated extension frames have no stop bridge. Native identity/job handles prevent PID/name-based bulk termination; proxy services remain read-only. Disable/uninstall/daemon restart cancels deadlines without killing processes. No proxy setting, tool trust or user file modification. See [service monitor](docs/development/SERVICE-MONITOR.md) for contracts, bounded observations, keeper lifecycle and Windows-only limitations.

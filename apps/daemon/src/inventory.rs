@@ -18,7 +18,20 @@ impl DaemonService {
                 }
             }
         }
-        rows.sort_by(|a, b| a.name.cmp(&b.name).then(a.path.cmp(&b.path)));
+        let registry=self.extension_capabilities()?;
+        let resolve_prefs=self.resolver_preferences(p)?;
+        let mut groups:BTreeMap<String,Vec<CandidateInstance>>=BTreeMap::new();
+        for row in &rows {if row.status=="available" && Path::new(&row.path).is_file() {
+            groups.entry(row.definition_id.clone()).or_default().push(CandidateInstance{instance_id:row.id.clone(),definition_id:row.definition_id.clone(),name:row.name.clone(),version:row.version.clone(),path:row.path.clone(),environment:row.environment_id.clone(),trust:parse_trust(&row.trust),arch:row.arch.clone(),cwd_match:false});
+        }}
+        let mut recommended=std::collections::BTreeSet::new();
+        for (definition,candidates) in groups {
+            if let Some(cap)=self.registry.capabilities_for_definition(&definition).map_err(db_err)?.first().and_then(|v|toolhub_core::CapabilityId::new(v).ok()) {
+                let requirement=toolhub_core::CapabilityRequirement{capability:cap,version:None,optional:false};
+                if let Some(selected)=toolhub_resolver::resolve(&registry,&requirement,candidates,&resolve_prefs).selected {recommended.insert(selected.instance_id);}
+            }
+        }
+        rows.sort_by(|a,b|a.name.cmp(&b.name).then_with(||recommended.contains(&b.id).cmp(&recommended.contains(&a.id))).then(a.path.cmp(&b.path)));
         let prefs = self
             .registry
             .get_setting("preferred_instances")
@@ -39,12 +52,14 @@ impl DaemonService {
                 .map_err(db_err)?;
             let mut value = json!(row);
             value["capabilities"] = json!(caps);
+            value["recommended"] = json!(recommended.contains(&row.id));
+            value["trust_status"] = json!(parse_trust(&row.trust));
             value["preferred"] = json!(
                 prefs.get(&row.definition_id).and_then(Value::as_str) == Some(row.id.as_str())
             );
             value["health"] = health.get(&row.id).cloned().unwrap_or(Value::Null);
             if p["detail"] == "summary" {
-                value = json!({"id":row.id,"definition_id":row.definition_id,"name":row.name,"version":row.version,"capabilities":caps,"preferred":value["preferred"],"status":row.status});
+                value = json!({"id":row.id,"definition_id":row.definition_id,"name":row.name,"version":row.version,"capabilities":caps,"preferred":value["preferred"],"status":row.status,"trust_status":value["trust_status"],"recommended":value["recommended"],"execution_authority":false});
             }
             result.push(value);
         }

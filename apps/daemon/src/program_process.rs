@@ -48,6 +48,15 @@ pub(super) fn spawn_helper(
     entry: &ProgramEntry,
     terminal: bool,
 ) -> Result<u32, String> {
+    spawn_helper_job(data, entry, terminal, None)
+}
+
+pub(super) fn spawn_helper_job(
+    data: &str,
+    entry: &ProgramEntry,
+    terminal: bool,
+    job: Option<windows_sys::Win32::Foundation::HANDLE>,
+) -> Result<u32, String> {
     let c = &entry.candidate;
     let direct = c.kind == "file"
         && Path::new(&c.path)
@@ -101,6 +110,47 @@ pub(super) fn spawn_helper(
         } else {
             CREATE_NO_WINDOW
         };
+    let mut attribute_size = 0usize;
+    let mut attributes = Vec::<usize>::new();
+    let mut startup_ex: STARTUPINFOEXW = unsafe { std::mem::zeroed() };
+    struct AttributeGuard(LPPROC_THREAD_ATTRIBUTE_LIST);
+    impl Drop for AttributeGuard {
+        fn drop(&mut self) {
+            unsafe {
+                DeleteProcThreadAttributeList(self.0);
+            }
+        }
+    }
+    let mut guard = None;
+    let mut job_handle = job.unwrap_or(std::ptr::null_mut());
+    if job.is_some() {
+        unsafe {
+            InitializeProcThreadAttributeList(std::ptr::null_mut(), 1, 0, &mut attribute_size);
+            if attribute_size == 0 || attribute_size > 65536 {
+                return Err("进程组属性不可用".into());
+            }
+            attributes.resize(attribute_size.div_ceil(std::mem::size_of::<usize>()), 0);
+            let list = attributes.as_mut_ptr().cast();
+            if InitializeProcThreadAttributeList(list, 1, 0, &mut attribute_size) == 0 {
+                return Err(std::io::Error::last_os_error().to_string());
+            }
+            guard = Some(AttributeGuard(list));
+            if UpdateProcThreadAttribute(
+                list,
+                0,
+                PROC_THREAD_ATTRIBUTE_JOB_LIST as usize,
+                (&mut job_handle as *mut windows_sys::Win32::Foundation::HANDLE).cast(),
+                std::mem::size_of_val(&job_handle),
+                std::ptr::null_mut(),
+                std::ptr::null(),
+            ) == 0
+            {
+                return Err(std::io::Error::last_os_error().to_string());
+            }
+            startup_ex.StartupInfo.cb = std::mem::size_of::<STARTUPINFOEXW>() as u32;
+            startup_ex.lpAttributeList = list;
+        }
+    }
     let startup = STARTUPINFOW {
         cb: std::mem::size_of::<STARTUPINFOW>() as u32,
         ..Default::default()
@@ -114,10 +164,19 @@ pub(super) fn spawn_helper(
             std::ptr::null(),
             std::ptr::null(),
             0,
-            flags,
+            flags
+                | if job.is_some() {
+                    EXTENDED_STARTUPINFO_PRESENT
+                } else {
+                    0
+                },
             env.as_ptr().cast(),
             cwd.as_ptr(),
-            &startup,
+            if job.is_some() {
+                &startup_ex.StartupInfo
+            } else {
+                &startup
+            },
             &mut process,
         )
     };
@@ -128,6 +187,7 @@ pub(super) fn spawn_helper(
         CloseHandle(process.hThread);
         CloseHandle(process.hProcess);
     }
+    drop(guard);
     Ok(process.dwProcessId)
 }
 

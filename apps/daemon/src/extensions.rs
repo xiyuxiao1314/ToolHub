@@ -351,6 +351,7 @@ impl DaemonService {
             }
             "extension.remove" => {
                 self.check_workbench_dependents(id)?;
+                if old.0.host_module.as_deref() == Some("services") { self.pause_service_timers()?; }
                 if old.0.host_module.as_deref() == Some("artifacts") {
                     self.pause_artifact_extension()?;
                 }
@@ -392,6 +393,7 @@ impl DaemonService {
         old: Option<&StoredPackage>,
         state_only: bool,
     ) -> Result<(), ProtocolError> {
+        if p.host_module.as_deref() == Some("services") && !enabled { self.pause_service_timers()?; }
         if p.host_module.as_deref() == Some("artifacts") && !enabled {
             self.pause_artifact_extension()?;
         }
