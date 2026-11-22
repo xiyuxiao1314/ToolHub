@@ -38,7 +38,7 @@ pub fn current_target(
         return None;
     }
     if !in_versions && !in_bin {
-        // A retained portable entry follows only a strictly newer installed build.
+        // A portable alias follows the selected equal-or-newer installed build.
         // A new portable build must not silently fall back to an older installation.
         use std::io::Read;
         let mut bytes = Vec::new();
@@ -54,7 +54,7 @@ pub fn current_target(
         let version = package["version"].as_str()?;
         let version = version.strip_prefix("toolhub ").unwrap_or(version);
         if crate::version::compare_versions(version, env!("CARGO_PKG_VERSION")).ok()?
-            != std::cmp::Ordering::Greater
+            == std::cmp::Ordering::Less
         {
             return None;
         }
@@ -216,7 +216,7 @@ pub fn forward_if_needed() -> Result<Option<i32>, String> {
 mod tests {
     use super::*;
     #[test]
-    fn portable_entries_follow_newer_installs_but_never_older_equal_or_escaping_targets() {
+    fn portable_entries_follow_selected_equal_or_newer_installs_without_downgrade() {
         let root = std::env::temp_dir().join(format!("toolhub-portable-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(root.join("versions/active")).unwrap();
         fs::create_dir_all(root.join("portable")).unwrap();
@@ -227,7 +227,7 @@ mod tests {
         let current = serde_json::json!({"cli":active});
         let metadata = active.parent().unwrap().join("package.json");
         assert!(current_target(&portable, &root, &current).is_none());
-        for version in ["0.3.0-beta.13", env!("CARGO_PKG_VERSION"), "invalid"] {
+        for version in ["0.3.0-beta.13", "invalid"] {
             fs::write(
                 &metadata,
                 serde_json::to_vec(&serde_json::json!({"version":version})).unwrap(),
@@ -235,6 +235,15 @@ mod tests {
             .unwrap();
             assert!(current_target(&portable, &root, &current).is_none());
         }
+        fs::write(
+            &metadata,
+            serde_json::to_vec(&serde_json::json!({"version":env!("CARGO_PKG_VERSION")})).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            current_target(&portable, &root, &current),
+            Some(active.canonicalize().unwrap())
+        );
         fs::write(&metadata, br#"{"version":"toolhub 99.0.0"}"#).unwrap();
         assert_eq!(
             current_target(&portable, &root, &current),
