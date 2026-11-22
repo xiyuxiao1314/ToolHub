@@ -26,8 +26,9 @@ try{
  await card.getByRole('button',{name:'预览版',exact:true}).click()
  await page.waitForFunction(async()=>(await window.__TAURI_INTERNALS__.invoke('updater_status')).preview)
  await card.getByRole('button',{name:'检查更新',exact:true}).click()
- await page.waitForFunction(async()=>!['checking','idle'].includes((await window.__TAURI_INTERNALS__.invoke('updater_status')).phase),null,{timeout:65000})
- const checked=await native('updater_status');results.push({test:'real-public-release-check',phase:checked.phase,error:checked.error})
+ let checked;const deadline=Date.now()+65000
+ do{checked=await native('updater_status');if(['current','available','error'].includes(checked.phase))break;await new Promise(resolve=>setTimeout(resolve,150))}while(Date.now()<deadline)
+ results.push({test:'real-public-release-check',phase:checked.phase,error:checked.error})
  assert(['current','available','error'].includes(checked.phase))
  assert(!checked.available_version||checked.available_version!==initial.current_version)
  await assert.rejects(native('updater_install'),/隔离实例/)
