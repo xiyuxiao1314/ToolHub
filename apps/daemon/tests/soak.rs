@@ -11,19 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 fn toolhubd_bin() -> String {
-    std::env::var("TOOLHUBD_BIN").unwrap_or_else(|_| {
-        let mut p = std::env::current_exe().unwrap();
-        p.pop();
-        if p.ends_with("deps") {
-            p.pop();
-        }
-        p.push(if cfg!(windows) {
-            "toolhubd.exe"
-        } else {
-            "toolhubd"
-        });
-        p.to_string_lossy().to_string()
-    })
+    std::env::var("TOOLHUBD_BIN").unwrap_or_else(|_| env!("CARGO_BIN_EXE_toolhubd").to_string())
 }
 
 fn fixture_root(dir: &std::path::Path) -> String {

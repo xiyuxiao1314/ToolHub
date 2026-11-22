@@ -51,6 +51,9 @@ jobs:
       - name: Release build
         run: cargo build --release -p toolhub-cli -p toolhub-daemon -p toolhub-desktop -p toolhub-updater --locked
       - name: Native checks
+        env:
+          TOOLHUB_BIN: ${{ github.workspace }}/target/release/toolhub${{ runner.os == 'Windows' && '.exe' || '' }}
+          TOOLHUBD_BIN: ${{ github.workspace }}/target/release/toolhubd${{ runner.os == 'Windows' && '.exe' || '' }}
         run: cargo test --release --workspace --locked -- --test-threads=1
       - name: TypeScript SDK
         run: node --test packages/sdk-typescript/test/client.test.js

@@ -13,12 +13,13 @@ fn binary(name: &str) -> std::path::PathBuf {
     if let Some(path) = std::env::var_os(variable) {
         return path.into();
     }
-    let exe = std::env::current_exe().unwrap();
-    let mut dir = exe.parent().unwrap();
-    if dir.ends_with("deps") {
-        dir = dir.parent().unwrap();
+    // Cargo provides the real binary location; test executables may be relocated.
+    // https://doc.rust-lang.org/cargo/reference/environment-variables.html
+    let cli = std::path::PathBuf::from(env!("CARGO_BIN_EXE_toolhub"));
+    if name == "toolhub" {
+        return cli;
     }
-    dir.join(if cfg!(windows) {
+    cli.parent().unwrap().join(if cfg!(windows) {
         format!("{name}.exe")
     } else {
         name.into()
@@ -311,10 +312,22 @@ fn all_meta_tools_route_through_isolated_daemon_and_preserve_authority() {
         true,
     );
     // Metadata offers neither distribute to another host nor grant service control.
-    call_tool(&mut client, "offer_skill_sync", json!({"path":task_root.join("absent-skill"),"source_agent":"conformance"}), true);
+    call_tool(
+        &mut client,
+        "offer_skill_sync",
+        json!({"path":task_root.join("absent-skill"),"source_agent":"conformance"}),
+        true,
+    );
     let services = call_tool(&mut client, "list_services", json!({}), !cfg!(windows));
-    if cfg!(windows) { assert_eq!(services["total"], 0); }
-    call_tool(&mut client, "register_service", json!({"name":"Invalid PID fixture","pid":4294967294u32,"project_dir":task_root}), true);
+    if cfg!(windows) {
+        assert_eq!(services["total"], 0);
+    }
+    call_tool(
+        &mut client,
+        "register_service",
+        json!({"name":"Invalid PID fixture","pid":4294967294u32,"project_dir":task_root}),
+        true,
+    );
     let package = call_tool(
         &mut client,
         "register_artifact_package",

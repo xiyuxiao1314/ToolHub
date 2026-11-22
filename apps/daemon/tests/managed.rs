@@ -5,9 +5,19 @@ use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 use toolhub_ipc::{read_response, write_frame, LocalStream, RpcClient};
 fn binary(name: &str) -> std::path::PathBuf {
-    let exe = std::env::current_exe().unwrap();
-    let dir = exe.parent().unwrap().parent().unwrap();
-    dir.join(if cfg!(windows) {
+    let variable = if name == "toolhubd" {
+        "TOOLHUBD_BIN"
+    } else {
+        "TOOLHUB_BIN"
+    };
+    if let Some(path) = std::env::var_os(variable) {
+        return path.into();
+    }
+    let daemon = std::path::PathBuf::from(env!("CARGO_BIN_EXE_toolhubd"));
+    if name == "toolhubd" {
+        return daemon;
+    }
+    daemon.parent().unwrap().join(if cfg!(windows) {
         format!("{name}.exe")
     } else {
         name.into()
