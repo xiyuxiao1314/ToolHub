@@ -132,13 +132,17 @@ fn main() -> anyhow::Result<()> {
         None
     };
     let service = Arc::new(Mutex::new(DaemonService::open(&registry_path())?));
+    let arguments:Vec<_>=std::env::args().collect();
+    if let Some(index)=arguments.iter().position(|v|v=="--update-probation"){service.lock().unwrap().update_probation(arguments.get(index+1).ok_or_else(||anyhow::anyhow!("missing update nonce"))?).map_err(anyhow::Error::msg)?;}
     service.lock().unwrap().artifact_recover_interrupted()?;
     if listen {
         let owned = Arc::clone(&service);
         std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_secs(10));
-            if let Err(error) = owned.lock().unwrap().service_monitor_tick() { tracing::warn!(code=?error.code,"Service monitor tick failed"); }
-            if let Err(error) = owned.lock().unwrap().artifact_cleanup_tick() {
+            let mut service=owned.lock().unwrap();
+            if service.update_busy() {continue}
+            if let Err(error) = service.service_monitor_tick() { tracing::warn!(code=?error.code,"Service monitor tick failed"); }
+            if let Err(error) = service.artifact_cleanup_tick() {
                 tracing::warn!(code=?error.code,"Artifact cleanup tick failed");
             }
         });
@@ -221,6 +225,7 @@ fn listen_loop(service: Arc<Mutex<DaemonService>>) -> anyhow::Result<()> {
                     if toolhub_ipc::write_response_frame(&mut stream, &response).is_err() {
                         break;
                     }
+                    if response.error.is_none() && serde_json::from_slice::<serde_json::Value>(&bytes).ok().is_some_and(|v|v["method"]=="update.commit") && service.lock().unwrap().shutdown_for_update {std::process::exit(0)}
                 }
             }
         });

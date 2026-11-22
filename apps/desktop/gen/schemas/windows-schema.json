@@ -363,6 +363,42 @@
           "markdownDescription": "Enables the tool_file_icon command without any pre-configured scope."
         },
         {
+          "description": "Enables the updater_cancel command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-updater-cancel",
+          "markdownDescription": "Enables the updater_cancel command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the updater_check command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-updater-check",
+          "markdownDescription": "Enables the updater_check command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the updater_download command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-updater-download",
+          "markdownDescription": "Enables the updater_download command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the updater_install command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-updater-install",
+          "markdownDescription": "Enables the updater_install command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the updater_preferences command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-updater-preferences",
+          "markdownDescription": "Enables the updater_preferences command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the updater_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-updater-status",
+          "markdownDescription": "Enables the updater_status command without any pre-configured scope."
+        },
+        {
           "description": "Denies the agent_integration command without any pre-configured scope.",
           "type": "string",
           "const": "deny-agent-integration",
@@ -547,6 +583,42 @@
           "type": "string",
           "const": "deny-tool-file-icon",
           "markdownDescription": "Denies the tool_file_icon command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the updater_cancel command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-updater-cancel",
+          "markdownDescription": "Denies the updater_cancel command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the updater_check command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-updater-check",
+          "markdownDescription": "Denies the updater_check command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the updater_download command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-updater-download",
+          "markdownDescription": "Denies the updater_download command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the updater_install command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-updater-install",
+          "markdownDescription": "Denies the updater_install command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the updater_preferences command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-updater-preferences",
+          "markdownDescription": "Denies the updater_preferences command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the updater_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-updater-status",
+          "markdownDescription": "Denies the updater_status command without any pre-configured scope."
         },
         {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",

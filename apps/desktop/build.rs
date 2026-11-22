@@ -4,6 +4,13 @@ fn main() {
             "open_service_page",
             "rpc",
             "app_versions",
+            "updater_status",
+            "updater_preferences",
+            "updater_check",
+            "updater_download",
+            "updater_cancel",
+            "updater_install",
+
             "autostart_status",
             "autostart_set",
             "agent_integration",

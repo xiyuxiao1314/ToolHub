@@ -54,7 +54,12 @@ use toolhub_resolver::{CandidateInstance, ResolvePrefs};
 #[path = "services.rs"]
 pub(crate) mod services;
 
+#[path = "update_gate.rs"]
+mod update_gate;
 pub struct DaemonService {
+    update_lease: Option<update_gate::Lease>,
+    pub shutdown_for_update: bool,
+    update_boot_nonce: Option<String>,
     pub registry: Registry,
     pub policy: PolicyEngine,
     pub sessions: Vec<DiscoverySession>,
@@ -131,6 +136,9 @@ impl DaemonService {
             .join("toolhub-resources");
         let resources = toolhub_recognizer::resources::ResourceStore::open(&resource_dir)?;
         let mut service = Self {
+            update_lease: None,
+            shutdown_for_update: false,
+            update_boot_nonce: None,
             registry,
             policy,
             sessions,
@@ -188,6 +196,13 @@ impl DaemonService {
                 req.id.clone(),
                 &ProtocolError::new(ErrorCode::InvalidParams, "named object params required"),
             );
+        }
+        if let Err(error)=self.update_access(&req.method) {return error_response(req.id.clone(),&error)}
+        if req.method.starts_with("update.") {
+            return match self.update_action(&req.method,&req.params) {
+                Ok(result)=>JsonRpcResponse{jsonrpc:"2.0".into(),id:req.id.clone(),result:Some(result),error:None},
+                Err(error)=>error_response(req.id.clone(),&error),
+            };
         }
         if let Err(error) = self.refresh_authority() {
             return error_response(req.id.clone(), &error);

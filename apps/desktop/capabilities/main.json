@@ -37,6 +37,12 @@
     "allow-extension-view-url",
     "allow-extension-export-text",
     "allow-pick-cli-path",
-    "allow-extension-repository"
+    "allow-extension-repository",
+    "allow-updater-status",
+    "allow-updater-preferences",
+    "allow-updater-check",
+    "allow-updater-download",
+    "allow-updater-cancel",
+    "allow-updater-install"
   ]
 }

@@ -59,6 +59,14 @@ try {
     Copy-Item -LiteralPath $configPath -Destination (Join-Path $versionPath 'codex-config.before.toml')
     [IO.File]::WriteAllText($configPath,$newConfig,[Text.UTF8Encoding]::new($false))
   }
+  $stableRoot=Join-Path $installationRoot 'bin'
+  New-Item -ItemType Directory -Path $stableRoot -Force | Out-Null
+  if ((Get-Item -LiteralPath $stableRoot).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Stable CLI folder cannot be a reparse point' }
+  $stableCli=Join-Path $stableRoot 'toolhub.exe'
+  if (-not(Test-Path -LiteralPath $stableCli)) {
+    Copy-Item -LiteralPath $cliPath -Destination $stableCli
+    @{schema='toolhub.forwarder/v1';sha256=(Get-FileHash -LiteralPath $stableCli -Algorithm SHA256).Hash.ToLowerInvariant()} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $stableRoot 'launcher.json') -Encoding utf8NoBOM
+  }
   $shortcutPath = Join-Path ([Environment]::GetFolderPath('Desktop')) 'ToolHub.lnk'
   if (Test-Path -LiteralPath $shortcutPath) { Copy-Item -LiteralPath $shortcutPath -Destination (Join-Path $versionPath 'shortcut.before.lnk') }
   $shellObject = New-Object -ComObject WScript.Shell

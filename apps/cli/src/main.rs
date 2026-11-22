@@ -215,6 +215,7 @@ enum McpCmd {
 }
 
 fn main() {
+    match toolhub_core::install_redirect::forward_if_needed(){Ok(Some(code))=>std::process::exit(code),Err(error)=>{eprintln!("ToolHub: {error}");std::process::exit(1)},_=>{}}
     let cli = Cli::parse();
     if let Err(e) = run(&cli) {
         let msg = e.to_string();

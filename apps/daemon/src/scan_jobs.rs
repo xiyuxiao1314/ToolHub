@@ -38,6 +38,7 @@ impl DaemonService {
         principal: &str,
         controller: bool,
     ) -> Result<PreparedScan, JsonRpcResponse> {
+        self.update_access(&req.method).map_err(|e|error_response(req.id.clone(),&e))?;
         let previous = self.connection_principal.replace(principal.into());
         let old = std::mem::replace(&mut self.controller_verified, controller);
         let result = toolhub_protocol::validate_method_params(req)

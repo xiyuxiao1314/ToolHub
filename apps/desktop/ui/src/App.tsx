@@ -9,9 +9,10 @@ import Navigation from './workbench/WorkbenchNavigation'
 import ExtensionApplications from './workbench/ExtensionApplications'
 import NavIcon from './workbench/NavIcon'
 import { GROUPS, groupFor, groupItems, isApplication, readNavigationPrefs, writeNavigationPrefs, type GroupId } from './workbench/navigation'
+import {UpdateProvider,UpdateNotice} from './UpdateSetting'
 import './workbench/workbench.css'
 
-export default function App() {
+function WorkbenchApp() {
   const host = useExtensionHost()
   const workbench = useWorkbench(host.enabled, host.nav)
   const { page, setPage, toast, setToast, notify, inventoryCounts, error, contentRef } = workbench
@@ -71,6 +72,7 @@ export default function App() {
         <div className="workspace-location"><NavIcon id={group} size={16}/><span>{currentGroup.label}</span><span className="location-divider">/</span><strong>{item?.label || '正在加载'}</strong></div>
         <div className="workspace-bar-actions"><button className="secondary-toggle" aria-label={preferences.collapsed ? '展开二级导航' : '收起二级导航'} aria-controls="secondary-navigation" aria-expanded={!preferences.collapsed} onClick={() => setPreferences(previous => ({ ...previous, collapsed: !previous.collapsed }))}><NavIcon id="collapse" size={17}/><span>{preferences.collapsed ? '展开导航' : '收起导航'}</span></button><span className="workspace-local"><i/>本机工作台</span></div>
       </header>
+      <UpdateNotice open={()=>navigate('settings')}/>
       <section className="content" ref={contentRef} aria-label="页面内容" tabIndex={-1}>
         {(host.error || error) && <div className="banner-error" role="alert"><span>{host.error || error}</span><button className="btn" onClick={() => { void host.reload(); void workbench.load() }}>重试连接</button></div>}
         {!host.ready ? <div className="card card-pad">正在加载扩展工作台…</div>
@@ -85,3 +87,5 @@ export default function App() {
     </main>
   </div>
 }
+
+export default function App(){return <UpdateProvider><WorkbenchApp/></UpdateProvider>}

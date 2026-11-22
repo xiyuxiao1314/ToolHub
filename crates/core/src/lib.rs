@@ -4,6 +4,7 @@
 //! environments, ownership evidence, trust, and execution identity.
 //! Numeric confidence is never execution authority.
 
+pub mod install_redirect;
 pub mod service_url;
 pub mod artifact;
 pub mod capability;

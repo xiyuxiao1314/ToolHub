@@ -49,7 +49,7 @@ jobs:
           npm ci --prefix apps/desktop/ui
           npm run build --prefix apps/desktop/ui
       - name: Release build
-        run: cargo build --release -p toolhub-cli -p toolhub-daemon -p toolhub-desktop --locked
+        run: cargo build --release -p toolhub-cli -p toolhub-daemon -p toolhub-desktop -p toolhub-updater --locked
       - name: Native checks
         run: cargo test --release --workspace --locked -- --test-threads=1
       - name: TypeScript SDK
@@ -60,6 +60,20 @@ jobs:
           node --experimental-strip-types scripts/ui-evidence/test-extension-storage.mjs
       - name: Package
         run: python scripts/package-release.py --platform ${{ matrix.platform }}
+      - name: Sign update metadata
+        env:
+          TOOLHUB_UPDATE_SIGNING_KEY: ${{ secrets.TOOLHUB_UPDATE_SIGNING_KEY }}
+          TOOLHUB_UPDATE_PLATFORM: ${{ matrix.platform }}
+        shell: pwsh
+        run: |
+          if ($env:TOOLHUB_UPDATE_SIGNING_KEY) {
+            $signer = if ($IsWindows) { './target/release/toolhub-update-sign.exe' } else { './target/release/toolhub-update-sign' }
+            $manifest = './dist/release/' + $env:TOOLHUB_UPDATE_PLATFORM + '/ToolHub-update-' + $env:TOOLHUB_UPDATE_PLATFORM + '.json'
+            & $signer $manifest ($manifest + '.sig')
+            if ($LASTEXITCODE -ne 0) { throw 'Update signing failed' }
+            & $signer verify $manifest ($manifest + '.sig')
+            if ($LASTEXITCODE -ne 0) { throw 'Update signature verification failed' }
+          } else { Write-Warning 'Update signing key is not configured; these artifacts cannot be published as an in-app update.' }
       - name: Verify distributable contents
         run: python scripts/verify-release.py --platform ${{ matrix.platform }}
       - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
@@ -77,5 +91,7 @@ jobs:
             dist/release/${{ matrix.platform }}/*.zip
             dist/release/${{ matrix.platform }}/*.dmg
             dist/release/${{ matrix.platform }}/verification.json
+            dist/release/${{ matrix.platform }}/ToolHub-update-*.json
+            dist/release/${{ matrix.platform }}/ToolHub-update-*.json.sig
           if-no-files-found: error
           retention-days: 14

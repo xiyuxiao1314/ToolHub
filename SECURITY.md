@@ -84,3 +84,8 @@ The actual Windows system curl path, native product identity, trusted Microsoft 
 ## Service monitor (beta.12)
 
 Owner-selected observation covers ToolHub launches, explicit Agent PID registrations and user-selected proxy ports only. Ordinary registration grants no execution/control authority. Process control and runtime deadlines require the verified desktop; isolated extension frames have no stop bridge. Native identity/job handles prevent PID/name-based bulk termination; proxy services remain read-only. Disable/uninstall/daemon restart cancels deadlines without killing processes. No proxy setting, tool trust or user file modification. See [service monitor](docs/development/SERVICE-MONITOR.md) for contracts, bounded observations, keeper lifecycle and Windows-only limitations.
+
+
+## Desktop update maintenance (beta.14)
+
+`update.prepare`, `update.cancel`, `update.commit`, and `update.finish` are verified-desktop-controller-only RPCs, not MCP tools. Preparation atomically refuses active execution, scan and Agent jobs and opens a 120-second owner/token lease that blocks new work. Commit rechecks and exits only the daemon, after its successful reply; registered service keepers continue. A newly started update daemon holds a short probation gate until the paired desktop completes its private startup handshake. Expired leases release the gate. Extensions and ordinary Agent peers cannot request maintenance or replace application code. Signed whole-distribution validation, activation snapshots and rollback are described in [UPDATES.md](docs/development/UPDATES.md).

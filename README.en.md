@@ -10,7 +10,7 @@
     <img alt="Beta status" src="https://img.shields.io/badge/status-beta-orange" />
   </p>
   <p><a href="README.md">简体中文</a> | <strong>English</strong></p>
-  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.13">Download v0.3.0-beta.13</a> · <a href="#screenshots">Screenshots</a> · <a href="#connect-an-ai-agent">Agent setup</a> · <a href="#build-from-source">Build from source</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">Report an issue</a></p>
+  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.14">Download v0.3.0-beta.14</a> · <a href="#screenshots">Screenshots</a> · <a href="#connect-an-ai-agent">Agent setup</a> · <a href="#build-from-source">Build from source</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">Report an issue</a></p>
 </div>
 
 [![M8ven Score](https://m8ven.ai/badge/mcp/xiyuxiao1314-toolhub-q0hzms?v=605fc85d6d6538d906e384fc8a7e66c1)](https://m8ven.ai/mcp/xiyuxiao1314-toolhub-q0hzms?s=readme)
@@ -67,11 +67,15 @@ Group temporary files, test records and backups by task, decide retention by pri
 
 ### Extension workbench
 
-Eight optional first-party features plus independently imported pages and themes. These screenshots are from an isolated v0.3.0-beta.3 Windows acceptance instance; these workbench features are included in the current beta.13 release.
+Eight optional first-party features plus independently imported pages and themes. These screenshots are from an isolated v0.3.0-beta.3 Windows acceptance instance; these workbench features are included in the current beta.14 release.
 
 ![Extension workbench: first-party feature lifecycle and appearance recovery](docs/images/extension-workbench.png)
 
 ![Graphite theme with top navigation and compact density](docs/images/extension-theme.png)
+
+## beta.14 updates
+
+Adds startup update checks, stable/preview channels, cancellable downloads, signed whole-distribution verification and explicit install/restart with maintenance and startup recovery. Older builds need one manual bootstrap. See [release notes](docs/releases/v0.3.0-beta.14.md).
 
 ## beta.13 updates
 
@@ -133,7 +137,7 @@ A shared Skill describes a procedure that different agents can understand, such 
 
 The market is currently a local catalog shipped with the application. You can import, preview, add and share `.toolhub-skill.json` packages. Bundled packages cover media processing, image conversion/OCR, PDF text/OCR, document conversion, archive extraction and CSV checks. There is no account system, paid content or automatic dependency installation. A separate [public extension catalog](https://github.com/xiyuxiao1314/ToolHub-Extensions) supports browsing/filtering packages before explicit import.
 
-The current beta.13 release is an extension workbench. Tools, programs, artifacts, environments, Skills, the capability market, tasks and service monitoring are eight default-enabled official feature extensions, with install, disable, uninstall, local edits and rollback. User data survives removal. Independent v2 packages add navigation and isolated HTML/CSS/JavaScript pages, or change theme, layout and density. Agent connectivity, permissions and recovery stay in the kernel. See [extension contracts and development](docs/development/EXTENSIONS.md).
+The current beta.14 release is an extension workbench. Tools, programs, artifacts, environments, Skills, the capability market, tasks and service monitoring are eight default-enabled official feature extensions, with install, disable, uninstall, local edits and rollback. User data survives removal. Independent v2 packages add navigation and isolated HTML/CSS/JavaScript pages, or change theme, layout and density. Agent connectivity, permissions and recovery stay in the kernel. See [extension contracts and development](docs/development/EXTENSIONS.md).
 
 The extension workbench is included in the beta.13 release. Frontend plugins use a limited SDK without direct program launch or file cleanup. Arbitrary native/background plugin runtimes are not supported.
 
@@ -141,14 +145,14 @@ The development gateway defaults to five search summaries and loads full details
 
 ## Downloads and platform support
 
-The current open-source preview is **v0.3.0-beta.13**. Download files from the Assets section of [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.13).
+The current open-source preview is **v0.3.0-beta.14**. Download files from the Assets section of [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.14).
 
 | Your system | Recommended download | Notes |
 | --- | --- | --- |
-| Windows 10 / 11, 64-bit | `ToolHub-v0.3.0-beta.13-windows-x64.zip` | Desktop, CLI, daemon and capability packages; native maintainer-host verification |
-| Mac, Apple Silicon (M series) | `ToolHub-v0.3.0-beta.13-macos-arm64.dmg` | macOS 13+; preview support; ZIP also available |
-| Mac, Intel | `ToolHub-v0.3.0-beta.13-macos-x64.dmg` | macOS 13+; preview support; ZIP also available |
-| CLI / MCP only | `ToolHub-CLI-v0.3.0-beta.13-<platform>.zip` | CLI and paired daemon; no desktop approval interface |
+| Windows 10 / 11, 64-bit | `ToolHub-v0.3.0-beta.14-windows-x64.zip` | Desktop, CLI, daemon and capability packages; native maintainer-host verification |
+| Mac, Apple Silicon (M series) | `ToolHub-v0.3.0-beta.14-macos-arm64.dmg` | macOS 13+; preview support; ZIP also available |
+| Mac, Intel | `ToolHub-v0.3.0-beta.14-macos-x64.dmg` | macOS 13+; preview support; ZIP also available |
+| CLI / MCP only | `ToolHub-CLI-v0.3.0-beta.14-<platform>.zip` | CLI and paired daemon; no desktop approval interface |
 | Independent extensions and source | [ToolHub-Extensions Releases](https://github.com/xiyuxiao1314/ToolHub-Extensions/releases) | Design Studio, FFmpeg, themes and pages are published separately; review source before importing |
 | Checksums | `SHA256SUMS.txt` | Compare SHA-256 values to check download integrity |
 
@@ -377,3 +381,12 @@ Project dependency discovery: [Electron adapter](docs/development/PROJECT_DEPEND
 ### Skill collection and distribution
 
 Install a Skill in its original host first, then optionally collect and distribute its complete folder through ToolHub. Track source revisions, individual destinations and history; new hosts can receive selected existing packages. Preserve local edits and distinguish file delivery from actual host loading. See [the detailed guide (Chinese)](docs/development/SKILL-DISTRIBUTION.md).
+
+
+### In-app updates (beta.14)
+
+Open **Settings → Software updates** to check, download, cancel, and install/restart. Startup checks are enabled by default and can be disabled. Stable and preview channels are available; checking never restarts the app automatically.
+
+The updater verifies Ed25519 signatures, platform/version compatibility and SHA-256 before replacing the complete desktop/CLI/daemon/resource distribution. Active jobs block installation; existing services and user records are preserved. A failed startup handoff attempts to restore the previous installation. Windows uses per-user version directories.
+
+Users of beta.13 and earlier need one manual bootstrap installation. Publishers must upload signed update metadata. Windows and macOS implementations are included; native macOS updating still needs platform validation. See [update mechanics and publisher setup (Chinese)](docs/development/UPDATES.md).

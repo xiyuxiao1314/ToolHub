@@ -3,6 +3,7 @@ import ToolsList from '../ToolsList'
 import ToolIcon from '../ToolIcon'
 import AgentHelp from '../AgentHelp'
 import StartupSetting from '../StartupSetting'
+import UpdateSetting from '../UpdateSetting'
 import ManagedTasks from '../ManagedTasks'
 import type { WorkbenchContext, UiPrefs } from './Workbench'
 import { KIND_LABEL, TRUST_LABEL, listFrom, toolKindCount, asRecord, parseMaybeJson, trustLevel, trustLabel, formatTs, toolTags, tagClass, StatusBadge } from './Workbench'
@@ -181,6 +182,7 @@ export default function SettingsPage(props: WorkbenchContext) {
               </div>
 
               <aside>
+                <UpdateSetting/>
                 <div className="card card-pad" style={{ marginBottom: 16 }}>
                   <h3 style={{ marginTop: 0 }}>当前配置摘要</h3>
                   <div className="kv">

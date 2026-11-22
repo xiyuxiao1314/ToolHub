@@ -1,0 +1,28 @@
+# 应用内更新
+
+beta.14 增加设置中的软件更新卡片：手动检查、稳定/预览通道、启动时检查开关、下载进度与取消、安装并重启。自动检查默认开启、每六小时最多一次；只访问公开的 ToolHub GitHub Releases。自动检查不代表自动安装。此前没有更新入口的 beta.13 用户需要手动安装一次带该功能的版本。
+
+## 分发契约
+
+更新整个桌面 ZIP：桌面程序、CLI、daemon、内置扩展/Skill 和资源必须配对。每个平台附 `ToolHub-update-<platform>.json` 和同名 `.sig`。清单 schema 为 `toolhub.desktop-update/v1`，字段 version、min_current、platform、url、size、sha256；签名为原始 UTF-8 清单字节的 Ed25519 签名，用 128 位十六进制字符编码。公钥编译进应用，私钥不进入源码和安装包。
+
+只接受官方仓库的精确版本 ZIP 地址和 HTTPS GitHub 发行 CDN 重定向；验证签名、严格版本递增、最低兼容版本、平台、文件长度和完整 SHA-256。分段下载四路并行、256 KiB 一块，单请求有界超时，可取消；不接受任意地址。解压从已复核的同一份内存字节完成，最多 6000 个条目、256 MiB 压缩包和 1 GiB 展开内容；拒绝链接、设备、绝对/父级路径、重复路径、Windows 特殊名字和不匹配的二进制架构。真实 CLI 版本也在交接前校验。
+
+## 安装与恢复
+
+所有更新操作仅对主窗口开放，不增加 MCP 工具或扩展 SDK 权限。安装前由已验证桌面申请 120 秒维护会话；正在执行的任务、扫描或 Agent 操作会阻止安装。会话与调用者绑定，拒绝新任务进入；控制器提交后后台只退出自身。已登记服务的进程组守护继续运行。
+
+Windows 使用新的当前用户版本目录，不覆盖运行中的文件；助手基于原程序复制并校验。系统自带 Windows PowerShell 5.1 完成激活，不依赖用户另装 PowerShell 7。迁移 ToolHub 自己的快捷方式、已存在且属于 ToolHub 的登录任务，以及明确指向旧 ToolHub CLI 的已知宿主配置；其他内容保留。每次尝试独立保存可恢复的激活快照。稳定 CLI 位于 `%LOCALAPPDATA%\ToolHub\bin\toolhub.exe`，有内容摘要标记；旧版目录中的 beta.14+ CLI/桌面也会转发到当前版本。旧 MCP 会话需要在宿主中重新连接，新的会话使用稳定入口。
+
+macOS 在当前 `.app` 的可写父目录中准备完整新包，校验 codesign 后交换应用，保留旧 `.app`。从只读 DMG 或无写权限的位置启动时需先移到可写应用目录。原生实现需要 Mac CI/实体机验收；Windows 测试不代表 Mac 已验收。
+
+新 daemon 在临时启动保护状态下拒绝任务启动；助手只持有自己启动的新应用和 daemon。新窗口和服务完成握手后提交更新，再允许工作。提交之前失败会结束这两个新进程、恢复旧激活信息并重开旧版本；从不按进程名结束服务。提交以后不自动终止新版本。更新结果保存在当前用户的 `ToolHub/updates/last-result.json`，可在设置中查看。
+
+## 发布者操作
+
+1. 持久保存与 `resources/updater-public-key.hex` 对应的私钥。当前开发机的种子存于 `%LOCALAPPDATA%\ToolHub\release-signing\update-key.dpapi`，只可由当前 Windows 用户解密；不要把它上传到仓库或日志。加密文件也需要独立妥善备份，换电脑不能直接当作可解密的原始种子。
+2. 发布构建时，将 32 字节种子的十六进制值作为仓库 Actions secret `TOOLHUB_UPDATE_SIGNING_KEY`，仅注入签名步骤。本版使用维护者本机签名：下载对应精确源码的三平台 CI 清单，核对安装包摘要，再逐平台执行 `scripts/sign-update-local.ps1 -Platform <platform>`，只上传公开清单与签名。Actions Secret 未配置，CI 会明确警告；将来若需 CI 签名，须另行授权私钥的远程托管。
+3. 原生三平台构建/测试/包校验通过后，签名工具输出 `.sig`；`toolhub-update-sign verify MANIFEST SIGNATURE` 再核对签名。没有私钥时只能产生普通下载包和未签名清单，不能把它声称为可用的应用内更新。
+4. 同一个正式 Release 必须一起上传平台 ZIP、清单、签名及校验清单；清单描述的是完整桌面 ZIP，不是 CLI-only ZIP。检查当前版本向新版本的真实升级与失败恢复后再公开。首次 beta.14 是更新功能的引导版本，最低兼容版本为 beta.14。
+
+签名仅证明发布来源与内容一致，不是病毒扫描或功能正确性证明。GitHub API 限流、网络错误或签名缺失会显示可重试状态；失败不以外部下载页冒充已安装。

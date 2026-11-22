@@ -11,7 +11,7 @@ use windows::Win32::System::TaskScheduler::*;
 use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 use windows::Win32::System::Variant::VARIANT;
 
-const MARKER: &str = "ToolHub current-user login startup v1";
+pub(crate) const MARKER: &str = "ToolHub current-user login startup v1";
 const ARGUMENTS: &str = "--autostart";
 const DELAY: &str = "PT15S";
 

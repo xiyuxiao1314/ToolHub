@@ -10,7 +10,7 @@
     <img alt="Status beta" src="https://img.shields.io/badge/status-beta-orange" />
   </p>
   <p><strong>简体中文</strong> | <a href="README.en.md">English</a></p>
-  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.13">下载 v0.3.0-beta.13</a> · <a href="#界面预览">界面预览</a> · <a href="#接入-ai-agent">Agent 接入</a> · <a href="#从源码构建">源码构建</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">反馈问题</a></p>
+  <p><a href="https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.14">下载 v0.3.0-beta.14</a> · <a href="#界面预览">界面预览</a> · <a href="#接入-ai-agent">Agent 接入</a> · <a href="#从源码构建">源码构建</a> · <a href="https://github.com/xiyuxiao1314/ToolHub/issues">反馈问题</a></p>
 </div>
 
 [![M8ven Score](https://m8ven.ai/badge/mcp/xiyuxiao1314-toolhub-q0hzms?v=605fc85d6d6538d906e384fc8a7e66c1)](https://m8ven.ai/mcp/xiyuxiao1314-toolhub-q0hzms?s=readme)
@@ -59,7 +59,7 @@ ToolHub 使用已有工具，工具发现不依赖 AI 服务；它不会自动�
 
 ### 扩展工作台
 
-八个官方功能可独立装卸；第三方包可新增导航、交互页和主题。本节截图来自 v0.3.0-beta.3 Windows 独立验收实例；这些扩展工作台能力已包含在当前 beta.13 发布中。
+八个官方功能可独立装卸；第三方包可新增导航、交互页和主题。本节截图来自 v0.3.0-beta.3 Windows 独立验收实例；这些扩展工作台能力已包含在当前 beta.14 发布中。
 
 ![扩展工作台：官方模块、安装管理和界面恢复](docs/images/extension-workbench.png)
 
@@ -72,6 +72,10 @@ ToolHub 使用已有工具，工具发现不依赖 AI 服务；它不会自动�
 ![设计台：组合、实时预览与平台参数](docs/images/design-studio.png)
 
 19 个 MCP 工具现已全部提供四项行为标注，协议测试使用独立注册表逐项调用。查询会保存 Agent 最近活动时间，因此采用保守的非严格只读标记；详见 [MCP 行为标注与外部报告说明](docs/development/MCP-ANNOTATIONS.md)。
+
+## beta.14 更新
+
+新增设置中的软件更新：自动检查、稳定/预览通道、下载与取消、签名校验、安装并重启，以及维护与启动失败恢复。旧版需手动安装一次引导版本。详见 [版本说明](docs/releases/v0.3.0-beta.14.md) 和 [更新机制](docs/development/UPDATES.md)。
 
 ## beta.13 更新
 
@@ -142,7 +146,7 @@ Windows 的“自动批准工具执行”默认开启：已信任且策略允许
 
 市场当前是随应用发布的本地能力包目录，可导入、预览、收录和分享 `.toolhub-skill.json`。内置包涉及媒体压缩/探测、音频提取、图片转换、PDF 文本/OCR、文档转换、归档解压和 CSV 数据检查。应用内没有账号、付费内容或自动安装依赖；另有公开的 [扩展目录](https://github.com/xiyuxiao1314/ToolHub-Extensions)，支持浏览筛选后明确导入。
 
-当前 beta.13 已采用扩展工作台架构：工具、程序、产物、环境、Skill、市场和任务成为默认启用的八个官方功能扩展，可安装、停用、卸载、编辑和回滚；卸载保留用户数据。独立 v2 包可以增加导航和 HTML/CSS/JavaScript 页面，也可以更换主题、导航布局和密度。智能体接入、权限和恢复入口保留在核心。参见 [扩展开发与使用说明](docs/development/EXTENSIONS.md)。
+当前 beta.14 已采用扩展工作台架构：工具、程序、产物、环境、Skill、市场和任务成为默认启用的八个官方功能扩展，可安装、停用、卸载、编辑和回滚；卸载保留用户数据。独立 v2 包可以增加导航和 HTML/CSS/JavaScript 页面，也可以更换主题、导航布局和密度。智能体接入、权限和恢复入口保留在核心。参见 [扩展开发与使用说明](docs/development/EXTENSIONS.md)。
 
 扩展架构已随 beta.6 发布。第三方页面使用受限 SDK，不能直接启动程序或清理文件，任意本机后台插件尚不支持。
 
@@ -150,14 +154,14 @@ Agent 上下文也已优化：MCP 搜索默认返回 5 条摘要，完整信息�
 
 ## 下载与平台支持
 
-当前开源预览版为 **v0.3.0-beta.13**。所有文件在 [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.13) 的 Assets 中下载。
+当前开源预览版为 **v0.3.0-beta.14**。所有文件在 [GitHub Releases](https://github.com/xiyuxiao1314/ToolHub/releases/tag/v0.3.0-beta.14) 的 Assets 中下载。
 
 | 你的系统 | 推荐下载 | 说明 |
 | --- | --- | --- |
-| Windows 10 / 11，64 位 | `ToolHub-v0.3.0-beta.13-windows-x64.zip` | 桌面、CLI、daemon 和能力包；本机原生验证 |
-| Mac，Apple Silicon（M 系列） | `ToolHub-v0.3.0-beta.13-macos-arm64.dmg` | macOS 13+；预览支持，另附 ZIP |
-| Mac，Intel | `ToolHub-v0.3.0-beta.13-macos-x64.dmg` | macOS 13+；预览支持，另附 ZIP |
-| 只需 CLI / MCP 服务 | `ToolHub-CLI-v0.3.0-beta.13-<平台>.zip` | 包含 CLI 和配对 daemon，不含桌面审批界面 |
+| Windows 10 / 11，64 位 | `ToolHub-v0.3.0-beta.14-windows-x64.zip` | 桌面、CLI、daemon 和能力包；本机原生验证 |
+| Mac，Apple Silicon（M 系列） | `ToolHub-v0.3.0-beta.14-macos-arm64.dmg` | macOS 13+；预览支持，另附 ZIP |
+| Mac，Intel | `ToolHub-v0.3.0-beta.14-macos-x64.dmg` | macOS 13+；预览支持，另附 ZIP |
+| 只需 CLI / MCP 服务 | `ToolHub-CLI-v0.3.0-beta.14-<平台>.zip` | 包含 CLI 和配对 daemon，不含桌面审批界面 |
 | 独立扩展与源码 | [ToolHub-Extensions Releases](https://github.com/xiyuxiao1314/ToolHub-Extensions/releases) | 设计台、FFmpeg、主题与页面包单独发布，安装前可审阅源码 |
 | 校验文件 | `SHA256SUMS.txt` | 对照 SHA-256 检查下载文件完整性 |
 
@@ -361,7 +365,7 @@ docs/                 系统设计、实现说明、历史开发与验证记录
 
 ## 已知限制与后续方向
 
-这是 beta 预览版，跨宿主实际兼容性和 macOS 桌面交互仍需更多用户反馈。没有自动更新、在线能力包索引或已签名的安装程序；不会自动解决缺失依赖。宿主检测只读取已知用户配置位置，项目覆盖、远程 MCP 和自定义路径可能需要手动确认。
+这是 beta 预览版，跨宿主实际兼容性和 macOS 桌面交互仍需更多用户反馈。应用内更新从 beta.14 开始提供，需要发布者提供签名清单；没有在线能力包索引或操作系统签名的安装程序，不会自动解决缺失依赖。宿主检测只读取已知用户配置位置，项目覆盖、远程 MCP 和自定义路径可能需要手动确认。
 
 后续重点是扩展工作台的 macOS 原生验收与功能对齐、发布签名、更明确的工具能力与依赖诊断、能力包版本与来源管理。欢迎贡献更多本机工具识别规则、可复用 Skill 和真实宿主兼容性结果。
 
@@ -387,3 +391,12 @@ ToolHub 源码以 [MIT License](LICENSE) 开源。第三方依赖保持各自许
 ### Skill 收录与分发（本地 beta.10）
 
 当前 Agent 先完成安装，ToolHub 再提供可选同步。记录来源、版本、分发目标与结果；新安装的智能体可从已有 Skill 中选择补发。支持完整目录、按需依赖检查和本地修改冲突保护，详见 [使用说明](docs/development/SKILL-DISTRIBUTION.md)。
+
+
+### 应用内更新（beta.14）
+
+在“设置 → 软件更新”中检查版本、下载更新、取消下载，验证完成后点击“安装并重启”。启动时自动检查默认开启，也可关闭；支持稳定版和预览版通道。自动检查不会自动重启。
+
+更新使用官方 GitHub Release 的完整桌面包，校验 Ed25519 签名、平台、版本和 SHA-256，桌面、CLI、后台服务与内置资源一起更新。运行中的任务会阻止安装，已有服务和用户库保留；新版本启动交接失败时尝试恢复旧版本。Windows 使用当前用户的版本目录，无需管理员安装。
+
+beta.13 及更早版本需要先手动安装一次带更新入口的版本。此功能需要发布者上传签名更新元数据；当前源码包含 Windows 和 macOS 实现，macOS 原生更新尚需验收。详细机制和发布者配置见 [应用内更新](docs/development/UPDATES.md)。

@@ -5,7 +5,9 @@ use std::path::Path;
 const SKILL: &str = include_str!("../../../skills/toolhub-integration/SKILL.md");
 
 fn connection_info(cli: &Path) -> Result<Value, String> {
-    let cli_path = cli.to_str().ok_or("CLI 路径包含无法表示的字符")?;
+    let stable=toolhub_core::install_redirect::stable_cli();
+    let command=stable.as_deref().unwrap_or(cli);
+    let cli_path = command.to_str().ok_or("CLI 路径包含无法表示的字符")?;
     let config = json!({"mcpServers":{"toolhub":{"command":cli_path,"args":["mcp","serve"]}}});
     let config_text = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
     let mimo_config = serde_json::to_string_pretty(&json!({"mcp":{"toolhub":{"type":"local","command":[cli_path,"mcp","serve"],"enabled":true}}})).map_err(|e|e.to_string())?;

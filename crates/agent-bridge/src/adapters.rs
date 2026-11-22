@@ -23,6 +23,9 @@ pub struct AgentRuntime {
     operations: std::collections::BTreeMap<String, std::sync::Arc<std::sync::Mutex<RunningAgent>>>,
 }
 impl AgentRuntime {
+    pub fn has_running(&self) -> bool {
+        self.operations.values().any(|state| state.lock().map_or(true,|s|s.operation.state=="running"))
+    }
     pub fn new() -> Self {
         Self::default()
     }

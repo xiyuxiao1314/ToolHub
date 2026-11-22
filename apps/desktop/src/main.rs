@@ -1,5 +1,6 @@
 //! Native desktop bridge to the authenticated shared user service.
 #![cfg_attr(windows, windows_subsystem = "windows")]
+mod updater;
 mod service_page;
 use service_page::open_service_page;
 mod autostart;
@@ -252,13 +253,17 @@ fn open_recycle_bin() -> Result<(), String> {
     Ok(())
 }
 fn main() {
+    if let Some(code)=updater::helper_main(){std::process::exit(code)}
+    match toolhub_core::install_redirect::forward_if_needed(){Ok(Some(code))=>std::process::exit(code),Err(error)=>eprintln!("ToolHub: {error}"),_=>{}}
     let login_launch = std::env::args_os().any(|arg| arg == "--autostart");
     if login_launch {
         startup_diagnostics::record("process_started", None);
     }
     let result = tauri::Builder::default()
         .manage(FrameServer::default())
+        .manage(updater::Updates::default())
         .setup(move |_app| {
+            updater::boot_health().map_err(std::io::Error::other)?;
             if login_launch {
                 startup_diagnostics::record("window_created", None);
             }
@@ -267,6 +272,13 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             rpc,
             app_versions,
+            updater::updater_status,
+            updater::updater_preferences,
+            updater::updater_check,
+            updater::updater_download,
+            updater::updater_cancel,
+            updater::updater_install,
+
             autostart_status,
             autostart_set,
             agent_integration,
