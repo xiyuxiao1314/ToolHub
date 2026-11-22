@@ -364,6 +364,13 @@ fn sanitized_command(executable: &Path) -> Command {
         .stderr(Stdio::null());
     for key in [
         "SystemRoot",
+        "SystemDrive",
+        "ProgramData",
+        "ALLUSERSPROFILE",
+        "ProgramFiles",
+        "ProgramFiles(x86)",
+        "CommonProgramFiles",
+        "CommonProgramFiles(x86)",
         "WINDIR",
         "USERPROFILE",
         "HOME",
