@@ -20,9 +20,6 @@ pub fn current_target(
     let versions = root.join("versions");
     let in_versions = exe.starts_with(&versions);
     let in_bin = name == "toolhub.exe" && exe.parent() == Some(root.join("bin").as_path());
-    if !in_versions && !in_bin {
-        return None;
-    }
     let target = PathBuf::from(
         current[if name == "toolhub.exe" {
             "cli"
@@ -39,6 +36,28 @@ pub fn current_target(
         || !target.is_file()
     {
         return None;
+    }
+    if !in_versions && !in_bin {
+        // A retained portable entry follows only a strictly newer installed build.
+        // A new portable build must not silently fall back to an older installation.
+        use std::io::Read;
+        let mut bytes = Vec::new();
+        fs::File::open(target.parent()?.join("package.json"))
+            .ok()?
+            .take(8193)
+            .read_to_end(&mut bytes)
+            .ok()?;
+        if bytes.len() > 8192 {
+            return None;
+        }
+        let package: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+        let version = package["version"].as_str()?;
+        let version = version.strip_prefix("toolhub ").unwrap_or(version);
+        if crate::version::compare_versions(version, env!("CARGO_PKG_VERSION")).ok()?
+            != std::cmp::Ordering::Greater
+        {
+            return None;
+        }
     }
     Some(target)
 }
@@ -137,6 +156,40 @@ pub fn forward_if_needed() -> Result<Option<i32>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn portable_entries_follow_newer_installs_but_never_older_equal_or_escaping_targets() {
+        let root = std::env::temp_dir().join(format!("toolhub-portable-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(root.join("versions/active")).unwrap();
+        fs::create_dir_all(root.join("portable")).unwrap();
+        let portable = root.join("portable/toolhub.exe");
+        let active = root.join("versions/active/toolhub.exe");
+        fs::write(&portable, b"fixture").unwrap();
+        fs::write(&active, b"fixture").unwrap();
+        let current = serde_json::json!({"cli":active});
+        let metadata = active.parent().unwrap().join("package.json");
+        assert!(current_target(&portable, &root, &current).is_none());
+        for version in ["0.3.0-beta.13", env!("CARGO_PKG_VERSION"), "invalid"] {
+            fs::write(
+                &metadata,
+                serde_json::to_vec(&serde_json::json!({"version":version})).unwrap(),
+            )
+            .unwrap();
+            assert!(current_target(&portable, &root, &current).is_none());
+        }
+        fs::write(&metadata, br#"{"version":"toolhub 99.0.0"}"#).unwrap();
+        assert_eq!(
+            current_target(&portable, &root, &current),
+            Some(active.canonicalize().unwrap())
+        );
+        assert!(current_target(&portable, &root, &serde_json::json!({"cli":portable})).is_none());
+        let canonical = root.canonicalize().unwrap();
+        assert!(canonical
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .starts_with("toolhub-portable-"));
+        fs::remove_dir_all(canonical).unwrap();
+    }
     #[test]
     fn only_own_retained_versions_and_stable_cli_can_forward_inside_versions() {
         let root = std::env::temp_dir().join(format!("toolhub-redirect-{}", uuid::Uuid::new_v4()));

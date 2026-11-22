@@ -4,7 +4,7 @@ beta.14 增加设置中的软件更新卡片：手动检查、稳定/预览通�
 
 ## 分发契约
 
-更新整个桌面 ZIP：桌面程序、CLI、daemon、内置扩展/Skill 和资源必须配对。每个平台附 `ToolHub-update-<platform>.json` 和同名 `.sig`。清单 schema 为 `toolhub.desktop-update/v1`，字段 version、min_current、platform、url、size、sha256；签名为原始 UTF-8 清单字节的 Ed25519 签名，用 128 位十六进制字符编码。公钥编译进应用，私钥不进入源码和安装包。
+更新整个桌面 ZIP：桌面程序、CLI、daemon、内置扩展/Skill 和资源必须配对。每个平台附 `ToolHub-update-<platform>.json` 和同名 `.sig`。清单 schema 为 `toolhub.desktop-update/v1`，字段 version、min_current、platform、url、size、sha256；签名为原始 UTF-8 清单字节的 Ed25519 签名，用 128 个十六进制字符编码。公钥编译进应用，私钥不进入源码和安装包。
 
 只接受官方仓库的精确版本 ZIP 地址和 HTTPS GitHub 发行 CDN 重定向；验证签名、严格版本递增、最低兼容版本、平台、文件长度和完整 SHA-256。分段下载四路并行、256 KiB 一块，单请求有界超时，可取消；不接受任意地址。解压从已复核的同一份内存字节完成，最多 6000 个条目、256 MiB 压缩包和 1 GiB 展开内容；拒绝链接、设备、绝对/父级路径、重复路径、Windows 特殊名字和不匹配的二进制架构。真实 CLI 版本也在交接前校验。
 
@@ -12,7 +12,7 @@ beta.14 增加设置中的软件更新卡片：手动检查、稳定/预览通�
 
 所有更新操作仅对主窗口开放，不增加 MCP 工具或扩展 SDK 权限。安装前由已验证桌面申请 120 秒维护会话；正在执行的任务、扫描或 Agent 操作会阻止安装。会话与调用者绑定，拒绝新任务进入；控制器提交后后台只退出自身。已登记服务的进程组守护继续运行。
 
-Windows 使用新的当前用户版本目录，不覆盖运行中的文件；助手基于原程序复制并校验。系统自带 Windows PowerShell 5.1 完成激活，不依赖用户另装 PowerShell 7。迁移 ToolHub 自己的快捷方式、已存在且属于 ToolHub 的登录任务，以及明确指向旧 ToolHub CLI 的已知宿主配置；其他内容保留。每次尝试独立保存可恢复的激活快照。稳定 CLI 位于 `%LOCALAPPDATA%\ToolHub\bin\toolhub.exe`，有内容摘要标记；旧版目录中的 beta.14+ CLI/桌面也会转发到当前版本。旧 MCP 会话需要在宿主中重新连接，新的会话使用稳定入口。
+Windows 使用新的当前用户版本目录，不覆盖运行中的文件；助手基于原程序复制并校验。系统自带 Windows PowerShell 5.1 完成激活，不依赖用户另装 PowerShell 7。迁移 ToolHub 自己的快捷方式、已存在且属于 ToolHub 的登录任务，以及明确指向旧 ToolHub CLI 的已知宿主配置；其他内容保留。每次尝试独立保存可恢复的激活快照。稳定 CLI 位于 `%LOCALAPPDATA%\ToolHub\bin\toolhub.exe`，有内容摘要标记；旧版目录中的 beta.14+ CLI/桌面也会转发到当前版本。原便携目录的 beta.14+ 入口只在已激活的安装版本严格更新时跟随，避免下次从旧目录启动又回到旧版；较新便携构建不会转向较旧安装。旧 MCP 会话需要在宿主中重新连接，新的会话使用稳定入口。
 
 macOS 在当前 `.app` 的可写父目录中准备完整新包，校验 codesign 后交换应用，保留旧 `.app`。从只读 DMG 或无写权限的位置启动时需先移到可写应用目录。原生实现需要 Mac CI/实体机验收；Windows 测试不代表 Mac 已验收。
 
