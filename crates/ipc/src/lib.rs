@@ -6,6 +6,7 @@ use toolhub_protocol::{JsonRpcRequest, JsonRpcResponse, ProtocolError};
 #[cfg(windows)]
 mod background_child;
 mod client;
+mod install_context;
 mod platform;
 pub use client::RpcClient;
 pub use platform::*;

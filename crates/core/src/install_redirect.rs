@@ -61,6 +61,65 @@ pub fn current_target(
     }
     Some(target)
 }
+/// Select the current paired default-profile daemon, including equal-version reinstalls.
+pub fn current_service(
+    root: &Path,
+    current: &serde_json::Value,
+    name: &str,
+    minimum: &str,
+) -> Option<PathBuf> {
+    if !matches!(name, "toolhubd.exe" | "toolhubd") {
+        return None;
+    }
+    use std::io::Read;
+    let root = root.canonicalize().ok()?;
+    let versions = root.join("versions").canonicalize().ok()?;
+    let folder = PathBuf::from(current["path"].as_str()?)
+        .canonicalize()
+        .ok()?;
+    if !folder.starts_with(&versions) || folder == versions {
+        return None;
+    }
+    let suffix = if name.ends_with(".exe") { ".exe" } else { "" };
+    for (key, stem) in [("cli", "toolhub"), ("desktop", "toolhub-desktop")] {
+        let paired = PathBuf::from(current[key].as_str()?).canonicalize().ok()?;
+        if paired.parent() != Some(folder.as_path())
+            || paired.file_name()?.to_str() != Some(format!("{stem}{suffix}").as_str())
+            || !paired.is_file()
+        {
+            return None;
+        }
+    }
+    let mut bytes = Vec::new();
+    fs::File::open(folder.join("package.json"))
+        .ok()?
+        .take(8193)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    if bytes.len() > 8192 {
+        return None;
+    }
+    let package: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    if !matches!(
+        package["schema"].as_str(),
+        Some("toolhub.package/v1" | "toolhub.release/v1")
+    ) {
+        return None;
+    }
+    let version = package["version"].as_str()?;
+    let version = version.strip_prefix("toolhub ").unwrap_or(version);
+    if crate::version::compare_versions(version, minimum).ok()? == std::cmp::Ordering::Less {
+        return None;
+    }
+    let daemon = folder.join(name).canonicalize().ok()?;
+    if daemon.parent() != Some(folder.as_path())
+        || daemon.file_name()?.to_str() != Some(name)
+        || !daemon.is_file()
+    {
+        return None;
+    }
+    Some(daemon)
+}
 pub fn stable_cli() -> Option<PathBuf> {
     #[cfg(windows)]
     {

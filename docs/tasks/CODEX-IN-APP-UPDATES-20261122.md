@@ -6,3 +6,6 @@ Acceptance: verify signatures/URL/version/platform/size/digest; reject downgrade
 
 
 Owner follow-up authorizes publishing this version to GitHub with source and native packages. Use exact-revision native CI artifacts and locally sign each platform manifest. Automatic approval rejected exporting the signing seed into an Actions Secret; do not retry or upload the private seed. Local signature files are the approved safer distribution alternative. Publish only after native checks and archive verification; keep macOS real upgrade acceptance explicitly pending.
+
+
+Live validation reproduced a persistent beta.14 MCP client re-spawning its retained daemon during handoff, defeating new-image readiness. Keep the already-created beta.14 tag immutable and leave its release unpublished. Deliver beta.15 as the first public updater bootstrap: shared/exclusive startup exclusion, per-reconnect active daemon selection with paired path/version validation, isolation preservation and injected-launch regression tests. Existing legacy MCP processes need one bootstrap reconnect. No user RPC replay and no daemon identity checks are relaxed.

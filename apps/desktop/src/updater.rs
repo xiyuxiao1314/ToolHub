@@ -397,7 +397,8 @@ pub async fn updater_install(
     app: tauri::AppHandle,
     state: tauri::State<'_, Updates>,
 ) -> Result<()> {
-    if std::env::var_os("TOOLHUB_REGISTRY").is_some() {
+    if std::env::var_os("TOOLHUB_REGISTRY").is_some() || std::env::var_os("TOOLHUBD_BIN").is_some()
+    {
         return Err("隔离实例不可更新正式安装".into());
     }
     let owned = state.inner().clone();
@@ -690,7 +691,13 @@ fn apply(folder: &Path) -> Result<()> {
         .create(true)
         .open(root.join("install.lock"))
         .map_err(|e| e.to_string())?;
-    lock.try_lock().map_err(|_| "另一个更新正在安装")?;
+    let locking = Instant::now();
+    while lock.try_lock().is_err() {
+        if locking.elapsed() > Duration::from_secs(5) {
+            return Err("另一个更新或后台启动正在进行，请稍后重试".into());
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
     let this = std::env::current_exe().map_err(|e| e.to_string())?;
     if this.parent().and_then(|p| p.canonicalize().ok()).as_ref() != Some(&folder)
         || package::hash_file(&this)? != package::hash_file(&plan.source)?

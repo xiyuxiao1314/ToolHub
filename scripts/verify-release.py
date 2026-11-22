@@ -35,7 +35,7 @@ assert update['schema']=='toolhub.desktop-update/v1' and update['version']==vers
 assert update['size']==desktop.stat().st_size and update['sha256']==hashlib.sha256(desktop.read_bytes()).hexdigest()
 assert update['url']==f'https://github.com/xiyuxiao1314/ToolHub/releases/download/v{version}/{desktop.name}'
 
-assert update['min_current']=='0.3.0-beta.14'
+assert update['min_current']=='0.3.0-beta.15'
 report={'passed':True,'platform':opts.platform,'version':version,'archives':reports,'update_metadata_matches_archive':True}
 (folder/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
 print(json.dumps({'passed':True,'platform':opts.platform,'archives':len(archives),'update_metadata_matches_archive':True}))

@@ -15,7 +15,7 @@ try{
  const actual=(await native('rpc',{method:'status',params:{}})).registry_path
  assert.equal(path.resolve(actual).toLowerCase(),path.resolve(registry).toLowerCase())
  assert(!/[\\/]\.toolhub[\\/]registry\.sqlite$/i.test(actual),'Production registry is forbidden')
- const initial=await native('updater_status');assert.equal(initial.current_version,'0.3.0-beta.14');assert.equal(initial.auto_check,true)
+ const initial=await native('updater_status');assert.equal(initial.current_version,'0.3.0-beta.15');assert.equal(initial.auto_check,true)
  await page.getByRole('navigation',{name:'一级导航',exact:true}).getByRole('button',{name:'设置',exact:true}).click()
  const card=page.getByRole('region',{name:'软件更新'})
  await card.getByRole('button',{name:'检查更新',exact:true}).waitFor()

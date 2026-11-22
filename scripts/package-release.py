@@ -110,7 +110,7 @@ print(json.dumps({'version':version,'platform':opts.platform,'assets':[str(p) fo
 
 # Full-distribution update metadata: desktop, CLI, daemon and resources move together.
 desktop_archive=next(p for p in assets if p.name.startswith('ToolHub-v') and p.suffix=='.zip')
-update={'schema':'toolhub.desktop-update/v1','version':version,'min_current':'0.3.0-beta.14','platform':opts.platform,
+update={'schema':'toolhub.desktop-update/v1','version':version,'min_current':'0.3.0-beta.15','platform':opts.platform,
     'url':f'https://github.com/xiyuxiao1314/ToolHub/releases/download/v{version}/{desktop_archive.name}',
     'size':desktop_archive.stat().st_size,'sha256':hashlib.sha256(desktop_archive.read_bytes()).hexdigest()}
 (output/f'ToolHub-update-{opts.platform}.json').write_text(json.dumps(update,separators=(',',':'))+'\n',encoding='utf-8')
